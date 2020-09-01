@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Basic unit-level model</title>
+
+<script>// Hide empty <a> tag within highlighted CodeBlock for screen reader accessibility (see https://github.com/jgm/pandoc/issues/6352#issuecomment-626106786) -->
+// v0.0.1
+// Written by JooYoung Seo (jooyoung@psu.edu) and Atsushi Yasumoto on June 1st, 2020.
+
+document.addEventListener('DOMContentLoaded', function() {
+  const codeList = document.getElementsByClassName("sourceCode");
+  for (var i = 0; i < codeList.length; i++) {
+    var linkList = codeList[i].getElementsByTagName('a');
+    for (var j = 0; j < linkList.length; j++) {
+      if (linkList[j].innerHTML === "") {
+        linkList[j].setAttribute('aria-hidden', 'true');
+      }
+    }
+  }
+});
+</script>
+
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css" data-origin="pandoc">
+code.sourceCode > span { display: inline-block; line-height: 1.25; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode { white-space: pre; position: relative; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+code.sourceCode { white-space: pre-wrap; }
+code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    for (var j = 0; j < rules.length; j++) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") continue;
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') continue;
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Basic unit-level model</h1>
+
+
+
+<p>The basic area-level model <span class="citation">(Battese, Harter, and Fuller 1988; Rao and Molina 2015)</span> is given by <span class="math display">\[
+y_j = \beta&#39; x_j + v_{i[j]} + \epsilon_j\,,\\
+v_i \stackrel{\mathrm{iid}}{\sim} {\cal N}(0, \sigma_v^2) \qquad \epsilon_j \stackrel{\mathrm{iid}}{\sim} {\cal N}(0, \sigma^2)
+\]</span> where <span class="math inline">\(j\)</span> runs from 1 to <span class="math inline">\(n\)</span>, the number of unit-level observations, <span class="math inline">\(\beta\)</span> is a vector of regression coefficients for given covariates <span class="math inline">\(x_j\)</span>, and <span class="math inline">\(v_i\)</span> are random area intercepts.</p>
+<p>We use the <code>api</code> dataset included in packages survey.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1"></a><span class="kw">library</span>(survey)</span>
+<span id="cb1-2"><a href="#cb1-2"></a><span class="kw">data</span>(api)</span>
+<span id="cb1-3"><a href="#cb1-3"></a>apipop<span class="op">$</span>cname &lt;-<span class="st"> </span><span class="kw">as.factor</span>(apipop<span class="op">$</span>cname)</span>
+<span id="cb1-4"><a href="#cb1-4"></a>apisrs<span class="op">$</span>cname &lt;-<span class="st"> </span><span class="kw">factor</span>(apisrs<span class="op">$</span>cname, <span class="dt">levels=</span><span class="kw">levels</span>(apipop<span class="op">$</span>cname))</span></code></pre></div>
+<p>The <code>apipop</code> data frame contains the complete population whereas <code>apisrs</code> is a simple random sample from it. The variable <code>cname</code> is the county name, and we will be interested in estimation at the county level. Not all counties in the population are sampled. In order to be able to make predictions for out-of-sample areas we make sure that the levels of the sample’s <code>cname</code> variable match those of its population counterpart.</p>
+<p>The basic unit-level model with county random area effects is fit as follows</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1"></a><span class="kw">library</span>(mcmcsae)</span>
+<span id="cb2-2"><a href="#cb2-2"></a>mod &lt;-<span class="st"> </span>api00 <span class="op">~</span><span class="st"> </span></span>
+<span id="cb2-3"><a href="#cb2-3"></a><span class="st">  </span><span class="kw">reg</span>(<span class="op">~</span><span class="st"> </span>ell <span class="op">+</span><span class="st"> </span>meals <span class="op">+</span><span class="st"> </span>stype <span class="op">+</span><span class="st"> </span>hsg <span class="op">+</span><span class="st"> </span>col.grad <span class="op">+</span><span class="st"> </span>grad.sch, <span class="dt">name=</span><span class="st">&quot;beta&quot;</span>) <span class="op">+</span></span>
+<span id="cb2-4"><a href="#cb2-4"></a><span class="st">  </span><span class="kw">gen</span>(<span class="dt">factor =</span> <span class="op">~</span><span class="st"> </span><span class="kw">iid</span>(cname), <span class="dt">name=</span><span class="st">&quot;v&quot;</span>)</span>
+<span id="cb2-5"><a href="#cb2-5"></a>sampler &lt;-<span class="st"> </span><span class="kw">create_sampler</span>(mod, <span class="dt">data=</span>apisrs)</span>
+<span id="cb2-6"><a href="#cb2-6"></a>sim &lt;-<span class="st"> </span><span class="kw">MCMCsim</span>(sampler, <span class="dt">store.all=</span><span class="ot">TRUE</span>, <span class="dt">verbose=</span><span class="ot">FALSE</span>)</span>
+<span id="cb2-7"><a href="#cb2-7"></a>(<span class="kw">summary</span>(sim))</span></code></pre></div>
+<pre><code>## llh_ :
+##      Mean        SD   t-value      MCSE     q0.05      q0.5     q0.95     n_eff     R_hat 
+## -1089.645     4.435  -245.691     0.127 -1097.336 -1089.401 -1082.719  1229.010     1.000 
+## 
+## sigma_ :
+##     Mean       SD  t-value     MCSE    q0.05     q0.5    q0.95    n_eff    R_hat 
+## 5.62e+01 3.03e+00 1.85e+01 6.75e-02 5.14e+01 5.60e+01 6.14e+01 2.02e+03 1.00e+00 
+## 
+## beta :
+##                 Mean     SD t-value    MCSE   q0.05     q0.5    q0.95 n_eff R_hat
+## (Intercept)  802.149 25.125   31.93 0.55319  760.38  802.391 844.1195  2063 0.999
+## ell           -1.955  0.301   -6.49 0.00683   -2.44   -1.953  -1.4649  1942 1.000
+## meals         -1.959  0.279   -7.03 0.00593   -2.42   -1.958  -1.5001  2206 1.000
+## stypeH      -106.266 13.403   -7.93 0.26613 -127.99 -106.382 -83.2523  2537 1.002
+## stypeM       -59.989 11.417   -5.25 0.23423  -78.75  -60.083 -41.3575  2376 1.000
+## hsg           -0.619  0.411   -1.51 0.00812   -1.29   -0.620   0.0513  2559 1.001
+## col.grad       0.584  0.490    1.19 0.01133   -0.22    0.572   1.3960  1870 1.000
+## grad.sch       2.123  0.474    4.48 0.00898    1.33    2.130   2.8878  2790 1.000
+## 
+## v_sigma :
+##    Mean      SD t-value    MCSE   q0.05    q0.5   q0.95   n_eff   R_hat 
+##  22.971   6.403   3.587   0.208  13.314  22.504  33.958 945.927   1.002 
+## 
+## v :
+##                  Mean   SD   t-value  MCSE q0.05     q0.5  q0.95 n_eff R_hat
+## Alameda      -25.3376 15.5 -1.637917 0.397 -51.4 -24.9348 -0.833  1517     1
+## Amador         0.7307 24.5  0.029783 0.448 -38.4   0.5594 40.278  3000     1
+## Butte          0.0213 24.1  0.000884 0.475 -39.9   0.0545 39.696  2566     1
+## Calaveras      7.3363 22.1  0.332020 0.424 -27.5   6.6664 44.519  2721     1
+## Colusa        -0.1862 24.2 -0.007687 0.442 -40.3  -0.3438 38.628  3000     1
+## Contra Costa  -9.9189 15.3 -0.648433 0.344 -36.1  -8.9934 14.541  1976     1
+## Del Norte      0.9561 23.8  0.040149 0.440 -37.1   0.4333 41.074  2933     1
+## El Dorado     -0.3595 24.2 -0.014866 0.446 -40.5   0.3054 36.991  2937     1
+## Fresno         0.1117 15.3  0.007296 0.351 -25.3  -0.1095 25.895  1900     1
+## Glenn         -0.2126 23.4 -0.009070 0.433 -38.4   0.0831 38.587  2935     1
+## ... 47 elements suppressed ...</code></pre>
+<p>We want to estimate the area population means <span class="math display">\[
+\theta_i = \frac{1}{N_i}\sum_{j \in U_i} y_j\,,
+\]</span> where <span class="math inline">\(U_i\)</span> is the set of units in area <span class="math inline">\(i\)</span> of size <span class="math inline">\(N_i\)</span>. The MCMC output in variable <code>sim</code> can be used to obtain draws from the posterior distribution for <span class="math inline">\(\theta_i\)</span>. The <span class="math inline">\(r\)</span>th draw can be expressed as <span class="math display">\[
+\theta_{i;r} = \frac{1}{N_i} \left(n_i \bar{y}_i + \beta_r&#39;(t_{x;i} - n_i \bar{x}_i) + (N_i - n_i)v_{i;r} + \sum_{j \in U_i\setminus s_i} \epsilon_{j;r} \right)\,,
+\]</span> where <span class="math inline">\(\bar{y}_i\)</span> is the sample mean of <span class="math inline">\(y\)</span> in area <span class="math inline">\(i\)</span> and <span class="math inline">\(t_{x;i}\)</span> is a vector of population totals for area <span class="math inline">\(i\)</span>.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1"></a>N &lt;-<span class="st"> </span><span class="kw">table</span>(apipop<span class="op">$</span>cname)</span>
+<span id="cb4-2"><a href="#cb4-2"></a>samplesums &lt;-<span class="st"> </span><span class="kw">tapply</span>(apisrs<span class="op">$</span>api00, apisrs<span class="op">$</span>cname, sum)</span>
+<span id="cb4-3"><a href="#cb4-3"></a>samplesums[<span class="kw">is.na</span>(samplesums)] &lt;-<span class="st"> </span><span class="dv">0</span>  <span class="co"># substitute 0 for out-of-sample areas</span></span>
+<span id="cb4-4"><a href="#cb4-4"></a>m &lt;-<span class="st"> </span><span class="kw">match</span>(apisrs<span class="op">$</span>cds, apipop<span class="op">$</span>cds)  <span class="co"># population units in the sample</span></span>
+<span id="cb4-5"><a href="#cb4-5"></a>res &lt;-<span class="st"> </span><span class="kw">predict</span>(sim, <span class="dt">newdata=</span>apipop, <span class="dt">labels=</span><span class="kw">names</span>(N),</span>
+<span id="cb4-6"><a href="#cb4-6"></a>         <span class="dt">fun=</span><span class="cf">function</span>(x, p) (samplesums <span class="op">+</span><span class="st"> </span><span class="kw">tapply</span>(x[<span class="op">-</span>m], apipop<span class="op">$</span>cname[<span class="op">-</span>m], sum ))<span class="op">/</span>N,</span>
+<span id="cb4-7"><a href="#cb4-7"></a>         <span class="dt">show.progress=</span><span class="ot">FALSE</span>)</span>
+<span id="cb4-8"><a href="#cb4-8"></a>(summ &lt;-<span class="st"> </span><span class="kw">summary</span>(res))</span></code></pre></div>
+<pre><code>##                 Mean    SD t-value  MCSE q0.05 q0.5 q0.95 n_eff R_hat
+## Alameda          679 14.88    45.6 0.332   654  679   702  2013 1.000
+## Amador           739 31.08    23.8 0.608   689  738   792  2616 1.000
+## Butte            680 26.26    25.9 0.568   638  679   722  2141 1.001
+## Calaveras        743 27.92    26.6 0.594   697  742   789  2208 1.000
+## Colusa           552 31.31    17.6 0.617   501  553   602  2575 1.002
+## Contra Costa     727 14.79    49.1 0.273   702  727   750  2933 1.000
+## Del Norte        680 32.12    21.2 0.607   628  679   734  2803 0.999
+## El Dorado        753 27.00    27.9 0.532   709  754   796  2572 1.001
+## Fresno           595 15.13    39.3 0.276   569  595   619  3000 1.002
+## Glenn            625 31.31    20.0 0.588   573  625   676  2832 1.000
+## Humboldt         701 27.35    25.6 0.543   656  701   745  2536 0.999
+## Imperial         558 24.50    22.8 0.506   519  557   600  2346 1.001
+## Inyo             706 33.27    21.2 0.708   652  706   761  2212 1.002
+## Kern             596 15.05    39.6 0.320   571  596   620  2211 1.001
+## Kings            595 22.33    26.6 0.452   556  595   630  2445 1.001
+## Lake             662 24.66    26.8 0.452   622  662   702  2982 1.000
+## Lassen           706 26.45    26.7 0.487   663  706   750  2946 1.000
+## Los Angeles      636  8.17    77.8 0.152   623  636   649  2903 0.999
+## Madera           615 19.90    30.9 0.386   582  615   647  2657 1.000
+## Marin            817 20.16    40.5 0.368   785  816   850  3000 1.000
+## Mariposa         724 36.12    20.1 0.714   666  724   782  2560 1.001
+## Mendocino        663 27.39    24.2 0.545   618  663   708  2522 1.001
+## Merced           578 23.13    25.0 0.479   541  578   617  2332 1.000
+## Modoc            672 29.78    22.6 0.659   624  671   722  2042 1.000
+## Mono             705 41.44    17.0 0.783   641  704   773  2800 1.000
+## Monterey         628 18.35    34.2 0.340   599  628   658  2912 1.001
+## Napa             701 22.05    31.8 0.426   665  701   737  2682 1.001
+## Nevada           799 29.10    27.5 0.563   751  799   847  2673 1.000
+## Orange           693 15.26    45.4 0.315   668  692   718  2346 1.000
+## Placer           772 23.89    32.3 0.489   734  772   813  2382 1.001
+## Plumas           691 31.85    21.7 0.629   639  692   742  2562 1.000
+## Riverside        636 13.92    45.7 0.270   613  636   658  2652 1.000
+## Sacramento       668 14.93    44.8 0.286   644  669   693  2721 1.001
+## San Benito       708 29.43    24.1 0.574   661  708   757  2633 1.000
+## San Bernardino   647 12.78    50.6 0.233   626  646   668  3000 1.000
+## San Diego        704 14.18    49.6 0.320   681  704   728  1967 0.999
+## San Francisco    638 19.87    32.1 0.402   607  638   671  2441 1.000
+## San Joaquin      630 17.53    35.9 0.368   601  631   658  2266 1.000
+## San Luis Obispo  752 23.14    32.5 0.435   715  752   791  2824 0.999
+## San Mateo        734 20.99    35.0 0.405   700  734   769  2681 1.000
+## Santa Barbara    679 19.35    35.1 0.390   647  679   711  2461 1.000
+## Santa Clara      733 15.96    45.9 0.292   705  734   759  2985 1.000
+## Santa Cruz       679 19.84    34.3 0.379   646  680   712  2736 1.000
+## Shasta           697 21.75    32.0 0.466   663  696   733  2184 1.001
+## Sierra           707 42.43    16.7 0.775   637  707   777  3000 1.001
+## Siskiyou         698 24.98    27.9 0.456   657  698   738  3000 1.000
+## Solano           711 19.97    35.6 0.391   678  711   743  2612 1.000
+## Sonoma           725 22.54    32.2 0.443   687  726   761  2583 1.000
+## Stanislaus       662 19.57    33.8 0.357   629  661   694  3000 1.003
+## Sutter           653 24.32    26.8 0.458   613  653   693  2815 1.000
+## Tehama           659 28.99    22.7 0.539   611  659   706  2893 1.000
+## Trinity          649 38.10    17.0 0.696   587  651   711  3000 1.001
+## Tulare           583 21.90    26.6 0.440   546  584   618  2476 1.000
+## Tuolumne         720 30.42    23.7 0.582   671  719   771  2731 1.000
+## Ventura          710 18.03    39.4 0.342   680  709   740  2783 1.000
+## Yolo             686 24.84    27.6 0.472   645  686   726  2773 1.000
+## Yuba             627 28.28    22.2 0.606   581  627   673  2176 1.001</code></pre>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1"></a>theta &lt;-<span class="st"> </span><span class="kw">c</span>(<span class="kw">tapply</span>(apipop<span class="op">$</span>api00, apipop<span class="op">$</span>cname, mean))  <span class="co"># true population quantities</span></span>
+<span id="cb6-2"><a href="#cb6-2"></a><span class="kw">plot_coef</span>(summ, <span class="kw">list</span>(<span class="dt">est=</span>theta), <span class="dt">n.se=</span><span class="dv">2</span>, <span class="dt">est.names=</span><span class="kw">c</span>(<span class="st">&quot;mcmcsae&quot;</span>, <span class="st">&quot;true&quot;</span>), <span class="dt">maxrows=</span><span class="dv">30</span>)</span></code></pre></div>
+<p><img src="data:image/png;base64,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" style="display: block; margin: auto;" /></p>
+<div id="binomial-unit-level-model" class="section level2">
+<h2>Binomial Unit-Level Model</h2>
+<p>A model with binomial likelihood can also be fit. We now model the target variable <code>sch.wide</code>, a binary variable indicating whether a school-wide growth target has been met. We use the same mean model structure as above for the linear model, but now using a logistic link function, <span class="math display">\[
+y_j \stackrel{\mathrm{iid}}{\sim} {\cal Be}(p_j)\,,\\
+\mathrm{logit}(p_j) = \beta&#39; x_j + v_{i[j]}\,,\\
+v_i \stackrel{\mathrm{iid}}{\sim} {\cal N}(0, \sigma_v^2)
+\]</span></p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1"></a>apisrs<span class="op">$</span>target.met &lt;-<span class="st"> </span><span class="kw">as.numeric</span>(apisrs<span class="op">$</span>sch.wide <span class="op">==</span><span class="st"> &quot;Yes&quot;</span>)</span>
+<span id="cb7-2"><a href="#cb7-2"></a>sampler &lt;-<span class="st"> </span><span class="kw">create_sampler</span>(<span class="kw">update</span>(mod, target.met <span class="op">~</span><span class="st"> </span>.), <span class="dt">family=</span><span class="st">&quot;binomial&quot;</span>, <span class="dt">data=</span>apisrs)</span>
+<span id="cb7-3"><a href="#cb7-3"></a>sim &lt;-<span class="st"> </span><span class="kw">MCMCsim</span>(sampler, <span class="dt">store.all=</span><span class="ot">TRUE</span>, <span class="dt">verbose=</span><span class="ot">FALSE</span>)</span>
+<span id="cb7-4"><a href="#cb7-4"></a><span class="kw">summary</span>(sim)</span></code></pre></div>
+<pre><code>## llh_ :
+##      Mean        SD   t-value      MCSE     q0.05      q0.5     q0.95     n_eff     R_hat 
+##  -83.2891    2.4918  -33.4257    0.0607  -87.5277  -83.1962  -79.4361 1685.4346    1.0008 
+## 
+## beta :
+##                  Mean     SD t-value     MCSE   q0.05      q0.5    q0.95 n_eff R_hat
+## (Intercept)  4.563445 1.4934  3.0558 0.058914  2.2238  4.480713  7.14145   643  1.00
+## ell         -0.035823 0.0150 -2.3838 0.000420 -0.0612 -0.035212 -0.01215  1280  1.00
+## meals        0.000808 0.0141  0.0572 0.000454 -0.0223  0.000659  0.02462   971  1.00
+## stypeH      -2.821852 0.6210 -4.5441 0.019304 -3.8534 -2.800611 -1.85445  1035  1.00
+## stypeM      -1.651438 0.5873 -2.8118 0.016695 -2.5977 -1.644618 -0.71640  1238  1.00
+## hsg         -0.025548 0.0223 -1.1470 0.000657 -0.0626 -0.025645  0.01055  1148  1.00
+## col.grad    -0.037802 0.0269 -1.4045 0.000868 -0.0816 -0.037805  0.00687   961  1.01
+## grad.sch     0.014016 0.0316  0.4434 0.001113 -0.0347  0.012320  0.06888   807  1.00
+## 
+## v_sigma :
+##     Mean       SD  t-value     MCSE    q0.05     q0.5    q0.95    n_eff    R_hat 
+##   0.3754   0.2857   1.3141   0.0123   0.0297   0.3198   0.9167 535.1238   1.0121 
+## 
+## v :
+##                   Mean    SD  t-value    MCSE  q0.05     q0.5 q0.95 n_eff R_hat
+## Alameda      -0.190148 0.433 -0.43866 0.01363 -1.000 -0.07204 0.338  1012 1.003
+## Amador        0.004611 0.489  0.00943 0.00915 -0.771  0.00267 0.762  2856 1.000
+## Butte        -0.000808 0.478 -0.00169 0.00872 -0.759 -0.00202 0.785  3000 0.999
+## Calaveras     0.035399 0.465  0.07609 0.00914 -0.675  0.00547 0.845  2588 0.999
+## Colusa       -0.010062 0.462 -0.02176 0.00846 -0.797 -0.00139 0.725  2991 1.000
+## Contra Costa  0.005358 0.404  0.01327 0.00940 -0.666  0.00159 0.674  1846 1.002
+## Del Norte    -0.007185 0.479 -0.01501 0.00887 -0.792 -0.00109 0.734  2910 1.000
+## El Dorado     0.004596 0.451  0.01019 0.00838 -0.729  0.00206 0.721  2896 1.000
+## Fresno       -0.042824 0.383 -0.11190 0.00892 -0.694 -0.01627 0.544  1841 1.002
+## Glenn        -0.014269 0.476 -0.02995 0.00871 -0.804 -0.00148 0.730  2994 1.000
+## ... 47 elements suppressed ...</code></pre>
+<p>To predict the population fractions of schools that meet the growth target by county,</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1"></a>samplesums &lt;-<span class="st"> </span><span class="kw">tapply</span>(apisrs<span class="op">$</span>target.met, apisrs<span class="op">$</span>cname, sum)</span>
+<span id="cb9-2"><a href="#cb9-2"></a>samplesums[<span class="kw">is.na</span>(samplesums)] &lt;-<span class="st"> </span><span class="dv">0</span>  <span class="co"># substitute 0 for out-of-sample areas</span></span>
+<span id="cb9-3"><a href="#cb9-3"></a>res &lt;-<span class="st"> </span><span class="kw">predict</span>(sim, <span class="dt">newdata=</span>apipop, <span class="dt">labels=</span><span class="kw">names</span>(N),</span>
+<span id="cb9-4"><a href="#cb9-4"></a>         <span class="dt">fun=</span><span class="cf">function</span>(x, p) (samplesums <span class="op">+</span><span class="st"> </span><span class="kw">tapply</span>(x[<span class="op">-</span>m], apipop<span class="op">$</span>cname[<span class="op">-</span>m], sum ))<span class="op">/</span>N,</span>
+<span id="cb9-5"><a href="#cb9-5"></a>         <span class="dt">show.progress=</span><span class="ot">FALSE</span>)</span>
+<span id="cb9-6"><a href="#cb9-6"></a>(summ &lt;-<span class="st"> </span><span class="kw">summary</span>(res))</span></code></pre></div>
+<pre><code>##                  Mean     SD t-value     MCSE q0.05  q0.5 q0.95 n_eff R_hat
+## Alameda         0.784 0.0615   12.74 0.001650 0.670 0.792 0.864  1390 1.002
+## Amador          0.837 0.1171    7.14 0.002182 0.600 0.800 1.000  2880 1.000
+## Butte           0.835 0.0755   11.06 0.001548 0.708 0.833 0.938  2377 1.000
+## Calaveras       0.875 0.0953    9.18 0.001884 0.700 0.900 1.000  2558 1.000
+## Colusa          0.645 0.1577    4.09 0.002951 0.333 0.667 0.889  2856 1.001
+## Contra Costa    0.817 0.0570   14.32 0.001349 0.721 0.821 0.899  1786 1.001
+## Del Norte       0.881 0.1079    8.16 0.002191 0.750 0.875 1.000  2424 1.001
+## El Dorado       0.850 0.0758   11.23 0.001521 0.725 0.850 0.950  2482 1.002
+## Fresno          0.781 0.0618   12.65 0.001463 0.667 0.790 0.871  1783 1.001
+## Glenn           0.790 0.1415    5.58 0.002717 0.556 0.778 1.000  2713 1.002
+## Humboldt        0.850 0.0746   11.39 0.001533 0.725 0.850 0.950  2369 1.000
+## Imperial        0.699 0.1059    6.60 0.002309 0.500 0.700 0.850  2103 1.002
+## Inyo            0.777 0.1584    4.91 0.003087 0.571 0.857 1.000  2635 1.000
+## Kern            0.804 0.0523   15.36 0.001232 0.706 0.811 0.878  1805 1.000
+## Kings           0.850 0.0791   10.74 0.001654 0.720 0.840 0.960  2289 1.001
+## Lake            0.825 0.0957    8.62 0.001837 0.636 0.818 0.955  2717 1.002
+## Lassen          0.834 0.1100    7.58 0.002184 0.636 0.818 1.000  2534 1.000
+## Los Angeles     0.799 0.0431   18.56 0.001040 0.728 0.799 0.869  1714 1.000
+## Madera          0.820 0.0753   10.89 0.001539 0.677 0.839 0.935  2391 1.001
+## Marin           0.837 0.0707   11.84 0.001705 0.700 0.840 0.940  1721 1.002
+## Mariposa        0.860 0.1517    5.67 0.003097 0.600 0.800 1.000  2400 1.002
+## Mendocino       0.815 0.0905    9.01 0.001700 0.640 0.840 0.960  2834 0.999
+## Merced          0.787 0.0826    9.53 0.001727 0.635 0.794 0.905  2289 1.001
+## Modoc           0.832 0.1578    5.27 0.002998 0.600 0.800 1.000  2769 0.999
+## Mono            0.748 0.2435    3.07 0.004572 0.333 0.667 1.000  2837 1.000
+## Monterey        0.803 0.0682   11.78 0.001688 0.687 0.807 0.916  1633 1.001
+## Napa            0.845 0.0790   10.70 0.001538 0.704 0.852 0.963  2635 1.000
+## Nevada          0.866 0.0961    9.01 0.001865 0.714 0.857 1.000  2655 0.999
+## Orange          0.774 0.0611   12.68 0.001364 0.672 0.775 0.873  2004 1.000
+## Placer          0.813 0.0761   10.68 0.001723 0.682 0.818 0.909  1950 0.999
+## Plumas          0.738 0.1558    4.74 0.002921 0.444 0.778 1.000  2844 0.999
+## Riverside       0.824 0.0527   15.64 0.001133 0.729 0.831 0.895  2163 1.000
+## Sacramento      0.847 0.0493   17.20 0.001286 0.764 0.847 0.924  1467 1.001
+## San Benito      0.816 0.1262    6.47 0.002513 0.545 0.818 1.000  2522 1.000
+## San Bernardino  0.862 0.0422   20.43 0.001159 0.793 0.862 0.934  1326 1.005
+## San Diego       0.848 0.0427   19.85 0.000988 0.775 0.850 0.913  1870 1.002
+## San Francisco   0.761 0.0740   10.28 0.001524 0.630 0.770 0.870  2359 0.999
+## San Joaquin     0.827 0.0576   14.36 0.001311 0.726 0.831 0.911  1932 1.001
+## San Luis Obispo 0.854 0.0731   11.69 0.001469 0.725 0.850 0.950  2474 0.999
+## San Mateo       0.796 0.0746   10.67 0.001915 0.664 0.804 0.888  1519 1.001
+## Santa Barbara   0.828 0.0669   12.39 0.001645 0.716 0.840 0.926  1652 1.001
+## Santa Clara     0.782 0.0729   10.73 0.002138 0.645 0.796 0.871  1162 1.000
+## Santa Cruz      0.787 0.0753   10.45 0.001667 0.653 0.796 0.898  2044 1.000
+## Shasta          0.816 0.0772   10.58 0.001726 0.675 0.825 0.925  1998 1.000
+## Sierra          0.723 0.2276    3.18 0.004201 0.333 0.667 1.000  2935 1.000
+## Siskiyou        0.842 0.1004    8.39 0.001970 0.667 0.867 1.000  2595 0.999
+## Solano          0.866 0.0634   13.67 0.001374 0.750 0.867 0.967  2125 1.002
+## Sonoma          0.846 0.0620   13.64 0.001423 0.741 0.852 0.935  1900 1.000
+## Stanislaus      0.812 0.0738   11.00 0.001822 0.681 0.824 0.901  1642 1.004
+## Sutter          0.832 0.0904    9.20 0.001722 0.650 0.850 0.950  2758 1.000
+## Tehama          0.842 0.1004    8.38 0.002095 0.647 0.882 1.000  2297 1.001
+## Trinity         0.745 0.2051    3.63 0.004003 0.500 0.750 1.000  2624 1.000
+## Tulare          0.831 0.0667   12.45 0.001492 0.709 0.836 0.927  2002 1.000
+## Tuolumne        0.878 0.0968    9.07 0.002004 0.746 0.917 1.000  2333 0.999
+## Ventura         0.840 0.0493   17.03 0.001061 0.758 0.845 0.913  2159 1.000
+## Yolo            0.853 0.0736   11.59 0.001598 0.714 0.857 0.971  2125 1.001
+## Yuba            0.793 0.1014    7.82 0.002037 0.632 0.789 0.947  2477 1.000</code></pre>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1"></a>theta &lt;-<span class="st"> </span><span class="kw">c</span>(<span class="kw">tapply</span>(apipop<span class="op">$</span>sch.wide <span class="op">==</span><span class="st"> &quot;Yes&quot;</span>, apipop<span class="op">$</span>cname, mean))  <span class="co"># true population quantities</span></span>
+<span id="cb11-2"><a href="#cb11-2"></a><span class="kw">plot_coef</span>(summ, <span class="kw">list</span>(<span class="dt">est=</span>theta), <span class="dt">n.se=</span><span class="dv">2</span>, <span class="dt">est.names=</span><span class="kw">c</span>(<span class="st">&quot;mcmcsae&quot;</span>, <span class="st">&quot;true&quot;</span>), <span class="dt">maxrows=</span><span class="dv">30</span>)</span></code></pre></div>
+<p><img src="data:image/png;base64,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" style="display: block; margin: auto;" /></p>
+</div>
+<div id="references" class="section level2 unnumbered">
+<h2>References</h2>
+<div id="refs" class="references">
+<div id="ref-Battese1988">
+<p>Battese, G. E., R. M. Harter, and W. A. Fuller. 1988. “An Error-Components Model for Prediction of County Crop Areas Using Survey and Satellite Data.” <em>Journal of the American Statistical Association</em> 83 (401): 28–36.</p>
+</div>
+<div id="ref-rao2015small">
+<p>Rao, J. N. K., and I. Molina. 2015. <em>Small Area Estimation</em>. John Wiley &amp; Sons.</p>
+</div>
+</div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
