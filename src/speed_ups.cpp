@@ -4,9 +4,6 @@
 
 using namespace Rcpp;
 
-// via the depends attribute we tell Rcpp to create hooks for
-// RcppEigen so that the build process will know what to do
-// [[Rcpp::depends(RcppEigen)]]
 
 // For code that never uses random number generation,
 // use option rng=false for a tiny speed-up
@@ -151,6 +148,18 @@ Eigen::VectorXd Csparse_numeric_crossprod(const Eigen::MappedSparseMatrix<double
   return A.adjoint() * y;
 }
 
+//’ Matrix product of two dense matrices
+//’
+//’ @param A a numeric matrix.
+//’ @param B a numeric matrix.
+//’ @return The matrix product \code{AB}.
+// [[Rcpp::export(rng=false)]]
+Eigen::MatrixXd Cmatmat(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::Map<Eigen::MatrixXd> & B) {
+  int n = A.cols();
+  if (B.rows() != n) stop("incompatible matrices");
+  return A * B;
+}
+
 //’ Matrix product of a sparse matrix with a matrix
 //’
 //’ @param A a numeric compressed, sparse, column-oriented matrix.
@@ -161,6 +170,18 @@ Eigen::MatrixXd Csparse_matrix_prod(const Eigen::MappedSparseMatrix<double> & A,
   if (A.cols() != y.rows()) stop("incompatible dimensions");
   return A * y;
 }
+
+//’ Matrix product of a matrix with a sparse matrix
+//’
+//’ @param A a matrix.
+//’ @param B a numeric compressed, sparse, column-oriented matrix.
+//’ @return The matrix product \code{AB}.
+// [[Rcpp::export(rng=false)]]
+Eigen::MatrixXd Cmatrix_sparse_prod(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::MappedSparseMatrix<double> & B) {
+  if (A.cols() != B.rows()) stop("incompatible dimensions");
+  return A * B;
+}
+
 
 //’ Matrix product of a symmetric sparse (dsC) matrix with a matrix
 //’
@@ -269,7 +290,7 @@ NumericVector sparse_sum_x(const int n,
 //’ @return The diagonal of A as a vector.
 // [[Rcpp::export(rng=false)]]
 Eigen::VectorXd diagC(const Eigen::Map<Eigen::MatrixXd> & A) {
-    return A.diagonal();
+  return A.diagonal();
 }
 
 //’ Add a vector to the diagonal of a dense matrix
@@ -335,10 +356,14 @@ NumericMatrix Cdense_crossprod_sym2(const NumericMatrix & A, const NumericMatrix
   if (B.nrow() != rank) stop("incompatible dimensions");
   NumericMatrix out = no_init(n, n);
   double z;
-  for (int i = 0; i < n; i++) {
-    for (int j = 0; j <= i; j++) {
+  int i, j, k;
+  for (i = 0; i < n; i++) {
+    for (j = 0; j <= i; j++) {
       z = 0;
-      for (int k = 0; k < rank; k++) {
+      for (k = 0; k < rank - 4; k += 4) {
+        z += (A(k,i) * B(k,j) + A(k+1,i) * B(k+1,j)) + (A(k+2,i) * B(k+2,j) + A(k+3,i) * B(k+3,j));
+      }
+      for (; k < rank; k++) {
         z += A(k,i) * B(k,j);
       }
       out(i,j) = z;
@@ -482,7 +507,7 @@ Eigen::VectorXd get_col_dgC(const Eigen::MappedSparseMatrix<double> & A, const i
 //’   M. Maechler (2012)
 //’     Accurately Computing log(1 − exp(− |a|)) Assessed by the Rmpfr package.
 //’     URL: \url{https://cran.r-project.org/package=Rmpfr/vignettes/log1mexp-note.pdf}.
-// [[Rcpp::export(rng=true)]]
+// [[Rcpp::export(rng=false)]]
 NumericVector log1pexpC(const NumericVector & x) {
   const int n = x.size();
   NumericVector out = no_init(n);
@@ -505,7 +530,7 @@ NumericVector log1pexpC(const NumericVector & x) {
 //’ @param M1 numeric dense matrix.
 //’ @param M2 numeric dense matrix.
 //’ @return The Kronecker product of M1 and M2 as a dense matrix.
-// [[Rcpp::export(rng=true)]]
+// [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Cdense_kron(const Eigen::Map<Eigen::MatrixXd> & M1, const Eigen::Map<Eigen::MatrixXd> & M2) {
   return kroneckerProduct(M1, M2);  //.selfadjointView<Eigen::Lower>() for symmetric matrices --> slower
 }
@@ -516,20 +541,22 @@ Eigen::MatrixXd Cdense_kron(const Eigen::Map<Eigen::MatrixXd> & M1, const Eigen:
 //’ @param n integer vector.
 //’ @param M2 numeric vector.
 //’ @return A vector with replicated multiples of v's elements.
-// [[Rcpp::export(rng=true)]]
+// [[Rcpp::export(rng=false)]]
 Eigen::VectorXd Crepgen(const Eigen::Map<Eigen::VectorXd> & v, const Eigen::Map<Eigen::VectorXi> & n, const Eigen::Map<Eigen::VectorXd> & M2) {
   const int q = M2.size();
   Eigen::VectorXd out(q * v.size());
   Eigen::VectorXd x;
   int ind = 0;
   int ind_out = 0;
+  int ni;
   for (int i = 0; i < n.size(); i++) {
-    x = v.segment(ind, n(i));
+    ni = n.coeff(i);
+    x = v.segment(ind, ni);
     for (int j = 0; j < q; j++) {
-      out.segment(ind_out, n(i)) = M2(j) * x;
-      ind_out += n(i);
+      out.segment(ind_out, ni) = M2.coeff(j) * x;
+      ind_out += ni;
     }
-    ind += n(i);
+    ind += ni;
   }
   return out;
 }

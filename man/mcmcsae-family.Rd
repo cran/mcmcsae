@@ -15,7 +15,7 @@ f_negbinomial(link = "logit")
 }
 \arguments{
 \item{link}{the name of a link function. Currently the only allowed link functions are:
-\code{"identity"} for Gaussian sampling distributions, \code{"logit"} (default) and \code{"probit"}
+\code{"identity"} for (log-)Gaussian sampling distributions, \code{"logit"} (default) and \code{"probit"}
 for binomial distributions and \code{"log"} for negative binomial sampling distributions.}
 }
 \value{

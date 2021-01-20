@@ -18,7 +18,8 @@ An object of class \code{dc} containing MCMC draws for a (vector) parameter.
 Read draws written to file by \code{\link{MCMCsim}} used with argument \code{to.file}.
 }
 \examples{
-\donttest{
+\dontrun{
+# NB this example creates a file "MCMCdraws_e_.RData" in the working directory
 n <- 100
 dat <- data.frame(x=runif(n), f=as.factor(sample(1:5, n, replace=TRUE)))
 gd <- generate_data(~ reg(~ x + f, Q0=1, name="beta"), data=dat)
@@ -26,7 +27,7 @@ dat$y <- gd$y
 sampler <- create_sampler(y ~ reg(~ x + f, name="beta"), data=dat)
 # run the MCMC simulation and write draws of residuals to file:
 sim <- MCMCsim(sampler, n.iter=500, to.file="e_")
-(summary(sim))
+summary(sim)
 mcres <- read_draws("e_")
 summary(mcres)
 }

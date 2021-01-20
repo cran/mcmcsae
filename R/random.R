@@ -64,7 +64,7 @@ binomial_coef <- function(n, y, log=TRUE) {
 #' Compute binomial coefficients for negative binomial distribution
 #' 
 #' @noRd
-#' @param r vector of overdispersion parameters.
+#' @param r vector of dispersion parameters.
 #' @param y vector of numbers of successes.
 #' @param log whether to compute the log binomial coefficient (default).
 #' @return Vector of negative binomial coefficients 'y+r-1 over y'.

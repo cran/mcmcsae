@@ -6,6 +6,7 @@
 \usage{
 generate_data(
   formula,
+  data = NULL,
   family = "gaussian",
   ny = NULL,
   ry,
@@ -14,12 +15,14 @@ generate_data(
   sigma.mod = NULL,
   Q0 = NULL,
   formula.V = NULL,
-  data = NULL
+  linpred = NULL
 )
 }
 \arguments{
 \item{formula}{A model formula, see \code{create_sampler}.
 Any left-hand-side of the formula is ignored.}
+
+\item{data}{see \code{create_sampler}.}
 
 \item{family}{see \code{create_sampler}.}
 
@@ -37,7 +40,7 @@ Any left-hand-side of the formula is ignored.}
 
 \item{formula.V}{see \code{create_sampler}.}
 
-\item{data}{see \code{create_sampler}.}
+\item{linpred}{see \code{create_sampler}.}
 }
 \value{
 A list with a generated data vector and a list of prior means of the

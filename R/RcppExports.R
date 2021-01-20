@@ -101,8 +101,16 @@ Csparse_numeric_crossprod <- function(A, y) {
     .Call(`_mcmcsae_Csparse_numeric_crossprod`, A, y)
 }
 
+Cmatmat <- function(A, B) {
+    .Call(`_mcmcsae_Cmatmat`, A, B)
+}
+
 Csparse_matrix_prod <- function(A, y) {
     .Call(`_mcmcsae_Csparse_matrix_prod`, A, y)
+}
+
+Cmatrix_sparse_prod <- function(A, B) {
+    .Call(`_mcmcsae_Cmatrix_sparse_prod`, A, B)
 }
 
 CsparseS_matrix_prod <- function(A, y) {

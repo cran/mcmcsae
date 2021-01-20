@@ -448,10 +448,10 @@ gen <- function(formula = ~ 1, factor=NULL,
 
   if (gl) {  # group-level covariates
     glp <- eval(glp)
-    sparse_template(self, modeled.Q=e$modeled.Q, prior.only=e$prior.only)
+    sparse_template(self, update.XX=e$modeled.Q, prior.only=e$prior.only)
     if (!in_block && !e$prior.only) glp$R <- NULL
   } else {
-    sparse_template(self, modeled.Q=e$modeled.Q, prior.only=e$prior.only)
+    sparse_template(self, update.XX=e$modeled.Q, prior.only=e$prior.only)
   }
 
   # BEGIN rprior function
@@ -657,7 +657,7 @@ gen <- function(formula = ~ 1, factor=NULL,
     if (q0 == 1L) {
       draw <- add(draw, bquote(M_coef_raw <- M_coef_raw - glp$X %m*v% (inv_xi * p[[.(name_gl)]])))
     } else {
-      draw <- add(draw, bquote(M_coef_raw <- M_coef_raw - glp$X %*% matrix(inv_xi * p[[.(name_gl)]], nrow=.(glp$p0), byrow=TRUE)))
+      draw <- add(draw, bquote(M_coef_raw <- M_coef_raw - glp$X %m*m% matrix(inv_xi * p[[.(name_gl)]], nrow=.(glp$p0), byrow=TRUE)))
     }
   }
   if (usePX) {
@@ -669,10 +669,10 @@ gen <- function(formula = ~ 1, factor=NULL,
     if (q0 == 1L)  # DAM is lD vector
       draw <- add(draw, quote(DAM <- DA %m*v% M_coef_raw))
     else  # DAM is of type matrix (lD x q0) as M_coef_raw is
-      draw <- add(draw, quote(DAM <- DA %*% M_coef_raw))
+      draw <- add(draw, quote(DAM <- DA %m*m% M_coef_raw))
     switch(var,
       unstructured = {
-        draw <- add(draw, bquote(SSR <- .rowSums((DAM %*% p[[.(name_Qraw)]]) * DAM, .(lD), .(q0))))
+        draw <- add(draw, bquote(SSR <- .rowSums((DAM %m*m% p[[.(name_Qraw)]]) * DAM, .(lD), .(q0))))
       },
       diagonal = {
         #draw <- add(draw, bquote(SSR <- .rowSums((DAM %*% Cdiag(p[[.(name_temp)]]$Qraw)) * DAM, .(lD), .(q0))))
@@ -753,7 +753,7 @@ gen <- function(formula = ~ 1, factor=NULL,
     draw <- add(draw, quote(p[names_se_cor] <- prec2se_cor(Qv)))
   } else {
     if (var == "diagonal") {
-      draw <- add(draw, bquote(SSR <- .colSums(M_coef_raw * (QA %*% M_coef_raw), .(l), .(q0))))
+      draw <- add(draw, bquote(SSR <- .colSums(M_coef_raw * (QA %m*m% M_coef_raw), .(l), .(q0))))
     } else {  # scalar variance
       if (q0 == 1L) {
         if (is.null(Q0))
@@ -762,9 +762,9 @@ gen <- function(formula = ~ 1, factor=NULL,
           draw <- add(draw, quote(SSR <- Q0 * dotprodC(M_coef_raw, QA %m*v% M_coef_raw)))
       } else {
         if (is.null(Q0))
-          draw <- add(draw, quote(SSR <- sum(M_coef_raw * (QA %*% M_coef_raw))))
+          draw <- add(draw, quote(SSR <- sum(M_coef_raw * (QA %m*m% M_coef_raw))))
         else
-          draw <- add(draw, quote(SSR <- sum(M_coef_raw * (QA %*% M_coef_raw %m*m% Q0))))
+          draw <- add(draw, quote(SSR <- sum(M_coef_raw * (QA %m*m% (M_coef_raw %m*m% Q0)))))
       }
     }
     switch(prior$type,

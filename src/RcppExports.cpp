@@ -307,6 +307,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// Cmatmat
+Eigen::MatrixXd Cmatmat(const Eigen::Map<Eigen::MatrixXd>& A, const Eigen::Map<Eigen::MatrixXd>& B);
+RcppExport SEXP _mcmcsae_Cmatmat(SEXP ASEXP, SEXP BSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type A(ASEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type B(BSEXP);
+    rcpp_result_gen = Rcpp::wrap(Cmatmat(A, B));
+    return rcpp_result_gen;
+END_RCPP
+}
 // Csparse_matrix_prod
 Eigen::MatrixXd Csparse_matrix_prod(const Eigen::MappedSparseMatrix<double>& A, const Eigen::Map<Eigen::MatrixXd>& y);
 RcppExport SEXP _mcmcsae_Csparse_matrix_prod(SEXP ASEXP, SEXP ySEXP) {
@@ -315,6 +326,17 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const Eigen::MappedSparseMatrix<double>& >::type A(ASEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type y(ySEXP);
     rcpp_result_gen = Rcpp::wrap(Csparse_matrix_prod(A, y));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Cmatrix_sparse_prod
+Eigen::MatrixXd Cmatrix_sparse_prod(const Eigen::Map<Eigen::MatrixXd>& A, const Eigen::MappedSparseMatrix<double>& B);
+RcppExport SEXP _mcmcsae_Cmatrix_sparse_prod(SEXP ASEXP, SEXP BSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type A(ASEXP);
+    Rcpp::traits::input_parameter< const Eigen::MappedSparseMatrix<double>& >::type B(BSEXP);
+    rcpp_result_gen = Rcpp::wrap(Cmatrix_sparse_prod(A, B));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -578,7 +600,6 @@ NumericVector log1pexpC(const NumericVector& x);
 RcppExport SEXP _mcmcsae_log1pexpC(SEXP xSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const NumericVector& >::type x(xSEXP);
     rcpp_result_gen = Rcpp::wrap(log1pexpC(x));
     return rcpp_result_gen;
@@ -589,7 +610,6 @@ Eigen::MatrixXd Cdense_kron(const Eigen::Map<Eigen::MatrixXd>& M1, const Eigen::
 RcppExport SEXP _mcmcsae_Cdense_kron(SEXP M1SEXP, SEXP M2SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type M1(M1SEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type M2(M2SEXP);
     rcpp_result_gen = Rcpp::wrap(Cdense_kron(M1, M2));
@@ -601,7 +621,6 @@ Eigen::VectorXd Crepgen(const Eigen::Map<Eigen::VectorXd>& v, const Eigen::Map<E
 RcppExport SEXP _mcmcsae_Crepgen(SEXP vSEXP, SEXP nSEXP, SEXP M2SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type v(vSEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXi>& >::type n(nSEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type M2(M2SEXP);

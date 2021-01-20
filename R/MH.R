@@ -53,12 +53,12 @@ draw_Leroux <- function(p, mc, coef_raw) {
   QA_diff <- mc$mat_sum_Leroux(mc$QA, mc$idL, Ldiff, -Ldiff)
   tr_diff <- switch(mc$var,
     unstructured = sum(crossprod_sym(coef_raw, QA_diff) * p[[mc$name_Qraw]]),
-    diagonal = sum(.colSums(coef_raw * (QA_diff %*% coef_raw), mc$l, mc$q0) * p[[mc$name_Qraw]]),
+    diagonal = sum(.colSums(coef_raw * (QA_diff %m*m% coef_raw), mc$l, mc$q0) * p[[mc$name_Qraw]]),
     scalar =
       if (mc$q0 == 1L)
         dotprodC(coef_raw, QA_diff %m*v% coef_raw) * p[[mc$name_Qraw]]
       else
-        sum(coef_raw * (QA_diff %*% coef_raw)) * p[[mc$name_Qraw]]
+        sum(coef_raw * (QA_diff %m*m% coef_raw)) * p[[mc$name_Qraw]]
   )
   # for now, assume a uniform prior on Leroux parameter
   detQA.star <- mc$det(2*L.star, 1 - 2*L.star)

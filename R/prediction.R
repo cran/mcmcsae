@@ -84,23 +84,22 @@ predict.draws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-sam
   if (is.null(newdata)) {
     if (is.null(X.)) stop("one of 'newdata' and 'X.' must be supplied")
     if (identical(X., "in-sample")) {
-      if ("linpred_" %in% par.names && model$full.in.sample.prediction) {
-        X. <- NULL  # linear predictor is already available in object
-      } else {
-        X. <- rep.int(list("X"), length(model$mod))
-        names(X.) <- names(model$mod)
-      }
+      use.linpred_ <- "linpred_" %in% par.names && model$do.linpred && is.null(model$linpred)
+      if (!use.linpred_ && !all(names(model$mod) %in% par.names)) stop("for prediction all coefficients must be stored in 'object' (use 'store.all=TRUE' in MCMCsim)")
+      X. <- NULL
       n <- model$n
       if (!is.null(var)) {
         warning("argument 'var' ignored for in-sample prediction", immediate.=TRUE)
         var <- NULL
       }
       if (model$modeled.Q) {
-        cholQ <- build_chol(switch(model$Q0.type,
-                                   unit = rep.int(1, model$n),
-                                   diag = model$Q0@x,
-                                   symm = model$Q0
-        ))
+        cholQ <- build_chol(
+          switch(model$Q0.type,
+            unit = rep.int(1, model$n),
+            diag = model$Q0@x,
+            symm = model$Q0
+          )
+        )
       } else {
         cholQ <- build_chol(model$Q0)
       }
@@ -115,13 +114,28 @@ predict.draws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-sam
         if (!("linpred_" %in% par.names))
           stop("'linpred_' not found in object. Use linpred='fitted' in create_sampler.")
         n <- nvars(object[["linpred_"]])
+        use.linpred_ <- TRUE
         X. <- NULL
       } else {
         if (!is.list(X.)) stop("'X.' must be a list")
-        n <- nrow(X.[[1L]])
+        if (!all(names(X.) %in% names(model$mod)))
+          stop("X. names not corresponding to a model component: ", paste(setdiff(names(X.), names(model$mod)), collapse=", "))
+        for (i in seq_along(X.)) {
+          X.[[i]] <- economizeMatrix(X.[[i]])
+          d <- dim(X.[[i]])
+          if (i == 1L) 
+            n <- d[1L]
+          else
+            if (d[1L] != n) stop("not all matrices in 'X.' have the same number of rows")
+          if (d[2L] != model$mod[[names(X.)[i]]]$q) stop("wrong number of columns for X. component ", names(X.)[i])
+        }
+        use.linpred_ <- FALSE
       }
-      # by default use unit variances for new (oos) predictions
-      if (is.null(var)) var <- 1
+      # by default use unit variances for new (oos) predictions, but warn if in-sample variance matrix is not unit diagonal
+      if (is.null(var)) {
+        if (type == "data" && model$Q0.type != "unit") warning("no 'var' specified, so unit variances are assumed for prediction", immediate.=TRUE)
+        var <- 1
+      }
       if (!(length(var) %in% c(1L, n))) stop("'var' should be either a scalar value or a vector of length 'nrow(newdata)'")
       if (model$modeled.Q && fam$family == "gaussian") stop("Please use argument 'newdata' instead of 'X.' to also supply information about the factors determining the (modeled) sampling variances.")
       if (fam$family == "binomial") {
@@ -129,28 +143,45 @@ predict.draws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-sam
         ny <- check_ny(ny, n, newdata)
       }
     }
+    if (!use.linpred_) {
+      # check that for mec components name_X is stored
+      name_Xs <- unlist(lapply(model$mod, `[[`, "name_X"))
+      if (!is.null(X.)) name_Xs <- name_Xs[names(X.)]
+      if (!all(name_Xs %in% par.names))
+        stop("(in-sample) prediction for a model with measurement error components requires that ",
+          "the samples of the corresponding covariates are stored (use 'store.all=TRUE' in MCMCsim)"
+        )
+    }
   } else {
     if (!is.null(X.)) warning("argument 'X.' is ignored", immediate.=TRUE)
+    use.linpred_ <- FALSE
     X. <- list()
     for (mc in model$mod) {
       if (is.null(mc$formula)) stop("model component without 'formula' cannot be used for prediction")
-      # for prediction do not (automatically) remove redundant columns!
-      X.[[mc$name]] <- compute_X(mc$formula, mc$factor, remove.redundant=FALSE,
-                                 drop.empty.levels=FALSE, sparse=mc$sparse, data=newdata)
-      if (mc$remove.redundant)
-        X.[[mc$name]] <- X.[[mc$name]][, model$coef.names[[mc$name]], drop=FALSE]
-      # check that X has the right number of columns
-      if (ncol(X.[[mc$name]]) != model$mod[[mc$name]]$q) stop("'newdata' has ", ncol(X.[[mc$name]]), " categories for model term '", mc$name, "' versus ", model$mod[[mc$name]]$q, " in the MCMC draws object")
-      # TODO check the category names as well; allow oos categories; insert missing categories in newdata
-      X.[[mc$name]] <- unname(X.[[mc$name]])
+      if (mc$type == "mec") {
+        X.[[mc$name]] <- mc$make_predict(newdata)
+      } else {
+        # for prediction do not (automatically) remove redundant columns!
+        X.[[mc$name]] <- compute_X(mc$formula, mc$factor, remove.redundant=FALSE,
+                                   drop.empty.levels=FALSE, sparse=mc$sparse, data=newdata)
+        if (mc$remove.redundant)
+          X.[[mc$name]] <- X.[[mc$name]][, model$coef.names[[mc$name]], drop=FALSE]
+        # check that X has the right number of columns
+        if (ncol(X.[[mc$name]]) != mc$q) stop("'newdata' yields ", ncol(X.[[mc$name]]), " predictor columns for model term '", mc$name, "' versus ", mc$q, " in the MCMC draws object")
+        # TODO check the category names as well; allow oos categories; insert missing categories in newdata
+        X.[[mc$name]] <- unname(X.[[mc$name]])
+      }
     }
+    if (!is.null(X.) && !all(names(X.) %in% par.names)) stop("for prediction all coefficients must be stored in 'object' (use 'store.all=TRUE' in MCMCsim)")
     n <- nrow(newdata)
-    if (is.null(var)) var <- 1
+    if (is.null(var)) {
+      if (type == "data" && model$Q0.type != "unit") warning("no 'var' specified, so unit variances are assumed for prediction", immediate.=TRUE)
+      var <- 1
+    }
     if (!(length(var) %in% c(1L, n))) stop("'var' should be either a scalar value or a vector of length 'nrow(newdata)'")
     if (model$modeled.Q && fam$family == "gaussian") {
       V <- list()
-      for (Vmc in model$Vmod)
-        V[[Vmc$name]] <- Vmc$make_predict_Vfactor(newdata)
+      for (Vmc in model$Vmod) V[[Vmc$name]] <- Vmc$make_predict_Vfactor(newdata)
     }
     if (fam$family == "binomial") {
       if (is.null(ny)) ny <- model$ny.input
@@ -167,30 +198,34 @@ predict.draws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-sam
   else
     d <- length(fun.(rep.int(0, n), get_draw(object, 1L, 1L)))
   if (!is.null(labels) && length(labels) != d) stop("incompatible 'labels' vector")
-  # check whether all coefficients are stored in object
-  if (!is.null(X.) && !all(names(X.) %in% par.names)) stop("for prediction all coefficients must be stored in 'object' (use 'store.all=TRUE' in MCMCsim)")
 
-  # TODO use cl if present in draws object
   if (is.null(cl))
     n.cores <- min(as.integer(n.cores)[1L], n.chain)
   else
     n.cores <- length(cl)
   if (n.cores > 1L) {
-    # parallel computation
     if (n.cores > parallel::detectCores()) stop("too many cores")
+    reserved.export.names <- c("X.", "cholQ", "var", "V", "ny", "d", "ppcheck")
     if (is.null(cl)) {
       cl <- setup_cluster(n.cores, seed, export)
+      on.exit(stop_cluster(cl))
     } else {
+      if (!is.null(export)) {
+        if (!is.character(export)) stop("'export' must be a character vector")
+        if (any(export %in% reserved.export.names))
+          stop("please use variable names other than ", paste(reserved.export.names, collapse=", "),
+               " in the definition of 'fun.'")
+        parallel::clusterExport(cl, export)
+      }
       if (!is.null(seed)) parallel::clusterSetRNGStream(cl, seed)
-      if (!is.null(export)) parallel::clusterExport(cl, export)
     }
-    parallel::clusterExport(cl, c("X.", "cholQ", "var", "V", "ny", "d", "ppcheck"), environment())
-    #message(n.chain, " chain(s) distributed over ", n.cores, " core(s)")
+    parallel::clusterExport(cl, reserved.export.names, environment())
+    message(length(iters), " draws distributed over ", n.cores, " cores")
     sim_list <- split_iters(object, iters, parts=n.cores)
     predict_obj <- function(obj) {
-      n.chain <- nchains(obj)
-      n.iter <- ndraws(obj)
-      out <- rep.int(list(matrix(NA_real_, n.iter, d)), n.chain)
+      chains <- seq_len(nchains(obj))
+      iters <- seq_len(ndraws(obj))
+      out <- rep.int(list(matrix(NA_real_, length(iters), d)), length(chains))
       if (ppcheck) {
         ppp <- rep.int(0, d)
         if (arg1)
@@ -198,10 +233,10 @@ predict.draws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-sam
         else
           y <- obj[["_model"]]$y
       }
-      for (i in seq_len(n.iter)) {
-        for (ch in seq_len(n.chain)) {
+      for (i in iters) {
+        for (ch in chains) {
           p <- get_draw(obj, i, ch)
-          if (is.null(X.))
+          if (use.linpred_)
             ystar <- p[["linpred_"]]
           else
             ystar <- model$lin_predict(p, X.)
@@ -242,7 +277,7 @@ predict.draws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-sam
     for (i in iters) {
       for (ch in seq_len(n.chain)) {
         p <- get_draw(object, i, ch)
-        if (is.null(X.))
+        if (use.linpred_)
           ystar <- p[["linpred_"]]
         else
           ystar <- model$lin_predict(p, X.)
@@ -296,6 +331,7 @@ predict.draws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-sam
 #' @export
 #' @param formula A model formula, see \code{create_sampler}.
 #'  Any left-hand-side of the formula is ignored.
+#' @param data see \code{create_sampler}.
 #' @param family see \code{create_sampler}.
 #' @param ny see \code{create_sampler}.
 #' @param ry see \code{create_sampler}.
@@ -304,17 +340,19 @@ predict.draws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-sam
 #' @param sigma.mod see \code{create_sampler}.
 #' @param Q0 see \code{create_sampler}.
 #' @param formula.V see \code{create_sampler}.
-#' @param data see \code{create_sampler}.
+#' @param linpred see \code{create_sampler}.
 #' @return A list with a generated data vector and a list of prior means of the
 #'  parameters. The parameters are drawn from their priors.
-generate_data <- function(formula, family="gaussian", ny=NULL, ry, r.mod,
-                          sigma.fixed=(family != "gaussian"), sigma.mod=NULL, Q0=NULL, formula.V=NULL,
-                          data=NULL) {
+generate_data <- function(formula, data=NULL, family="gaussian",
+                          ny=NULL, ry, r.mod,
+                          sigma.fixed=(family != "gaussian"),
+                          sigma.mod=NULL, Q0=NULL, formula.V=NULL,
+                          linpred=NULL) {
   if (!sigma.fixed && is.null(sigma.mod))
     sigma.mod <- pr_invchisq(df=1, scale=1, n=1L)  # use a proper prior for sigma by default
-  sampler <- create_sampler(formula=formula, ny=ny, ry=ry, r.mod=r.mod,
+  sampler <- create_sampler(formula=formula, data=data, family=family, ny=ny, ry=ry, r.mod=r.mod,
                             sigma.fixed=sigma.fixed, sigma.mod=sigma.mod, Q0=Q0, formula.V=formula.V,
-                            family=family, data=data, prior.only=TRUE)
+                            linpred=linpred, prior.only=TRUE)
   sim <- MCMCsim(sampler, n.iter=1L, n.chain=1L, store.all=TRUE, from.prior=TRUE, verbose=FALSE)
   pars <- lapply(sim[par_names(sim)], function(x) setNames(x[[1L]][1L, ], attr(x, "labels")))
   list(y=as.vector(as.matrix.dc(predict(sim), colnames=FALSE)), pars=pars)

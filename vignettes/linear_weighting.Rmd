@@ -1,8 +1,8 @@
 ---
-title: Linear regression, prediction, and weighting
+title: Linear regression, prediction, and survey weighting
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Linear regression and linear weighting}
+  %\VignetteIndexEntry{Linear regression, prediction, and survey weighting}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -59,7 +59,8 @@ compute_DIC(sim)
 ```
 
 The output of function [`MCMCsim`](../html/MCMCsim.html) is
-an object of class `draws`. Methods for the generic functions `summary`, `plot`, `predict`, `residuals` and `fitted` are currently implemented for this class.
+an object of class `draws`.
+The package provides methods for the generic functions `summary`, `plot`, `predict`, `residuals` and `fitted` for this class.
 
 
 ## Prediction

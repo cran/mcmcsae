@@ -61,6 +61,10 @@ is_zero_matrix <- function(x) {
   }
 }
 
+# create a dgCMatrix of zeros
+zeroMatrix <- function(nr, nc)
+  new("dgCMatrix", p=rep.int(0L, nc + 1L), Dim=c(as.integer(nr), as.integer(nc)))
+
 
 ################################################################################
 # matrix algebra: efficient matrix-vector products and some new Matrix methods
@@ -173,21 +177,38 @@ scale_mat <- function(Q, scale) {
 }
 
 # matrix - matrix multiplication
-# M is a matrix
-# Q is either matrix, dsC or numeric representing a diagonal matrix
-# length 1 numeric Q is always allowed and implies scalar multiplication
-`%m*m%` <- function(M, Q) {
-  switch(class(Q)[1L],
-    matrix = M %*% Q,
+# assume that either M1 or M2 is matrix
+# numeric vector input represents diagonal matrix
+# length 1 numeric vector is allowed and implies scalar multiplication
+`%m*m%` <- function(M1, M2) {
+  switch(class(M1)[1L],
+    matrix =
+      switch(class(M2)[1L],
+        matrix = Cmatmat(M1, M2),
+        dgCMatrix = Cmatrix_sparse_prod(M1, M2),
+        dsCMatrix = {
+          class(M2) <- .dgC.class.attr
+          Cmatrix_sparseS_prod(M1, M2)
+        },
+        numeric =
+          if (length(M2) == 1L)
+            if (M2 == 1) M1 else M2 * M1
+          else
+            Cdense_diag_prod(M1, M2),
+        stop("unsupported matrix product")
+      ),
+    dgCMatrix = Csparse_matrix_prod(M1, M2),
     dsCMatrix = {
-      class(Q) <- .dgC.class.attr
-      Cmatrix_sparseS_prod(M, Q)
+      class(M1) <- .dgC.class.attr
+      CsparseS_matrix_prod(M1, M2)
     },
-    numeric =
-      if (length(Q) == 1L)
-        if (Q == 1) M else Q * M
+    tabMatrix = Ctab_matrix_prod(M1, M2),
+    ddiMatrix =
+      if (length(M1@x))
+        M1@x * M2
       else
-        Cdense_diag_prod(M, Q)
+        M2,
+    stop("unsupported matrix product")
   )
 }
 
@@ -199,15 +220,16 @@ crossprod_sym <- function(M, Q) {
   classQ <- class(Q)[1L]
   switch(class(M)[1L],
     matrix =
-      if (classQ == "dsCMatrix" || classQ == "matrix")
-        Cdense_crossprod_sym2(M, Q %*% M)  # exploits symmetry of the resulting matrix
-      else if (classQ == "ddiMatrix")
-        if (Q@diag == "U")
-          Cdense_crossprod_sym0(M)
-        else
-          Cdense_crossprod_sym(M, Q@x)
-      else  # vector Q
-        Cdense_crossprod_sym(M, Q),
+      switch(classQ,
+        matrix = Cdense_crossprod_sym2(M, Cmatmat(Q, M)),
+        dsCMatrix = Cdense_crossprod_sym2(M, Q %m*m% M),
+        ddiMatrix = 
+          if (Q@diag == "U")
+            Cdense_crossprod_sym0(M)
+          else
+            Cdense_crossprod_sym(M, Q@x),
+        numeric = Cdense_crossprod_sym(M, Q)
+      ),
     ddiMatrix = {
       if (M@diag == "U")
         if (classQ == "numeric") {
@@ -316,10 +338,10 @@ get_col <- function(M, j) {
       out
     },
     tabMatrix = {
-      out <- rep.int(0, M@Dim[1L])
-      ind <- which(M@perm == j - 1L)
-      if (length(ind)) out[ind] <- if (M@num) M@x[ind] else 1
-      out
+      if (M@num)
+        as.numeric(M@perm == j - 1L) * M@x
+      else
+        as.numeric(M@perm == j - 1L)
     },
     stop("unsupported class '", class(M)[1L], "'")
   )

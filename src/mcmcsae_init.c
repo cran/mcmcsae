@@ -7,7 +7,6 @@
 
 cholmod_common c;
 
-
 /* .Call calls */
 extern SEXP _mcmcsae_add_diagC(SEXP, SEXP);
 extern SEXP _mcmcsae_Cbacksolve(SEXP, SEXP);
@@ -30,6 +29,8 @@ extern SEXP _mcmcsae_Cdiag_sparse_prod(SEXP, SEXP);
 extern SEXP _mcmcsae_CdiagU(SEXP);
 extern SEXP _mcmcsae_Cforwardsolve(SEXP, SEXP);
 extern SEXP _mcmcsae_CforwardsolveM(SEXP, SEXP);
+extern SEXP _mcmcsae_Cmatmat(SEXP, SEXP);
+extern SEXP _mcmcsae_Cmatrix_sparse_prod(SEXP, SEXP);
 extern SEXP _mcmcsae_Cmatrix_sparse_tcrossprod(SEXP, SEXP);
 extern SEXP _mcmcsae_Cmatrix_sparseS_prod(SEXP, SEXP);
 extern SEXP _mcmcsae_Cmatrix_tab_tcrossprod(SEXP, SEXP);
@@ -93,6 +94,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_mcmcsae_CdiagU",                      (DL_FUNC) &_mcmcsae_CdiagU,                      1},
     {"_mcmcsae_Cforwardsolve",               (DL_FUNC) &_mcmcsae_Cforwardsolve,               2},
     {"_mcmcsae_CforwardsolveM",              (DL_FUNC) &_mcmcsae_CforwardsolveM,              2},
+    {"_mcmcsae_Cmatmat",                     (DL_FUNC) &_mcmcsae_Cmatmat,                     2},
+    {"_mcmcsae_Cmatrix_sparse_prod",         (DL_FUNC) &_mcmcsae_Cmatrix_sparse_prod,         2},
     {"_mcmcsae_Cmatrix_sparse_tcrossprod",   (DL_FUNC) &_mcmcsae_Cmatrix_sparse_tcrossprod,   2},
     {"_mcmcsae_Cmatrix_sparseS_prod",        (DL_FUNC) &_mcmcsae_Cmatrix_sparseS_prod,        2},
     {"_mcmcsae_Cmatrix_tab_tcrossprod",      (DL_FUNC) &_mcmcsae_Cmatrix_tab_tcrossprod,      2},
@@ -141,9 +144,10 @@ void R_init_mcmcsae(DllInfo *dll) {
     R_useDynamicSymbols(dll, FALSE);
     
     M_R_cholmod_start(&c);
-    // TODO maybe add error handler and set other cholmod options
+    c.error_handler = M_R_cholmod_error;
 }
 
 void R_unload_mcmcsae(DllInfo *dll) {
     M_cholmod_finish(&c);
 }
+

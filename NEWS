@@ -1,0 +1,18 @@
+
+version 0.6.0
+- measurement in covariates model component mec() added
+- new function pr_gig to specify a Generalized Inverse Gaussian prior
+- new argument logJacobian for create_sampler to allow comparisons of
+  information criteria between model fits based on different transformations
+- added function to set labels of draws component object
+- data is now second argument of create_sampler and generate_data functions,
+  in line with many model fitting functions in R
+- generate_data gains argument linpred, which is convenient for generating
+  both data and latent quantities of interest for area-level models
+- solved a bug in function split_iters
+- print.dc_summary now correctly handles max.lines argument
+- adapted to new version of Matrix package
+- more input checks and small code improvements
+
+version 0.5.0
+- initial CRAN release

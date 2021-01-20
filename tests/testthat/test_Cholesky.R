@@ -59,7 +59,7 @@ test_that("Cholesky for dsCMatrix works", {
   # in-place update only works for same sparsity pattern!!
   M <- M + Diagonal(n)
   ch$update(M)
-  cholM <- Cholesky_dsC(M, perm=FALSE, LDL=FALSE, super=NA)
+  cholM <- Cholesky_dsC(M, perm=FALSE, LDL=FALSE, super=1L)
   y0 <- rnorm(n)
   y1 <- matrix(rnorm(3*n), n, 3)
   y2 <- rsparsematrix(n, 10, 0.1)
@@ -70,14 +70,15 @@ test_that("Cholesky for dsCMatrix works", {
   expect_equal(ch$solve(y1, system="Lt"), array(solve(cholM, y1, system="Lt")@x, dim(y1)))
   expect_equal(ch$solve(y2, system="Lt"), solve(cholM, y2, system="Lt"))
   expect_equal(ch$solve(y0, system="L"), solve(cholM, y0, system="L")@x)
-  expect_equal(ch$solve(y0, system="L", systemP=TRUE), solve(cholM, y0, system="L")@x)
+  # NB disable following test; currently cannot control cholmod ordering
+  #expect_equal(ch$solve(y0, system="L", systemP=TRUE), solve(cholM, y0, system="L")@x)
   expect_equal(ch$solve(y1, system="L"), array(solve(cholM, y1, system="L")@x, dim(y1)))
   expect_equal(ch$solve(y2, system="L"), solve(cholM, y2, system="L"))
   # with permutation
   ch <- build_chol(M, perm=TRUE)
   M <- M + Diagonal(x=runif(n))
   ch$update(M)
-  cholM <- Cholesky_dsC(M, perm=TRUE, LDL=FALSE, super=NA)
+  cholM <- Cholesky_dsC(M, perm=TRUE, LDL=FALSE, super=1L)
   expect_equal(ch$solve(y0), solve(cholM, y0)@x)
   expect_equal(ch$solve(y1), array(solve(cholM, y1)@x, dim(y1)))
   expect_equal(ch$solve(y2), solve(cholM, y2))

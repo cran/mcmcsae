@@ -251,7 +251,7 @@ compute_DIC <- function(x, use.pV=FALSE) {
   post.means <- get_means(x)
   if (is.null(post.means[["e_"]]))
     stop("cannot compute DIC: missing simulation means of ", if (x[["_model"]]$e.is.res) "residuals" else "linear predictor", "'e_'")
-  if (x[["_model"]]$modeled.Q && (x[["_model"]]$family$family == "gaussian")) {
+  if (x[["_model"]]$modeled.Q && x[["_model"]]$family$family == "gaussian") {
     if (is.null(post.means[["Q_"]])) stop("cannot compute DIC: missing simulation means of 'Q_'")
     if (x[["_model"]]$Q0.type == "symm") {
       # reconstruct mean sparse precision matrix

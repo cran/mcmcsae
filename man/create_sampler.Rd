@@ -6,6 +6,7 @@
 \usage{
 create_sampler(
   formula,
+  data = NULL,
   family = "gaussian",
   ny = NULL,
   ry,
@@ -14,8 +15,8 @@ create_sampler(
   sigma.mod = NULL,
   Q0 = NULL,
   formula.V = NULL,
+  logJacobian = NULL,
   linpred = NULL,
-  data = NULL,
   compute.weights = FALSE,
   block = compute.weights,
   prior.only = FALSE,
@@ -31,28 +32,28 @@ Other terms in the formula are interpreted as ordinary regression
 effects (treated in the same way as \code{reg(...)} terms, but without the option to change e.g. the prior),
 An offset can be specified as \code{offset(...)}.}
 
+\item{data}{data frame with n rows in which the variables specified in model components (if any) can be found.}
+
 \item{family}{character string describing the data distribution. The default is 'gaussian'.
 Other options are 'binomial' for the binomial distribution and 'negbinomial' for the negative binomial distribution.
-For the binomial and negative binomial distributions a logistic link function is used.
-In the case of binary data a probit link function is also supported for the binomial/Bernoulli
-distribution.}
+For the binomial and negative binomial distributions logistic and log link functions are used by default, respectively.
+In the case of binary data a probit link function is also supported for the binomial/Bernoulli distribution.}
 
 \item{ny}{in case \code{family="binomial"} the (vector of) numbers of trials.
 It can be either a numeric vector or the name of a variable in \code{data}.
 Defaults to a vector of 1s.}
 
-\item{ry}{in case \code{family="negbinomial"} the overdispersion parameter or vector
-of overdispersion parameters. Use \code{r.mod} instead if the (scalar)
-overdispersion parameter should be inferred from the data. If neither
-\code{ry} nor \code{r.mod} is specified a default inverse chi-squared
+\item{ry}{in case \code{family="negbinomial"} the dispersion parameter or vector
+of dispersion parameters. Use \code{r.mod} instead if the (scalar)
+dispersion parameter should be inferred from the data. If neither
+\code{ry} nor \code{r.mod} is specified a default chi-squared
 prior with 1 degree of freedom is assumed.}
 
-\item{r.mod}{in case \code{family="negbinomial"}, a prior for the (inverse) overdispersion parameter.
-In this case the (scalar) overdispersion parameter is inferred from the data.
-The prior can be specified by a call to a prior specification function.
-Currently only \code{\link{pr_invchisq}} is supported, which may be used
-to specify an inverse chi-squared or beta-prime prior for the
-inverse overdispersion parameter.}
+\item{r.mod}{prior specification for a scalar (reciprocal) dispersion parameter
+of the negative binomial distribution, in case the dispersion parameter is
+to be inferred. The prior can be specified by a call to a prior specification function.
+Currently \code{\link{pr_invchisq}}, \code{\link{pr_gig}} and \code{\link{pr_fixed}}
+are supported.}
 
 \item{sigma.fixed}{for Gaussian models, if \code{TRUE} the residual standard deviation parameter 'sigma_' is fixed at 1. In that case
 argument \code{sigma.mod} is ignored. This is convenient for Fay-Herriot type models with (sampling) variances assumed to be known.
@@ -60,11 +61,11 @@ Default is \code{FALSE}.}
 
 \item{sigma.mod}{prior for the variance parameter of a gaussian sampling distribution.
 This can be specified by a call to one of the prior specification functions
-\code{\link{pr_invchisq}} and \code{\link{pr_exp}} for an inverse chi-squared or
-exponential prior distribution, respectively. The default is an improper
-prior \code{pr_invchisq(df=0, scale=1)}. A half-t prior on the
-standard deviation can be specified using
-\code{\link{pr_invchisq}} with a chi-squared distributed scale parameter.}
+\code{\link{pr_invchisq}}, \code{\link{pr_exp}}, \code{\link{pr_gig}} or \code{\link{pr_fixed}} for
+inverse chi-squared, exponential, generalized inverse gaussian or degenerate prior distribution,
+respectively. The default is an improper prior \code{pr_invchisq(df=0, scale=1)}. A half-t prior on the
+standard deviation can be specified using \code{\link{pr_invchisq}} with a chi-squared distributed scale
+parameter.}
 
 \item{Q0}{n x n data-level precision matrix for a Gaussian model. It defaults to the unit matrix.
 If an n-vector is provided it will be expanded to a (sparse) diagonal matrix with Q0 on its diagonal.
@@ -77,14 +78,18 @@ at a certain level specified by a factor variable. By using unit-level inverse-c
 sampling distribution becomes a Student-t distribution, and by using unit-level exponential factors it becomes
 a Laplace or double exponential distribution.}
 
+\item{logJacobian}{if the data are transformed the logarithm of the Jacobian can be supplied so that it
+is incorporated in all log-likelihood computations. This can be useful for comparing information criteria
+for different transformations. It should be supplied as a vector of the same size as the response variable,
+and is currently only supported if \code{family="gaussian"}.
+For example, when a log-transformation is used on response vector \code{y}, the vector \code{-log(y)}
+should be supplied.}
+
 \item{linpred}{a list of matrices defining (possibly out-of-sample) linear predictors to be simulated.
 This allows inference on e.g. (sub)population totals or means. The list must be of the form
-\code{list(name_1=X_1, ...)} where the names refer to the model component names and predictors are
-computed by summing \code{X_i \%*\% p[[name_i]]}. Alternatively, \code{X_i} may be the name of an object
-stored in \code{mod[[name_i]]}, typically \code{"X"} corresponding to the design matrix.
-Finally, \code{linpred="fitted"} can be used if the linear predictor corresponds to fitted values.}
-
-\item{data}{data frame with n rows in which the variables specified in model components (if any) can be found.}
+\code{list(name_1=X_1, ...)} where the names refer to the model component names and predictions are
+computed by summing \code{X_i \%*\% p[[name_i]]}. Alternatively, \code{linpred="fitted"} can be used
+for simulations of the full in-sample linear predictor.}
 
 \item{compute.weights}{if \code{TRUE} weights are computed for each element of \code{linpred}. Note that for
 a large dataset in combination with vector-valued linear predictors the weights can take up a lot of memory.

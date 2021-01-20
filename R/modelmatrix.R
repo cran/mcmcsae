@@ -71,12 +71,12 @@ model_matrix <- function(formula, data=environment(formula), contrasts.arg=NULL,
     trms <- terms(formula, data=data)
     n <- nrow(data)
   }
-  tmat <- attr(trms, "factor")
   if (!is.null(by)) {
     if (length(by) != n) stop("incompatible vector 'by'")
     Maggr <- aggrMatrix(by)
   }
   has_intercept <- attr(trms, "intercept") == 1L
+  tmat <- terms_matrix(trms)
   if (!length(tmat)) {
     if (has_intercept) {
       if (isTRUE(sparse))
@@ -88,18 +88,18 @@ model_matrix <- function(formula, data=environment(formula), contrasts.arg=NULL,
       else
         return(crossprod(Maggr, out))
     } else {
-      # empty design matrix; copy behaviour of (sparse.)model.matrix
+      # empty design matrix
       if (isTRUE(sparse))
-        return(sparseMatrix(i=integer(0L), p=0L, dims=c(if (is.null(by)) n else ncol(by), 0L), check=FALSE))
+        return(zeroMatrix(if (is.null(by)) n else ncol(by), 0L))
       else
-        return(matrix(nrow=if (is.null(by)) n else ncol(by), ncol=0L))
+        return(matrix(0, nrow=if (is.null(by)) n else ncol(by), ncol=0L))
     }
   }
   tnames <- colnames(tmat)
   vnames <- rownames(tmat)
   # 1. analyse
   # which variables are quantitative
-  qvar <- !catvars(formula, data)
+  qvar <- !catvars(trms, data)
   qterm <- apply(tmat, 2L, function(x) any(qvar[x == 1L]))
   qvar <- vnames[which(qvar)]
   q <- if (has_intercept) 1L else 0L  # nr of columns
@@ -300,14 +300,23 @@ model_matrix <- function(formula, data=environment(formula), contrasts.arg=NULL,
 }
 
 
-# returns a named logical vector indicating for each variable in
-#   the model formula whether it is categorical
-catvars <- function(model, data=environment(model)) {
-  trms <- terms(model, data=data)
-  vnames <- rownames(attr(trms, "factor"))
+# return a named logical vector indicating for each variable in
+#   the model terms object whether it is categorical
+catvars <- function(trms, data) {
+  vnames <- rownames(terms_matrix(trms))
   vapply(vnames, function(x) {
       temp <- eval_in(x, data)
       is.factor(temp) || is.character(temp)
     }, FALSE
   )
+}
+
+# extract the independent variable in terms matrix from a terms object
+terms_matrix <- function(trms) {
+  tmat <- attr(trms, "factor")
+  if (attr(trms, "response")) {
+    w <- which(rowSums(tmat) == 0)
+    if (length(w)) tmat <- tmat[-w, , drop=FALSE]
+  }
+  tmat
 }

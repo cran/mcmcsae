@@ -36,8 +36,8 @@ Use \code{as.matrix} to convert to a matrix, concatenating the chains.
 \donttest{
 data(iris)
 sampler <- create_sampler(Sepal.Length ~ reg(~ Petal.Length + Species, name="beta"), data=iris)
-sim <- MCMCsim(sampler, burnin=100, n.chain=2, n.iter=500)
-(summary(sim))
+sim <- MCMCsim(sampler, burnin=100, n.chain=2, n.iter=400)
+summary(sim)
 if (require("coda", quietly=TRUE)) {
   mcbeta <- to_mcmc(sim$beta)
   geweke.diag(mcbeta)
@@ -51,7 +51,7 @@ dat <- data.frame(x=runif(n), f=as.factor(sample(1:5, n, replace=TRUE)))
 gd <- generate_data(~ reg(~ x + f, Q0=1, name="beta"), data=dat)
 dat$y <- gd$y
 sampler <- create_sampler(y ~ reg(~ x + f, name="beta"), data=dat)
-sim <- MCMCsim(sampler, n.chain=2, n.iter=500)
+sim <- MCMCsim(sampler, n.chain=2, n.iter=400)
 str(sim$beta)
 str(as.array(sim$beta))
 bayesplot::mcmc_hist(as.array(sim$beta))
@@ -63,7 +63,7 @@ bayesplot::mcmc_recover_hist(as.array(sim$beta), gd$pars$beta)
 ex <- mcmcsae_example()
 plot(ex$dat$fT, ex$dat$y)
 sampler <- create_sampler(ex$model, data=ex$dat)
-sim <- MCMCsim(sampler, n.chain=2, n.iter=500, store.all=TRUE)
+sim <- MCMCsim(sampler, n.chain=2, n.iter=400, store.all=TRUE)
 str(sim$beta)
 str(as.matrix(sim$beta))
 # fake data simulation check:

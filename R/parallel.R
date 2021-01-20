@@ -208,8 +208,9 @@ split_iters <- function(obj, iters=NULL, parts=NULL) {
     if (!all(iters %in% seq_len(ndraws(obj)))) stop("non-existing iterations selected")
   }
   n.iter <- length(iters)
+  if (n.iter < parts) stop("cannot split ", n.iter, " draws in ", parts, " parts")
   its <- rep(n.iter %/% parts, parts) + rep(1:0, c(n.iter %% parts, parts - n.iter %% parts))
-  its <- split(seq_len(n.iter), rep(seq_len(parts), its))
+  its <- split(iters, rep(seq_len(parts), its))
   out <- rep(list(NULL), parts)
   obj_class <- class(obj)[1L]
   if (!(obj_class %in% c("dc", "draws"))) stop("unsupported class '", obj_class, "'")

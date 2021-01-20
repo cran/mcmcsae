@@ -109,7 +109,7 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
   q <- ncol(X)
   in_block <- name %in% unlist(e$block)
 
-  Q0 <- set_prior_precision(Q0, q, sparse=if (in_block) TRUE else NULL)  # blocking currently uses x-slot of precision matrix
+  Q0 <- set_prior_precision(Q0, q, sparse=if (in_block) TRUE else NULL)  # mc_block uses x-slot of precision matrix
   informative.prior <- !is_zero_matrix(Q0)
   if (!informative.prior || is.null(b0) || all(b0 == 0)) {
     b0 <- 0

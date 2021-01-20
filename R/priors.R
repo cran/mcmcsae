@@ -22,6 +22,27 @@ set_prior_precision <- function(Q0=NULL, q, sparse=NULL) {
   Q0
 }
 
+#' Create an object containing information about a degenerate prior fixing a
+#' parameter to a fixed value
+#'
+#' @export
+#' @param value value parameter of length 1 or \code{n}.
+#' @param n dimension, if known. For internal use only.
+#' @param post whether conditional posterior sampling function should be
+#'  created. For internal use only.
+#' @return An environment with information about the prior and possibly conditional
+#'  posterior distribution(s), to be used by other package functions.
+pr_fixed <- function(value=1, n=NULL, post=FALSE) {
+  if (!is.null(n)) {
+    n <- as.integer(n)
+    if (!(length(value) %in% c(1L, n))) stop("value parameter has wrong length")
+    rprior <- function() value
+    if (post) draw <- function() value
+  }
+  type <- "fixed"
+  environment()
+}
+
 #' Create an object containing information about exponential prior distributions
 #'
 #' @export
@@ -36,9 +57,9 @@ set_prior_precision <- function(Q0=NULL, q, sparse=NULL) {
 #      to sample from
 pr_exp <- function(scale=1, n=NULL, post=FALSE) {
   if (!all(scale > 0)) stop("scale parameter must be positive")
-  if (!is.null(n) && !(length(scale) %in% c(1L, n))) stop("scale parameter has wrong length")
   if (!is.null(n)) {
     n <- as.integer(n)
+    if (!(length(scale) %in% c(1L, n))) stop("scale parameter has wrong length")
     rprior <- function() scale * rexp(n)
     if (post) {
       # TODO set a=2/scale here, and default p=-1/2
@@ -47,6 +68,34 @@ pr_exp <- function(scale=1, n=NULL, post=FALSE) {
     }
   }
   type <- "exp"
+  environment()
+}
+
+#' Create an object containing information about Generalized Inverse Gaussian (GIG) prior distributions
+#'
+#' @export
+#' @param a parameter of length 1 or \code{n}.
+#' @param b parameter of length 1 or \code{n}.
+#' @param p parameter of length 1 or \code{n}.
+#' @param n dimension, if known. For internal use only.
+#' @param post whether conditional posterior sampling function should be
+#'  created. For internal use only.
+#' @return An environment with information about the prior and possibly conditional
+#'  posterior distribution(s), to be used by other package functions.
+pr_gig <- function(a, b, p, n=NULL, post=FALSE) {
+  if (any(a < 0)) stop("parameter 'a' must be nonnegative")
+  if (any(b < 0)) stop("parameter 'b' must be nonnegative")
+  if (any(a[p >= 0] == 0)) stop("parameter 'a' should not be 0 when p >= 0")
+  if (any(b[p <= 0] == 0)) stop("parameter 'b' should not be 0 when p <= 0")
+  if (!is.null(n)) {
+    n <- as.integer(n)
+    if (!(length(a) %in% c(1L, n))) stop("parameter 'a' has wrong length")
+    if (!(length(b) %in% c(1L, n))) stop("parameter 'b' has wrong length")
+    if (!(length(p) %in% c(1L, n))) stop("parameter 'p' has wrong length")
+    rprior <- function() Crgig(n, p, a, b)
+    if (post) draw <- function(p, a, b) Crgig(n, p, a, b)
+  }
+  type <- "gig"
   environment()
 }
 

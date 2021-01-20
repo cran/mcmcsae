@@ -345,7 +345,7 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
       if (!is.null(Rf)) {
         nIGMRF <- nIGMRF + 1L
         if (is.null(out$R)) {
-          out$R <- Matrix(0, prod(factor.info$n[seq_len(f)]), 0L)
+          out$R <- zeroMatrix(prod(factor.info$n[seq_len(f)]), 0L)
         }
         out$R <- cbind(out$R, kronecker(Rf, CdiagU(prod(factor.info$n[seq_len(f - 1L)]))))
       }

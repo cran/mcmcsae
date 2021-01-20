@@ -72,3 +72,11 @@ test_that("kronecker product closure template works, fixed M1", {
   M2b <- M2 + runif(1)
   expect_equal(kron(M1, M2b), as(as(kronecker(M1, Cdiag(rep.int(M2b, 12))), "CsparseMatrix"), "symmetricMatrix"))
 })
+
+test_that("kronecker product template does not fail with explicit zeros", {
+  M1 <- Diagonal(x=c(1,0,3))
+  M2 <- matrix(c(2,1,1,2), 2, 2)
+  kron <- build_kron(M1, M2, q2=2)
+  M2b <- rWishart(1L, 2, diag(2))[,,1L]
+  expect_equal(sum(abs(kron(M1, M2b) - kronecker(M1, M2b))), 0)
+})

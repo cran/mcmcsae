@@ -34,8 +34,7 @@
 #' }
 #'
 #' @export
-#' @author Harm Jan Boonstra and Grzegorz Baltissen, who helped implement a first version
-#'  of the TMVNV Gibbs sampler.
+#' @author Harm Jan Boonstra, with help from Grzegorz Baltissen
 #' @param Q precision matrix (unconstrained) (n x n); used in case \code{cholQ} is not supplied.
 #' @param perm whether permutation/pivoting should be used to build a Cholesky object.
 #' @param mu mean of the (unconstrained) multivariate normal distribution.
@@ -277,8 +276,8 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       # currently tabMatrix disallowed because used as solve rhs below
       S <- economizeMatrix(S, sparse=if (class(cholQ$cholM)[1L] == "matrix") FALSE else NULL, allow.tabMatrix=FALSE)
       if (method == "HMC" && !update.Q) {
-        # define VS as Q^-1 S = V S
-        VS <- economizeMatrix(cholQ$solve(S), sparse=if (is.matrix(cholQ$cholM)) FALSE else NULL, allow.tabMatrix=FALSE)  # NB alternatively transform after projection
+        # define VS as Q^-1 S = V S; alternatively transform after projection
+        VS <- economizeMatrix(cholQ$solve(S), sparse=if (is.matrix(cholQ$cholM)) FALSE else NULL, allow.tabMatrix=FALSE)
       }
     }
     if (method == "Gibbs") {
@@ -441,12 +440,12 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     # set function signature (avoiding check NOTE)
     if (update.Q) {
       # total precision matrix to use in chol is Q + Imult*I
-      formals(draw) <- c(alist(p=), alist(scale=1), alist(Q=), alist(Imult=0), alist(Xy=))
+      formals(draw) <- alist(p=, scale=1, Q=, Imult=0, Xy=)
     } else {
       if (update.mu)
-        formals(draw) <- c(alist(p=), alist(scale=1), alist(Xy=))
+        formals(draw) <- alist(p=, scale=1, Xy=)
       else
-        formals(draw) <- c(alist(p=), alist(scale=1))
+        formals(draw) <- alist(p=, scale=1)
     }
   }  # END if (method == "direct")
 
@@ -557,8 +556,9 @@ create_TMVN_sampler <- function(Q, perm=NULL,
   }  # END if (method == "Gibbs") {
 
   if (method == "HMC") {
-    draw <- function(p) {
+    draw_temp <- function(p, Imult) {
       if (update.Q) {
+        cholQ$update(Q, Imult)
         VS <- cholQ$solve(S)
         if (eq) {
           if (bigR) {
@@ -581,10 +581,10 @@ create_TMVN_sampler <- function(Q, perm=NULL,
               mu <- mu + cholQ$solve(R %m*v% cholRVR$solve(r - crossprod_mv(R, mu)))
             else
               mu <- mu + VR %m*v% cholRVR$solve(r - crossprod_mv(R, mu))
-            else
-              mu <- mu + VR.RVRinv %m*v% (r - crossprod_mv(R, mu))
-            s.adj <- s - crossprod_mv(S, mu)  # if positive, mu violates inequalities
-            abs.s.adj <- abs(s.adj)
+          else
+            mu <- mu + VR.RVRinv %m*v% (r - crossprod_mv(R, mu))
+        s.adj <- s - crossprod_mv(S, mu)  # if positive, mu violates inequalities
+        abs.s.adj <- abs(s.adj)
       }
 
       # 1. draw p from N(0, M^{-1}); instead draw v=dx/dt from N(0, M)
@@ -707,15 +707,16 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       }
 
       p
-    }  # END function draw
-    # set function signature (avoiding check NOTE)
+    }  # END function draw_temp
+    draw <- draw_temp
+    rm(draw_temp)
     if (update.Q) {
-      formals(draw) <- c(alist(p=), alist(scale=1), alist(cholQ=), alist(Xy=))
+      formals(draw) <- alist(p=, scale=1, Q=, Imult=0, Xy=)
     } else {
       if (update.mu)
-        formals(draw) <- c(alist(p=), alist(scale=1), alist(Xy=))
+        formals(draw) <- alist(p=, scale=1, Xy=)
       else
-        formals(draw) <- c(alist(p=), alist(scale=1))
+        formals(draw) <- alist(p=, scale=1)
     }
   }  # END if (method == "HMC")
 

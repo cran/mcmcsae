@@ -48,35 +48,34 @@
 #'  Other terms in the formula are interpreted as ordinary regression
 #'  effects (treated in the same way as \code{reg(...)} terms, but without the option to change e.g. the prior),
 #'  An offset can be specified as \code{offset(...)}.
+#' @param data data frame with n rows in which the variables specified in model components (if any) can be found.
 #' @param family character string describing the data distribution. The default is 'gaussian'.
 #'  Other options are 'binomial' for the binomial distribution and 'negbinomial' for the negative binomial distribution.
-#'  For the binomial and negative binomial distributions a logistic link function is used.
-#'  In the case of binary data a probit link function is also supported for the binomial/Bernoulli
-#'  distribution.
+#'  For the binomial and negative binomial distributions logistic and log link functions are used by default, respectively.
+#'  In the case of binary data a probit link function is also supported for the binomial/Bernoulli distribution.
 #' @param ny in case \code{family="binomial"} the (vector of) numbers of trials.
 #'  It can be either a numeric vector or the name of a variable in \code{data}.
 #'  Defaults to a vector of 1s.
-#' @param ry in case \code{family="negbinomial"} the overdispersion parameter or vector
-#'  of overdispersion parameters. Use \code{r.mod} instead if the (scalar)
-#'  overdispersion parameter should be inferred from the data. If neither
-#'  \code{ry} nor \code{r.mod} is specified a default inverse chi-squared
+#' @param ry in case \code{family="negbinomial"} the dispersion parameter or vector
+#'  of dispersion parameters. Use \code{r.mod} instead if the (scalar)
+#'  dispersion parameter should be inferred from the data. If neither
+#'  \code{ry} nor \code{r.mod} is specified a default chi-squared
 #'  prior with 1 degree of freedom is assumed.
-#' @param r.mod in case \code{family="negbinomial"}, a prior for the (inverse) overdispersion parameter.
-#'  In this case the (scalar) overdispersion parameter is inferred from the data.
-#'  The prior can be specified by a call to a prior specification function.
-#'  Currently only \code{\link{pr_invchisq}} is supported, which may be used
-#'  to specify an inverse chi-squared or beta-prime prior for the
-#'  inverse overdispersion parameter.
+#' @param r.mod prior specification for a scalar (reciprocal) dispersion parameter
+#'  of the negative binomial distribution, in case the dispersion parameter is
+#'  to be inferred. The prior can be specified by a call to a prior specification function.
+#'  Currently \code{\link{pr_invchisq}}, \code{\link{pr_gig}} and \code{\link{pr_fixed}}
+#'  are supported.
 #' @param sigma.fixed for Gaussian models, if \code{TRUE} the residual standard deviation parameter 'sigma_' is fixed at 1. In that case
 #'  argument \code{sigma.mod} is ignored. This is convenient for Fay-Herriot type models with (sampling) variances assumed to be known.
 #'  Default is \code{FALSE}.
 #' @param sigma.mod prior for the variance parameter of a gaussian sampling distribution.
 #'  This can be specified by a call to one of the prior specification functions
-#'  \code{\link{pr_invchisq}} and \code{\link{pr_exp}} for an inverse chi-squared or
-#'  exponential prior distribution, respectively. The default is an improper
-#'  prior \code{pr_invchisq(df=0, scale=1)}. A half-t prior on the
-#'  standard deviation can be specified using
-#'  \code{\link{pr_invchisq}} with a chi-squared distributed scale parameter.
+#'  \code{\link{pr_invchisq}}, \code{\link{pr_exp}}, \code{\link{pr_gig}} or \code{\link{pr_fixed}} for
+#'  inverse chi-squared, exponential, generalized inverse gaussian or degenerate prior distribution,
+#'  respectively. The default is an improper prior \code{pr_invchisq(df=0, scale=1)}. A half-t prior on the
+#'  standard deviation can be specified using \code{\link{pr_invchisq}} with a chi-squared distributed scale
+#'  parameter.
 #' @param Q0 n x n data-level precision matrix for a Gaussian model. It defaults to the unit matrix.
 #'  If an n-vector is provided it will be expanded to a (sparse) diagonal matrix with Q0 on its diagonal.
 #'  If a name is supplied it will be looked up in \code{data} and subsequently expanded to a diagonal matrix.
@@ -86,13 +85,17 @@
 #'  at a certain level specified by a factor variable. By using unit-level inverse-chi-squared factors the marginal
 #'  sampling distribution becomes a Student-t distribution, and by using unit-level exponential factors it becomes
 #'  a Laplace or double exponential distribution.
+#' @param logJacobian if the data are transformed the logarithm of the Jacobian can be supplied so that it
+#'  is incorporated in all log-likelihood computations. This can be useful for comparing information criteria
+#'  for different transformations. It should be supplied as a vector of the same size as the response variable,
+#'  and is currently only supported if \code{family="gaussian"}.
+#'  For example, when a log-transformation is used on response vector \code{y}, the vector \code{-log(y)}
+#'  should be supplied.
 #' @param linpred a list of matrices defining (possibly out-of-sample) linear predictors to be simulated.
 #'  This allows inference on e.g. (sub)population totals or means. The list must be of the form
-#'  \code{list(name_1=X_1, ...)} where the names refer to the model component names and predictors are
-#'  computed by summing \code{X_i \%*\% p[[name_i]]}. Alternatively, \code{X_i} may be the name of an object
-#'  stored in \code{mod[[name_i]]}, typically \code{"X"} corresponding to the design matrix.
-#'  Finally, \code{linpred="fitted"} can be used if the linear predictor corresponds to fitted values.
-#' @param data data frame with n rows in which the variables specified in model components (if any) can be found.
+#'  \code{list(name_1=X_1, ...)} where the names refer to the model component names and predictions are
+#'  computed by summing \code{X_i \%*\% p[[name_i]]}. Alternatively, \code{linpred="fitted"} can be used
+#'  for simulations of the full in-sample linear predictor.
 #' @param compute.weights if \code{TRUE} weights are computed for each element of \code{linpred}. Note that for
 #'  a large dataset in combination with vector-valued linear predictors the weights can take up a lot of memory.
 #'  By default only means are stored in the simulation carried out using \code{\link{MCMCsim}}.
@@ -131,11 +134,11 @@
 #'  M. Zhou and L. Carin (2015).
 #'    Negative Binomial Process Count and Mixture Modeling.
 #'    IEEE Transactions on Pattern Analysis and Machine Intelligence 37(2), 307-320.
-create_sampler <- function(formula, family="gaussian",
+create_sampler <- function(formula, data=NULL, family="gaussian",
                            ny=NULL, ry, r.mod,
                            sigma.fixed=NULL,
-                           sigma.mod=NULL, Q0=NULL, formula.V=NULL,
-                           linpred=NULL, data=NULL,
+                           sigma.mod=NULL, Q0=NULL, formula.V=NULL, logJacobian=NULL,
+                           linpred=NULL,
                            compute.weights=FALSE, block=compute.weights,
                            prior.only=FALSE,
                            control=NULL) {
@@ -159,14 +162,17 @@ create_sampler <- function(formula, family="gaussian",
       warning("no left hand side in 'formula': setting up prior samplers only", immediate.=TRUE)
       prior.only <- TRUE
     }
-    # TODO data not always required in this case
-    if (is.null(data)) stop("'data' argument required")
-    n <- nrow(data)
+    if (is.null(data)) {
+      if (!length(all.vars(formula))) stop("no way to determine the number of cases")
+      n <- length(get(all.vars(formula)[1L]))
+    } else
+      n <- nrow(data)
   }
 
   if (n < 1L) stop("empty data")
   if (is.null(data)) {
-    data <- data.frame(`(Intercept)`=rep.int(1L, n))  # need this to determine sample size
+    # ensure that n can always be determined by model_Matrix
+    data <- data.frame(`(Intercept)`=rep.int(1L, n))
   }
 
   mod <- to_mclist(formula)
@@ -228,7 +234,7 @@ create_sampler <- function(formula, family="gaussian",
       y_eff <- function() 0
     use.offset <- FALSE
   }
-  
+
   if (family$family == "gaussian") {
     if (!is.null(ny)) warning("argument 'ny' ignored for family 'gaussian'")
     if (prior.only || n == 1L) {
@@ -239,7 +245,7 @@ create_sampler <- function(formula, family="gaussian",
       scale_y <- sd(y) / (length(mod) + 1L)
       if (scale_y == 0 || !is.finite(scale_y)) scale_y <- 1
     }
-    if (!identical(sigma.fixed, TRUE)) sigma.fixed <- FALSE
+    if (!isTRUE(sigma.fixed)) sigma.fixed <- FALSE
     f_mean <- identity  # mean function acting on linear predictor
   } else {  # binomial or negative-binomial likelihood
     if (!isUnitDiag(Q0) || !is.null(formula.V)) stop("'Q0' and 'formula.V' arguments cannot be used with (negative) binomial likelihood")
@@ -266,15 +272,25 @@ create_sampler <- function(formula, family="gaussian",
     } else {  # negative binomial likelihood
       if (!is.null(ny)) warning("argument 'ny' ignored for negative binomial sampling")
       if (missing(ry)) {
-        if (missing(r.mod))
-          r.mod <- pr_invchisq(1, 1, 1L, post = !prior.only)
-        else
-          r.mod <- pr_invchisq(r.mod$df, r.mod$scale, 1L, post = !prior.only)
-        if (is.list(r.mod$df)) stop("modeled degrees of freedom not supported for negative binomial overdispersion parameter")
+        if (missing(r.mod)) r.mod <- pr_invchisq(df=1, scale=1)
+        switch(r.mod$type,
+          fixed = {
+            if (r.mod$value <= 0) stop("negative binomial dispersion parameter must be positive")
+            r.mod <- pr_fixed(r.mod$value, n=1L, !prior.only)
+          },
+          invchisq = {
+            if (is.list(r.mod$df)) stop("modeled degrees of freedom parameter not supported in 'r.mod'")
+            r.mod <- pr_invchisq(r.mod$df, r.mod$scale, n=1L, post = !prior.only)
+          },
+          gig = {
+            r.mod <- pr_gig(r.mod$a, r.mod$b, r.mod$p, n=1L, post = !prior.only)
+          },
+          stop("unsupported prior")
+        )
         modeled.r <- TRUE
         y <- as.numeric(y)  # for C++ rCRT function; alternatively force to be integer
         f_mean <- function(eta) stop("TBI: mean function for negative binomial with modeled dispersion parameter")
-      } else {  # prior on overdispersion parameter
+      } else {  # prior on dispersion parameter
         if (!missing(r.mod)) warning("argument 'r.mod' ignored")
         if (is.character(ry)) ry <- data[[ry]]
         if (!(length(ry) %in% c(1L, n))) stop("'ry' has wrong length")
@@ -312,7 +328,9 @@ create_sampler <- function(formula, family="gaussian",
     if (!length(block)) stop("'block' must contain at least one character vector")
     for (b in seq_along(block)) {
       if (length(block[[b]]) < 2L) warning("block with only one model component")
-      if (!all(block[[b]] %in% names(mod))) stop("invalid name in block ", b)
+      if (!all(block[[b]] %in% names(mod))) {
+        stop("invalid name(s) '", paste(setdiff(block[[b]], names(mod)), collapse="', '"), "' in block ", b)
+      }
     }
     if (any(duplicated(unlist(block)))) stop("a model component name can only appear once in 'block'")
   }
@@ -342,6 +360,7 @@ create_sampler <- function(formula, family="gaussian",
     mc <- as.list(mc)[-1L]
     mod[[mc$name]] <- switch(types[k],
       reg = do.call(reg, mc, envir=parent.frame()),
+      mec = do.call(mec, mc, envir=parent.frame()),
       gen = do.call(gen, mc, envir=parent.frame())
     )
   }
@@ -353,12 +372,19 @@ create_sampler <- function(formula, family="gaussian",
   } else {
     if (is.null(sigma.mod)) sigma.mod <- pr_invchisq(df=0, scale=1)
     switch(sigma.mod$type,
+      fixed = {
+        if (sigma.mod$value <= 0) stop("standard deviation parameter must be positive")
+        sigma.mod <- pr_fixed(sigma.mod$value, n=1L, !prior.only)
+      },
       invchisq = {
         if (is.list(sigma.mod$df)) stop("modeled degrees of freedom parameter not supported in 'sigma.mod'")
         sigma.mod <- pr_invchisq(sigma.mod$df, sigma.mod$scale, n=1L, !prior.only)
       },
       exp = {
         sigma.mod <- pr_exp(sigma.mod$scale, n=1L, !prior.only)
+      },
+      gig = {
+        sigma.mod <- pr_gig(sigma.mod$a, sigma.mod$b, sigma.mod$p, n=1L, !prior.only)
       },
       stop("unsupported prior")
     )
@@ -450,42 +476,38 @@ create_sampler <- function(formula, family="gaussian",
   for (k in seq_along(mod)) {
     mc <- mod[[k]]
     switch(mc$type,
-       reg = {
-         rprior <- add(rprior, bquote(p[[.(mc$name)]] <- mod[[.(k)]]$rprior(p)))
-       },
-       gen = {
-         rprior <- add(rprior, bquote(p <- mod[[.(k)]]$rprior(p)))
-       }
+      reg = rprior <- add(rprior, bquote(p[[.(mc$name)]] <- mod[[.(k)]]$rprior(p))),
+      mec = rprior <- add(rprior, bquote(p <- mod[[.(k)]]$rprior(p))),
+      gen = rprior <- add(rprior, bquote(p <- mod[[.(k)]]$rprior(p)))
     )
   }
 
-  if (!is.null(linpred)) {
-    if (length(linpred) == 1L && linpred == "fitted") {
-      linpred <- as.list(rep.int("X", length(mod)))
-      names(linpred) <- names(mod)
-    }
-    if (!all(names(linpred) %in% names(mod))) stop("not all names of 'linpred' are model component names")
-    for (k in names(linpred)) {
-      if (!is.character(linpred[[k]]))
+  if (is.null(linpred)) {
+    do.linpred <- FALSE
+  } else {
+    if (identical(linpred, "fitted")) {
+      linpred <- NULL
+    } else {
+      if (!all(names(linpred) %in% names(mod))) stop("not all names of 'linpred' are model component names")
+      for (k in names(linpred))
         linpred[[k]] <- economizeMatrix(linpred[[k]], strip.names=FALSE)
     }
+    do.linpred <- TRUE
     rprior <- add(rprior, quote(p$linpred_ <- lin_predict(p, linpred)))
-    # indicator for full in-sample linear prediction; used in predict method
-    full.in.sample.prediction <- (length(linpred) == length(mod)) && all(unlist(linpred) == "X")
   }
 
   lin_predict <- function(p, linpred) {
     out <- if (use.offset) offset else 0
-    for (k in names(linpred))
-      if (is.character(linpred[[k]]))
-        out <- out + mod[[k]][[linpred[[k]]]] %m*v% p[[k]]
-      else
-        out <- out + linpred[[k]] %m*v% p[[k]]
+    if (is.null(linpred))
+      for (mc in mod) out <- out + mc$linpred(p)
+    else
+      for (k in names(linpred))
+        out <- out + if (is.function(linpred[[k]])) linpred[[k]](p) else linpred[[k]] %m*v% p[[k]]
     out
   }
   # generate from predictive distribution; lp is output of lin_predict
   switch(family$family,
-    gaussian = 
+    gaussian =
       rpredictive <- function(p, lp, cholQ=NULL, var=NULL, V=NULL, ny) {
         sigma <- if (sigma.fixed) 1 else p[["sigma_"]]
         if (is.null(var)) {  # in-sample, cholQ must be supplied
@@ -500,18 +522,19 @@ create_sampler <- function(formula, family="gaussian",
         } else {
           if (modeled.Q)
             for (mc in Vmod) var <- var * V[[mc$name]](p)
-          rnorm(length(lp), mean=lp, sd=sigma * sqrt(var))
+          lp + sigma * sqrt(var) * Crnorm(length(lp))
         }
       },
     binomial = 
       rpredictive <- function(p, lp, cholQ=NULL, var=NULL, V=NULL, ny)
         rbinom(length(lp), size=ny, prob=family$linkinv(lp)),
     negbinomial = 
-      rpredictive <- function(p, lp, cholQ=NULL, var=NULL, V=NULL, ny) {
-        # NB definition of rnbinom has p <-> 1-p
-        if (modeled.r)
+      # NB definition of rnbinom has p <-> 1-p
+      if (modeled.r) {
+        rpredictive <- function(p, lp, cholQ=NULL, var=NULL, V=NULL, ny)
           rnbinom(length(lp), size=p[["negbin_r_"]], prob=1/(1 + exp(lp)))
-        else
+      } else {
+        rpredictive <- function(p, lp, cholQ=NULL, var=NULL, V=NULL, ny)
           rnbinom(length(lp), size=ry, prob=1/(1 + exp(lp)))
       }
   )
@@ -529,6 +552,9 @@ create_sampler <- function(formula, family="gaussian",
             delta.beta <- p[[mc$name]] - mc$b0
             - mc$q * log(sigma) - 0.5 * dotprodC(delta.beta, mc$Q0 %m*v% delta.beta) / sigma^2
           },
+          mec = {
+            stop("TBI: log-prior for measurement error in covariates component")
+          },
           gen = {
             stop("TBI: log-prior for generic model component")
           }
@@ -541,11 +567,12 @@ create_sampler <- function(formula, family="gaussian",
   store_default <- function(prior.sampler=FALSE) {
     out <- if (prior.sampler) NULL else "llh_"
     if (!sigma.fixed) out <- c(out, "sigma_")
-    if (!is.null(linpred)) out <- c(out, "linpred_")
+    if (do.linpred) out <- c(out, "linpred_")
     if (family$family == "negbinomial" && modeled.r) out <- c(out, "negbin_r_")
     for (mc in mod)
       switch(mc$type,
         reg = out <- c(out, mc$name),
+        mec = out <- c(out, mc$name),
         gen = {
           out <- c(out, mc$name_sigma)
           if (mc$var == "unstructured") out <- c(out, mc$name_rho)
@@ -579,11 +606,11 @@ create_sampler <- function(formula, family="gaussian",
   }
 
 
-  if (compute.weights && is.null(linpred)) stop("weights can only be computed for a linear predictor specified by argument 'linpred'")
+  if (compute.weights && !do.linpred) stop("weights can only be computed for a linear predictor specified by argument 'linpred'")
   if (compute.weights && !single.block) stop("'compute.weights=TRUE' cannot be combined with 'block=FALSE'")
 
   if (length(block)) {
-    mbs <- list()  # model blocks
+    mbs <- list()
     for (b in seq_along(block)) mbs[[b]] <- create_mc_block(mod[block[[b]]])
     rm(b)
   }
@@ -660,17 +687,32 @@ create_sampler <- function(formula, family="gaussian",
   adapt <- function(ar) {}
 
   if (family$family == "negbinomial" && modeled.r) {
-    # draw latent L_i (i=1:n) from its CRT f.c.
-    mCRT <- .opts$CRT.approx.m
-    draw <- add(draw, quote(L <- CrCRT(y, p[["negbin_r_"]], mCRT)))
-    # draw overdispersion parameter r
-    if (is.list(r.mod$scale))
-      draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(2*sum(L), 2*sum(log1pexpC(p[["e_"]])), p[["negbin_r_"]])))
-    else
-      draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(2*sum(L), 2*sum(log1pexpC(p[["e_"]])))))
+    if (r.mod$type == "fixed") {
+      start <- add(start, quote(if (is.null(p[["negbin_r_"]])) p$negbin_r_ <- 1/r.mod$rprior()))
+    } else {
+      # draw latent L_i (i=1:n) from its CRT f.c.
+      mCRT <- .opts$CRT.approx.m
+      draw <- add(draw, quote(L <- CrCRT(y, p[["negbin_r_"]], mCRT)))
+      start <- add(start, quote(if (is.null(p[["negbin_r_"]])) p$negbin_r_ <- runif(1L, 0.1, 10)))
+      start <- add(start, quote(if (length(p[["negbin_r_"]]) != 1L) stop("wrong length for 'negbin_r_' start value")))
+    }
+    # draw dispersion parameter r
+    switch(r.mod$type,
+      fixed = {
+        draw <- add(draw, quote(p$negbin_r_ <- 1/r.mod$draw()))
+      },
+      invchisq = {
+        if (is.list(r.mod$scale))
+          draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(2*sum(L), 2*sum(log1pexpC(p[["e_"]])), p[["negbin_r_"]])))
+        else
+          draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(2*sum(L), 2*sum(log1pexpC(p[["e_"]])))))
+
+      },
+      gig = {
+        draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(p = r.mod$p - sum(L), a = r.mod$a, b = r.mod$b + 2*sum(log1pexpC(p[["e_"]])))))
+      }
+    )
     draw <- add(draw, quote(ny <- y + p[["negbin_r_"]]))  # used in Polya-Gamma full conditional for latent precision vector
-    start <- add(start, quote(if (is.null(p[["negbin_r_"]])) p$negbin_r_ <- runif(1L, 0.1, 10)))
-    start <- add(start, quote(if (length(p[["negbin_r_"]]) != 1L) stop("wrong length for 'negbin_r_' start value")))
     start <- add(start, quote(ny <- y + p[["negbin_r_"]]))
   }
 
@@ -729,7 +771,7 @@ create_sampler <- function(formula, family="gaussian",
     for (k in seq_along(mod)) {
       mc <- mod[[k]]
       switch(mc$type,
-        reg = {
+        reg=, mec = {
           if (mc$informative.prior) {
             if (is.null(mc$R))
               df.data <- df.data + mc$q
@@ -753,8 +795,10 @@ create_sampler <- function(formula, family="gaussian",
         stop("unrecognized model type")
       )
     }
-    # return state with new standard deviation and log-likelihood
     switch(sigma.mod$type,
+      fixed = {
+        draw_sigma <- add(draw_sigma, quote(p$sigma_ <- sqrt(sigma.mod$draw())))
+      },
       invchisq = {
         if (is.list(sigma.mod$scale))
           draw_sigma <- add(draw_sigma, quote(p$sigma_ <- sqrt(sigma.mod$draw(df.data, SSR, 1 / p[["sigma_"]]^2))))
@@ -762,14 +806,22 @@ create_sampler <- function(formula, family="gaussian",
           draw_sigma <- add(draw_sigma, quote(p$sigma_ <- sqrt(sigma.mod$draw(df.data, SSR))))
       },
       exp = {
-        draw_sigma <- add(draw_sigma, quote(p$sigma_ <- sqrt(prior$draw(df.data, 2/prior$scale, SSR))))
+        draw_sigma <- add(draw_sigma, quote(p$sigma_ <- sqrt(sigma.mod$draw(1 - 0.5*df.data, 2/sigma.mod$scale, SSR))))
+      },
+      gig = {
+        draw_sigma <- add(draw_sigma, quote(p$sigma_ <- sqrt(sigma.mod$draw(sigma.mod$p - 0.5*df.data, sigma.mod$a, sigma.mod$b + SSR))))
       }
     )
     draw_sigma <- add(draw_sigma, quote(p))
 
     draw <- add(draw, quote(p <- draw_sigma(p, SSR)))
-    start <- add(start, quote(if (is.null(p[["sigma_"]])) p$sigma_ <- runif(1L, 0.1 * scale_y, scale_y) * mean(sqrt(diag(Q0)))))
-    start <- add(start, quote(if (length(p[["sigma_"]]) != 1L) stop("wrong length for 'sigma_' start value")))
+
+    if (sigma.mod$type == "fixed") {
+      start <- add(start, quote(if (is.null(p[["sigma_"]])) p$sigma_ <- sqrt(sigma.mod$rprior())))
+    } else {
+      start <- add(start, quote(if (is.null(p[["sigma_"]])) p$sigma_ <- runif(1L, 0.1 * scale_y, scale_y) * mean(sqrt(diag(Q0)))))
+      start <- add(start, quote(if (length(p[["sigma_"]]) != 1L) stop("wrong length for 'sigma_' start value")))
+    }
   }  # END if (!sigma.fixed)
 
   for (k in seq_along(mod)) {
@@ -780,6 +832,10 @@ create_sampler <- function(formula, family="gaussian",
           start <- add(start, bquote(p <- mod[[.(k)]]$start(p)))
           draw <- add(draw, bquote(p <- mod[[.(k)]]$draw(p)))
         }
+      },
+      mec = {
+        start <- add(start, bquote(p <- mod[[.(k)]]$start(p)))
+        draw <- add(draw, bquote(p <- mod[[.(k)]]$draw(p)))
       },
       gen = {
         if (mc$gl && mc$usePX) MHpars <- c(MHpars, mc$name_xi)
@@ -795,19 +851,16 @@ create_sampler <- function(formula, family="gaussian",
       draw <- add(draw, bquote(p <- mbs[[.(k)]]$draw(p)))
       start <- add(start, bquote(p <- mbs[[.(k)]]$start(p)))
     }
-    if (compute.weights) {  # a single block in this case
-      if (length(linpred) != length(mod) || !all(names(mod) %in% names(linpred))) stop("'linpred' must be a list with names '", paste(names(mod), collapse="', '"), "'")
-    }
   }
 
-  if (!is.null(linpred)) {
+  if (do.linpred) {
     draw <- add(draw, quote(p$linpred_ <- lin_predict(p, linpred)))
   }
 
   draw <- add(draw, quote(p))  # return state p
 
   if (!control$recompute.e && !single.block) {
-    # TODO adding this sometimes gives bad starting values in case of single.block; check whether we need it anyway
+    # adding this sometimes gives bad starting values in case of single.block (no need anyway in that case)
     start <- add(start, quote(p$e_ <- compute_e(p)))
   }
   start <- add(start, quote(p))
@@ -815,10 +868,17 @@ create_sampler <- function(formula, family="gaussian",
 
   # data and functions for log-likelihood and related computations (DIC, WAIC)
   # llh can also be used as an objective function to optimize
+  if (!is.null(logJacobian)) {
+    if (family$family != "gaussian") warning("argument 'logJacobian' ignored for non-gaussian distributions")
+    logJacobian <- as.numeric(logJacobian)
+    if (length(logJacobian) != n) stop("'logJacobian' should be a vector of the same size as the response vector")
+    if (anyNA(logJacobian)) stop("missing values in 'logJacobian'")
+  }
   switch(family$family,
     gaussian = {
       # constant term llh_0 of log-likelihood
       llh_0 <- -0.5 * n * log(2*pi)
+      if (!is.null(logJacobian)) llh_0 <- llh_0 + sum(logJacobian)
       if (!modeled.Q || Q0.type == "symm") {
         llh_0 <- llh_0 + 0.5 * as.numeric(determinant(1 * Q0, logarithm=TRUE)$modulus)  # 1 * Q0 to ensure no chol object is stored with Q0 and possibly other refs to Q0
       }
@@ -878,7 +938,10 @@ create_sampler <- function(formula, family="gaussian",
             }
           }
         )
-        llh_0_i + 0.5 * ( log(q) - q * res_i^2 )
+        if (is.null(logJacobian))
+          llh_0_i + 0.5 * ( log(q) - q * res_i^2 )
+        else
+          llh_0_i + matrix(rep_each(logJacobian[i], nc*ni), nc*ni, length(i)) + 0.5 * ( log(q) - q * res_i^2 )
       }
     },
     binomial=, negbinomial = {

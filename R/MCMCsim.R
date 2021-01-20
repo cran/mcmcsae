@@ -190,15 +190,15 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
   }
 
   # derived quantities
-  if (!is.null(pred)) {
+  if (is.null(pred)) {
+    do.pred <- FALSE
+  } else {
     if (!is.list(pred) || is.null(names(pred))) stop("'pred' must be a named list")
     predict <- function(p) {}
     for (j in seq_along(pred))
       predict <- add(predict, substitute(p[[comp]] <- evalq(expr, env=p), list(expr=str2lang_(pred[[j]]), comp=names(pred)[j])))
     predict <- add(predict, quote(p))
     do.pred <- TRUE
-  } else {
-    do.pred <- FALSE
   }
 
   # set up starting values
@@ -227,14 +227,26 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
 
   if (from.prior)
     draw <- sampler$rprior  # function that returns a draw from the prior
-  else
+  else {
     draw <- sampler$draw  # function that returns a draw from the posterior
+    if (is.null(draw)) {
+      if (sampler$prior.only)
+        stop("sampler does not have a function 'draw'; please use 'from.prior=TRUE' if you want to sample from priors")
+      else
+        stop("sampler does not have a function 'draw'")
+    }
+  }
 
   # do a test draw both for timing and storage information
   timing <- system.time({
     test_draw <- draw(p[[1L]])
-    if (!is.null(pred)) test_draw <- predict(test_draw)
   })
+  if (do.pred) {
+    if (any(names(pred) %in% names(test_draw)))
+      stop("names in 'pred' clashing with sampler's parameter names: ",
+           paste(intersect(names(pred), names(test_draw)), collapse=", "))
+    timing <- timing + system.time(test_draw <- predict(test_draw))
+  }
   if (verbose && (burnin + n.iter) * n.chain * timing["elapsed"] > 1) {
     cat("\nEstimated computation time:", format((burnin + n.iter) * n.chain * timing["elapsed"]), "s\n")
   }
@@ -502,6 +514,11 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
     for (v in store) {
       if (!is.null(sampler$coef.names))
         attr(out[[v]], "labels") <- sampler$coef.names[[v]]
+      if (is.null(attr(out[[v]], "labels")))
+        if (nvars(out[[v]]) == 1L)
+          attr(out[[v]], "labels") <- v
+        else
+          attr(out[[v]], "labels") <- as.character(seq_len(nvars(out[[v]])))
       class(out[[v]]) <- "dc"  # draws component class
     }
     sim.time <- proc.time() - started
@@ -527,8 +544,8 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
 #' \donttest{
 #' data(iris)
 #' sampler <- create_sampler(Sepal.Length ~ reg(~ Petal.Length + Species, name="beta"), data=iris)
-#' sim <- MCMCsim(sampler, burnin=100, n.chain=2, n.iter=500)
-#' (summary(sim))
+#' sim <- MCMCsim(sampler, burnin=100, n.chain=2, n.iter=400)
+#' summary(sim)
 #' if (require("coda", quietly=TRUE)) {
 #'   mcbeta <- to_mcmc(sim$beta)
 #'   geweke.diag(mcbeta)
@@ -542,7 +559,7 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
 #' gd <- generate_data(~ reg(~ x + f, Q0=1, name="beta"), data=dat)
 #' dat$y <- gd$y
 #' sampler <- create_sampler(y ~ reg(~ x + f, name="beta"), data=dat)
-#' sim <- MCMCsim(sampler, n.chain=2, n.iter=500)
+#' sim <- MCMCsim(sampler, n.chain=2, n.iter=400)
 #' str(sim$beta)
 #' str(as.array(sim$beta))
 #' bayesplot::mcmc_hist(as.array(sim$beta))
@@ -554,7 +571,7 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
 #' ex <- mcmcsae_example()
 #' plot(ex$dat$fT, ex$dat$y)
 #' sampler <- create_sampler(ex$model, data=ex$dat)
-#' sim <- MCMCsim(sampler, n.chain=2, n.iter=500, store.all=TRUE)
+#' sim <- MCMCsim(sampler, n.chain=2, n.iter=400, store.all=TRUE)
 #' str(sim$beta)
 #' str(as.matrix(sim$beta))
 #' # fake data simulation check:
@@ -618,7 +635,7 @@ as.matrix.dc <- function(x, colnames=TRUE, ...) {
 #' data(iris)
 #' sampler <- create_sampler(Sepal.Length ~ 
 #'     reg(~ Petal.Length + Species, name="beta"), data=iris)
-#' sim <- MCMCsim(sampler, burnin=100, n.iter=500)
+#' sim <- MCMCsim(sampler, burnin=100, n.iter=400)
 #' (summary(sim))
 #' par_names(sim)
 #'
@@ -632,7 +649,8 @@ par_names <- function(draws) draws[["_info"]][["parnames"]]
 #' Read draws written to file by \code{\link{MCMCsim}} used with argument \code{to.file}.
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
+#' # NB this example creates a file "MCMCdraws_e_.RData" in the working directory
 #' n <- 100
 #' dat <- data.frame(x=runif(n), f=as.factor(sample(1:5, n, replace=TRUE)))
 #' gd <- generate_data(~ reg(~ x + f, Q0=1, name="beta"), data=dat)
@@ -640,7 +658,7 @@ par_names <- function(draws) draws[["_info"]][["parnames"]]
 #' sampler <- create_sampler(y ~ reg(~ x + f, name="beta"), data=dat)
 #' # run the MCMC simulation and write draws of residuals to file:
 #' sim <- MCMCsim(sampler, n.iter=500, to.file="e_")
-#' (summary(sim))
+#' summary(sim)
 #' mcres <- read_draws("e_")
 #' summary(mcres)
 #' }
@@ -854,9 +872,9 @@ print.dc_summary <- function(x, digits=3L, max.lines=1000L, tail=FALSE, sort=NUL
   else
     rows <- seq_len(nlines)
   maxpr <- getOption("max.print")
-  if (nlines > maxpr) {
+  if (nlines*ncol(x) > maxpr) {
     on.exit(options(max.print=maxpr))
-    options(max.print=nlines)
+    options(max.print=nlines*ncol(x))
   }
   if (is.null(sort)) {
     print(x[rows, ], digits=digits, ...)
@@ -898,23 +916,40 @@ print.draws_summary <- function(x, digits=3L, max.lines=10L, tail=FALSE, sort=NU
   }
 }
 
-#' Get the variable labels of a draws component for a vector-valued parameter
-#' 
+#' Get and set the variable labels of a draws component for a vector-valued parameter
+#'
 #' @examples
 #' \donttest{
 #' ex <- mcmcsae_example()
 #' sampler <- create_sampler(ex$model, data=ex$dat)
-#' sim <- MCMCsim(sampler, store.all=TRUE)
+#' sim <- MCMCsim(sampler, burnin=50, n.iter=100, n.chain=1, store.all=TRUE)
 #' labels(sim$beta)
 #' labels(sim$v)
+#' labels(sim$beta) <- c("a", "b")
+#' labels(sim$beta)
 #' }
-#' 
-#' @export
+#'
 ## @method labels dc
 #' @param object a component of a draws object.
+#' @param value a vector of labels.
 #' @param ... currently not used.
-#' @return The variable labels.
+#' @return The extractor function returns the variable labels.
+#' @name labels
+NULL
+
+#' @export
+#' @rdname labels
 labels.dc <- function(object, ...) attr(object, "labels")
+
+#' @export
+#' @rdname labels
+`labels<-` <- function(object, value) {
+  if (class(object)[1L] == "dc") {
+    if (length(value) != nvars(object)) stop("wrong length of labels vector")
+  }
+  attr(object, "labels") <- as.character(value)
+  object
+}
 
 #' Get the number of chains, samples per chain or the number of variables in a simulation object
 #'
@@ -1031,15 +1066,15 @@ n_eff <- function(dc, useFFT=TRUE, lag.max, cl=NULL) {
   n.var <- nvars(dc)
   n.draw <- ndraws(dc)
   if (n.draw < 2L) return(rep.int(NA_real_, n.var))
-  if (!missing(lag.max)) {
+  if (missing(lag.max)) {
+    lag.max <- n.draw - 1L
+  } else {
     if (useFFT) {
       warning("'lag.max' argument ignored because 'useFFT=TRUE'")
       lag.max <- n.draw - 1L
     } else {
       lag.max <- min(lag.max, n.draw - 1L)
     }
-  } else {
-    lag.max <- n.draw - 1L
   }
   # function to compute autocovariance function summed over (a subset of) chains
   compute_acov_sum <- function(dc) {

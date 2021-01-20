@@ -3,7 +3,7 @@ title: Basic area-level model
 output: rmarkdown::html_vignette
 bibliography: mcmcsae.bib
 vignette: >
-  %\VignetteIndexEntry{Area-level models}
+  %\VignetteIndexEntry{Basic area-level model}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---

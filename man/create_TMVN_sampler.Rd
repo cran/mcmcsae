@@ -145,6 +145,5 @@ Z.I. Botev and P. L'Ecuyer (2016).
    arXiv:1807.09155.
 }
 \author{
-Harm Jan Boonstra and Grzegorz Baltissen, who helped implement a first version
- of the TMVNV Gibbs sampler.
+Harm Jan Boonstra, with help from Grzegorz Baltissen
 }

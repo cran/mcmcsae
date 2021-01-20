@@ -19,7 +19,7 @@ Get the parameter names from a draws object
 data(iris)
 sampler <- create_sampler(Sepal.Length ~ 
     reg(~ Petal.Length + Species, name="beta"), data=iris)
-sim <- MCMCsim(sampler, burnin=100, n.iter=500)
+sim <- MCMCsim(sampler, burnin=100, n.iter=400)
 (summary(sim))
 par_names(sim)
 

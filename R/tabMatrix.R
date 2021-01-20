@@ -351,7 +351,7 @@ fac2tabM <- function(fvars, data, x=numeric(), xlab=character(), drop.unused.lev
 tables2tabM <- function(formula, data, ...) {
   n <- nrow(data)
   trms <- terms(formula, data=data)
-  tmat <- attr(trms, "factor")
+  tmat <- terms_matrix(trms)
   if (!length(tmat)) {
     if (intercept_only(formula))
       return(list(new("tabMatrix", perm=rep.int(0L, n), reduced=FALSE, num=TRUE, x=rep.int(1, n), Dim=c(n, 1L))))
@@ -360,7 +360,7 @@ tables2tabM <- function(formula, data, ...) {
   }
   tnames <- colnames(tmat)
   vnames <- rownames(tmat)
-  qvar <- !catvars(formula, data)  # quantitative variables
+  qvar <- !catvars(trms, data)  # quantitative variables
   qvar <- vnames[which(qvar)]
   out <- setNames(rep(list(NULL), length(tnames)), tnames)
   for (k in seq_along(tnames)) {

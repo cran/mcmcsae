@@ -105,6 +105,8 @@ double do_rgig1(double lambda, double chi, double psi) {
   return as<double>(fun(1, lambda, chi, psi));
 }
 
+#define ZTOL (DOUBLE_EPS*10.0)
+
 //’ Draw a vector of generalized inverse gaussian (GiG) variates
 //’
 //’ @param n the size of the vector.
@@ -118,13 +120,28 @@ NumericVector Crgig(const int n, const NumericVector & p, const NumericVector & 
   const int np=p.size();
   const int na=a.size();
   const int nb=b.size();
+  double pi,ai,bi;
   GetRNGstate();
   for (int i = 0; i < n; ++i) {
-    out[i] = do_rgig1(
-      np == 1 ? p[0] : p[i],
-      nb == 1 ? b[0] : b[i],
-      na == 1 ? a[0] : a[i]
-    );
+    // edge case issue in GIGrvg; for now we deal with these (gamma/invgamma) cases ourselves
+    pi = np == 1 ? p[0] : p[i];
+    ai = na == 1 ? a[0] : a[i];
+    bi = nb == 1 ? b[0] : b[i];
+    // parameter translation: lambda=p, chi=b, psi=a
+    if (ai < ZTOL || bi < ZTOL) {
+      if (pi > 0.0) {
+        out[i] = R::rgamma(pi, 2.0/ai);
+      } else {
+        out[i] = 1.0/R::rgamma(-pi, 2.0/bi);
+      }
+    } else {
+      out[i] = do_rgig1(pi, bi, ai);
+    }
+    //out[i] = do_rgig1(
+    //  np == 1 ? p[0] : p[i],
+    //  nb == 1 ? b[0] : b[i],
+    //  na == 1 ? a[0] : a[i]
+    //);
   }
   PutRNGstate();
   return out;
@@ -132,13 +149,13 @@ NumericVector Crgig(const int n, const NumericVector & p, const NumericVector & 
 
 
 //’ Draw a vector of (approximate) Chinese Restaurant Table (CRT) variates
-// Used in a Gibbs sampler for negative binomial model with modeled overdispersion parameter.
+// Used in a Gibbs sampler for negative binomial model with modeled dispersion parameter.
 // The approximation is based on Le Cam's theorem, i.e. the approximation of a convolution
 // of Bernoulli random variables by a Poisson distribution. The sampling is exact for all
 // values of \code{y} less than or equal to \code{2*m}. 
 //’
 //’ @param y data vector.
-//’ @param r scalar overdispersion parameter.
+//’ @param r scalar dispersion parameter.
 //’ @param m positive integer; larger values give more accuracy but slower performance.
 //’ @return A vector of (approximate) CRT variates.
 // [[Rcpp::export(rng=true)]]

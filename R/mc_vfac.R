@@ -63,7 +63,7 @@ vfac <- function(factor="local_",
   # function that creates an oos prediction function (closure) based on new data
   make_predict_Vfactor <- function(newdata) {
     if (factor == "local_") {
-      # "local_" corresponds to unit-level, i.e. Student-t sampling distribution (provided invchisq scale parameter is not modeled)
+      # "local_" corresponds to unit-level, e.g. Student-t sampling distribution
       Hnew <- nrow(newdata)
     } else {
       # TODO allow random generation for oos-levels more generally (currently only for Student-t sampling)

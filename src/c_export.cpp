@@ -1,5 +1,5 @@
-
 #include <Rcpp.h>
+
 
 extern "C" SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP LDL, SEXP super, SEXP Imult, SEXP m);
 extern "C" SEXP CHMf_solve(SEXP a, SEXP b, SEXP system);

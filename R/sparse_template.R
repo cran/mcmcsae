@@ -1,7 +1,7 @@
 # mc: model component
-# modeled.Q: whether residual variance is modeled
+# update.XX: whether XX is updated in each draw
 # add.outer.R: whether outer product of constraints should be added (for positive definiteness in blocked components)
-sparse_template <- function(mc, modeled.Q=FALSE, add.outer.R=FALSE, prior.only=FALSE) {
+sparse_template <- function(mc, update.XX=FALSE, add.outer.R=FALSE, prior.only=FALSE) {
 
   if (mc$type == "block") {
     Q <- mc$QT
@@ -44,11 +44,11 @@ sparse_template <- function(mc, modeled.Q=FALSE, add.outer.R=FALSE, prior.only=F
 
     mc$MVNsampler <- NULL
     if (!add.outer.R || is.null(R)) {
-      if (modeled.Q)
+      if (update.XX)
         mat_sum <- make_mat_sum(M1=XX, M2=Q)
       else
-        mat_sum <- make_mat_sum(M0=XX, M1=Q)  # constant XX
-      XX_Q <- if (modeled.Q) mat_sum(XX, Q) else mat_sum(Q)
+        mat_sum <- make_mat_sum(M0=XX, M1=Q)
+      XX_Q <- if (update.XX) mat_sum(XX, Q) else mat_sum(Q)
       tryCatch(
         suppressWarnings(
           mc$MVNsampler <- create_TMVN_sampler(Q=XX_Q, update.Q=TRUE, name=mc$name, R=R, S=mc$S)
@@ -72,11 +72,11 @@ sparse_template <- function(mc, modeled.Q=FALSE, add.outer.R=FALSE, prior.only=F
     }
     if (is.null(mc$MVNsampler)) {  # 2nd attempt or add.outer.R
       if (is.null(R)) stop("singular precision matrix and no constraints")
-      if (modeled.Q)
+      if (update.XX)
         mat_sum <- make_mat_sum(M0=tcrossprod(R), M1=XX, M2=Q)
       else
         mat_sum <- make_mat_sum(M0=economizeMatrix(XX + tcrossprod(R), symmetric=TRUE), M1=Q)
-      XX_Q <- if (modeled.Q) mat_sum(XX, Q) else mat_sum(Q)
+      XX_Q <- if (update.XX) mat_sum(XX, Q) else mat_sum(Q)
       mc$MVNsampler <- create_TMVN_sampler(Q=XX_Q, update.Q=TRUE, name=mc$name, R=R, S=mc$S)
     }
 
@@ -84,16 +84,15 @@ sparse_template <- function(mc, modeled.Q=FALSE, add.outer.R=FALSE, prior.only=F
     if (mc$type == "gen" && mc$unit_Q) {  # unit QA, scalar Qv (with unit Q0), and no constraints
       if (isUnitDiag(XX)) {
         # TODO cleaner and more efficient handling of unit XX case (unit_Q + unit XX --> scalar update)
-        if (modeled.Q) stop("sparse_template: assertion violated")
         XX.expanded <- expandUnitDiag(XX)
         mc$update <- function(XX, QA, Qv, w) list(Q=XX.expanded, Imult=Qv*w)
         keep.kp <- keep.ms <- FALSE
       } else {
-        if (class(XX)[1L] == class(if (modeled.Q) mat_sum(XX, Q) else mat_sum(Q))[1L]) {
+        if (class(XX)[1L] == class(if (update.XX) mat_sum(XX, Q) else mat_sum(Q))[1L]) {
           keep.kp <- keep.ms <- FALSE
           mc$update <- function(XX, QA, Qv, w) list(Q=XX, Imult=Qv*w)
         } else {  # keep mat_sum, kron_prod because for some reason XX has type incompatible with ch
-          if (modeled.Q)
+          if (update.XX)
             mc$update <- function(XX, QA, Qv, w) list(Q=mat_sum(XX, kron_prod(QA, Qv * w)), Imult=0)
           else
             mc$update <- function(XX, QA, Qv, w) list(Q=mat_sum(kron_prod(QA, Qv * w)), Imult=0)
@@ -102,12 +101,12 @@ sparse_template <- function(mc, modeled.Q=FALSE, add.outer.R=FALSE, prior.only=F
     } else {
       if (mc$type == "block" || mc$q0 == 1L) {  # scalar Qv, or block
         if (mc$type != "block") keep.kp <- FALSE
-        if (modeled.Q)
+        if (update.XX)
           mc$update <- function(XX, QA, Qv, w) list(Q=mat_sum(XX, QA, w2=Qv*w), Imult=0)
         else
           mc$update <- function(XX, QA, Qv, w) list(Q=mat_sum(QA, w1=Qv*w), Imult=0)
       } else {  # q0 > 1, no block
-        if (modeled.Q)
+        if (update.XX)
           mc$update <- function(XX, QA, Qv, w) list(Q=mat_sum(XX, kron_prod(QA, Qv), w2=w), Imult=0)
         else
           mc$update <- function(XX, QA, Qv, w) list(Q=mat_sum(kron_prod(QA, Qv), w1=w), Imult=0)

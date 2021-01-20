@@ -22,7 +22,7 @@ void R_init_mcmcsae(DllInfo *dll) {
   R_useDynamicSymbols(dll, FALSE);
 
   M_R_cholmod_start(&c);
-  // TODO maybe add error handler and set other cholmod options
+  c.error_handler = M_R_cholmod_error;
 }
 
 void R_unload_mcmcsae(DllInfo *dll) {
@@ -63,14 +63,12 @@ SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP LDL, SEXP super, SEXP Imult, SEXP 
       iPerm  = asLogical(perm),
       iLDL   = asLogical(LDL);
   int im     = asInteger(m);
-  if ((im < -1) || (im > 3)) error("Cholesky ordering method must be an integer between 0 and 3");
+  if ((im < -1) || (im > 3)) error("Cholesky ordering method must be an integer between -1 and 3");
 
   double dImult = asReal(Imult);
 
   // NA --> let CHOLMOD choose
   if (iSuper == NA_LOGICAL)	iSuper = -1;
-  // if (iPerm == NA_LOGICAL)	iPerm = -1;
-  if (iLDL == NA_LOGICAL)	iLDL = -1;
 
   c.final_ll = (iLDL == 0) ? 1 : 0;
   c.supernodal = (iSuper > 0) ? CHOLMOD_SUPERNODAL :
@@ -85,7 +83,6 @@ SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP LDL, SEXP super, SEXP Imult, SEXP 
   if (!M_cholmod_factorize_p(A, &dImult, (int*)NULL, 0, L, &c))
     error("Cholesky factorization failed");
 
-  // do we need to restore c as in Matrix internal_chm_factor?
   return M_chm_factor_to_SEXP(L, 1 /* free */);
 }
 
@@ -169,7 +166,7 @@ SEXP CHM_update_inplace(SEXP object, SEXP parent, SEXP mult) {
   return R_NilValue;
 }
 
-void CHM_options() {
+void CHM_options() { int a=0;
   Rprintf("/* parameters for symbolic/numeric factorization and update/downdate */ \n");
   Rprintf("dbound = %lf \n", c.dbound);
   Rprintf("grow0 = %lf \n", c.grow0);
@@ -194,12 +191,11 @@ void CHM_options() {
   Rprintf("print = %d \n", c.print);
   Rprintf("precise = %d \n", c.precise);
   Rprintf("try_catch = %d \n", c.try_catch);
-  // TODO print whether error_handler is NULL or not
   Rprintf("/* ordering options */ \n");
   Rprintf("nmethods = %d \n", c.nmethods);
   Rprintf("current = %d \n", c.current);
   Rprintf("selected = %d \n", c.selected);
-  // TODO? print options for all methods (struct)
+  // TODO print options for all methods (struct)
   Rprintf("postorder = %d \n", c.postorder);
   Rprintf("default_nesdis = %d \n", c.default_nesdis);
   Rprintf("/* METIS workarounds */ \n");
@@ -208,7 +204,6 @@ void CHM_options() {
   Rprintf("metis_nswitch = %d \n", c.metis_nswitch);
   Rprintf("/* workspace */ \n");
   Rprintf("nrow = %d \n", c.nrow);
-  // TODO SuiteSparse_long mark
   Rprintf("iworksize = %d \n", c.iworksize);
   Rprintf("xworksize = %d \n", c.xworksize);
   Rprintf("itype = %d \n", c.itype);
@@ -230,5 +225,4 @@ void CHM_options() {
   Rprintf("aatfl = %lf \n", c.aatfl);
   Rprintf("called_nd = %d \n", c.called_nd);
   Rprintf("blas_ok = %d \n", c.blas_ok);
-  // TODO? (QR options and statistics and) GPU configuration and statistics
 }

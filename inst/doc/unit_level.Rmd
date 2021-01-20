@@ -1,9 +1,9 @@
 ---
-title: Basic unit-level model
+title: Basic unit-level models
 output: rmarkdown::html_vignette
 bibliography: mcmcsae.bib
 vignette: >
-  %\VignetteIndexEntry{Unit-level models}
+  %\VignetteIndexEntry{Basic unit-level models}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---

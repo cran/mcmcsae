@@ -81,12 +81,10 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
         P <- cholM@perm + 1L
         iP <- invPerm(cholM@perm, zero.p=TRUE)
       }
-      #if (object.size(cholM) > 500000) {
       if (.opts$chol.inplace) {
         # requires that zero-pattern does not change!
         update <- function(parent, mult=0) cCHM_update_inplace(cholM, parent, mult)
       } else {
-        # is there any reason not to do it in place?
         # for forked parallel processing cholM should probably be stored in the state list p
         update <- function(parent, mult=0) cholM <<- .updateCHMfactor(cholM, parent, mult)
       }
