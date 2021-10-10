@@ -7,16 +7,16 @@
 \alias{nvars}
 \title{Get the number of chains, samples per chain or the number of variables in a simulation object}
 \usage{
-nchains(object)
+nchains(obj)
 
-ndraws(object)
+ndraws(obj)
 
 nvars(dc)
 }
 \arguments{
-\item{object}{a draws object or component of a draws object.}
+\item{obj}{an mcdraws object or a draws component (dc) object.}
 
-\item{dc}{a component of a draws object.}
+\item{dc}{a draws component object.}
 }
 \value{
 The number of chains or retained samples per chain or

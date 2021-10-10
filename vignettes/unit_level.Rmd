@@ -13,7 +13,7 @@ options(width=100)  # width of output
 ```
 
 
-The basic area-level model [@Battese1988; @rao2015small] is given by
+The basic unit-level model [@Battese1988; @rao2015small] is given by
 $$
 y_j = \beta' x_j + v_{i[j]} + \epsilon_j\,,\\
 v_i \stackrel{\mathrm{iid}}{\sim} {\cal N}(0, \sigma_v^2) \qquad \epsilon_j \stackrel{\mathrm{iid}}{\sim} {\cal N}(0, \sigma^2)

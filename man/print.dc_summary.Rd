@@ -4,7 +4,15 @@
 \alias{print.dc_summary}
 \title{Display a summary of a \code{dc} object}
 \usage{
-\method{print}{dc_summary}(x, digits = 3L, max.lines = 1000L, tail = FALSE, sort = NULL, ...)
+\method{print}{dc_summary}(
+  x,
+  digits = 3L,
+  max.lines = 1000L,
+  tail = FALSE,
+  sort = NULL,
+  max.label.length = NULL,
+  ...
+)
 }
 \arguments{
 \item{x}{an object of class \code{dc_summary}.}
@@ -17,6 +25,8 @@ If \code{NULL}, all elements are displayed.}
 \item{tail}{if \code{TRUE} the last instead of first at most \code{max.lines} are displayed.}
 
 \item{sort}{column name on which to sort the output.}
+
+\item{max.label.length}{if specified, printed row labels will be abbreviated to at most this length.}
 
 \item{...}{passed on to \code{print.default}.}
 }

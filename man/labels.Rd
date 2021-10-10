@@ -4,14 +4,14 @@
 \alias{labels}
 \alias{labels.dc}
 \alias{labels<-}
-\title{Get and set the variable labels of a draws component for a vector-valued parameter}
+\title{Get and set the variable labels of a draws component object for a vector-valued parameter}
 \usage{
 \method{labels}{dc}(object, ...)
 
 labels(object) <- value
 }
 \arguments{
-\item{object}{a component of a draws object.}
+\item{object}{a draws component object.}
 
 \item{...}{currently not used.}
 
@@ -21,7 +21,7 @@ labels(object) <- value
 The extractor function returns the variable labels.
 }
 \description{
-Get and set the variable labels of a draws component for a vector-valued parameter
+Get and set the variable labels of a draws component object for a vector-valued parameter
 }
 \examples{
 \donttest{

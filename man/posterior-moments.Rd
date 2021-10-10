@@ -4,14 +4,14 @@
 \alias{posterior-moments}
 \alias{get_means}
 \alias{get_sds}
-\title{Get means or standard deviations of parameters from the MCMC output in a draws object}
+\title{Get means or standard deviations of parameters from the MCMC output in an mcdraws object}
 \usage{
-get_means(draws, vnames = NULL)
+get_means(obj, vnames = NULL)
 
-get_sds(draws, vnames = NULL)
+get_sds(obj, vnames = NULL)
 }
 \arguments{
-\item{draws}{an object of class \code{draws}.}
+\item{obj}{an object of class \code{mcdraws}.}
 
 \item{vnames}{optional character vector to select a subset of parameters.}
 }
@@ -19,7 +19,7 @@ get_sds(draws, vnames = NULL)
 A list with simulation means or standard deviations.
 }
 \description{
-Get means or standard deviations of parameters from the MCMC output in a draws object
+Get means or standard deviations of parameters from the MCMC output in an mcdraws object
 }
 \examples{
 \donttest{

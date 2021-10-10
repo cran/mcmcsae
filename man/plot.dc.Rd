@@ -3,7 +3,7 @@
 \name{plot.dc}
 \alias{plot.dc}
 \title{Trace, density and autocorrelation plots for (parameters of a) draws
-component object}
+component (dc) object}
 \usage{
 \method{plot}{dc}(x, nrows, ncols, ask = FALSE, ...)
 }
@@ -20,7 +20,7 @@ component object}
 }
 \description{
 Trace, density and autocorrelation plots for (parameters of a) draws
-component object
+component (dc) object
 }
 \examples{
 \donttest{

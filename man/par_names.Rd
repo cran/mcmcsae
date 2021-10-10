@@ -2,18 +2,18 @@
 % Please edit documentation in R/MCMCsim.R
 \name{par_names}
 \alias{par_names}
-\title{Get the parameter names from a draws object}
+\title{Get the parameter names from an mcdraws object}
 \usage{
-par_names(draws)
+par_names(obj)
 }
 \arguments{
-\item{draws}{a draws object.}
+\item{obj}{an mcdraws object.}
 }
 \value{
-The names of the parameters whose MCMC simulations are stored in \code{draws}.
+The names of the parameters whose MCMC simulations are stored in \code{obj}.
 }
 \description{
-Get the parameter names from a draws object
+Get the parameter names from an mcdraws object
 }
 \examples{
 data(iris)

@@ -41,9 +41,10 @@ vreg <- function(formula=NULL, remove.redundant=FALSE, sparse=NULL, X=NULL,
 
   if (e$Q0.type == "symm") stop("TBI: vreg component with (compatible) non-diagonal sampling variance matrix")
 
-  if (is.null(X))
-    X <- model_Matrix(formula, data=e$data, remove.redundant=remove.redundant, sparse=sparse)
-  else
+  if (is.null(X)) {
+    X <- model_matrix(formula, e$data, sparse=sparse)
+    if (remove.redundant) X <- remove_redundancy(X)
+  } else
     X <- economizeMatrix(X, strip.names=FALSE)
   if (nrow(X) != e$n) stop("design matrix with incompatible number of rows")
   e$coef.names[[name]] <- colnames(X)
@@ -77,7 +78,10 @@ vreg <- function(formula=NULL, remove.redundant=FALSE, sparse=NULL, X=NULL,
 
   # function that creates an oos prediction function (closure) based on new data
   make_predict_Vfactor <- function(newdata) {
-    Xnew <- unname(model_Matrix(formula, data=newdata))  # oos design matrix
+    #Xnew <- unname(compute_X(formula, data=newdata))  # oos design matrix
+    Xnew <- model_matrix(formula, newdata)
+    # TODO remove columns not corresponding to columns in X
+    Xnew <- unname(Xnew)
     rm(newdata)
     function(p) exp(Xnew %m*v% p[[name]])
   }

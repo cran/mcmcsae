@@ -1,5 +1,5 @@
 #' Trace, density and autocorrelation plots for (parameters of a) draws
-#' component object
+#' component (dc) object
 #'
 #' @examples
 #' \donttest{
@@ -38,7 +38,7 @@ plot.dc <- function(x, nrows, ncols, ask=FALSE, ...) {
 
 #' Trace, density and autocorrelation plots
 #' 
-#' Trace, density and autocorrelation plots for selected components of a \code{draws} object.
+#' Trace, density and autocorrelation plots for selected components of an \code{mcdraws} object.
 #'
 #' @examples
 #' \donttest{
@@ -49,14 +49,14 @@ plot.dc <- function(x, nrows, ncols, ask=FALSE, ...) {
 #' }
 #'
 #' @export
-## @method plot draws
-#' @param x an object of class \code{draws}.
+## @method plot mcdraws
+#' @param x an object of class \code{mcdraws}.
 #' @param vnames optional character vector to select a subset of parameters.
 #' @param nrows number of rows in plot layout.
 #' @param ncols number of columns in plot layout.
 #' @param ask ask before plotting the next page; default is \code{FALSE}.
 #' @param ... arguments passed to \code{\link[stats]{density}}.
-plot.draws <- function(x, vnames, nrows, ncols, ask=FALSE, ...) {
+plot.mcdraws <- function(x, vnames, nrows, ncols, ask=FALSE, ...) {
   obj <- NULL
   labs <- NULL
   for (v in vnames) {

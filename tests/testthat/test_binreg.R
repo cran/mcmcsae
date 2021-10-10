@@ -1,7 +1,7 @@
 
 context("Binomial regression")
 
-# for reproducibility, even over platforms:
+# for reproducibility, even across platforms:
 set.seed(1, kind="Mersenne-Twister", normal.kind="Inversion")
 
 n <- 1000L

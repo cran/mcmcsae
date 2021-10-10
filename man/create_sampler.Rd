@@ -9,7 +9,7 @@ create_sampler(
   data = NULL,
   family = "gaussian",
   ny = NULL,
-  ry,
+  ry = NULL,
   r.mod,
   sigma.fixed = NULL,
   sigma.mod = NULL,
@@ -24,36 +24,49 @@ create_sampler(
 )
 }
 \arguments{
-\item{formula}{formula to specify the response variable and additive model components. The model components form
-the linear predictor part of the model. A model component on the right hand side can currently be
-either a regression term specified with \code{\link{reg}(...)} or a generic random effect term specified
-with \code{\link{gen}(...)}. See for details the help pages for these model component creation functions.
-Other terms in the formula are interpreted as ordinary regression
-effects (treated in the same way as \code{reg(...)} terms, but without the option to change e.g. the prior),
-An offset can be specified as \code{offset(...)}.}
+\item{formula}{formula to specify the response variable and additive model components. The model components
+form the linear predictor part of the model. A model component on the right hand side can be either
+a regression term specified by \code{\link{reg}(...)}, a covariates subject to error term specified
+by \code{\link{mec}(...)}, or a generic random effect term specified by \code{\link{gen}(...)}.
+See for details the help pages for these model component creation functions.
+An offset can be specified as \code{offset(...)}.
+Other terms in the formula are collectively interpreted as ordinary regression effects,
+treated in the same way as a \code{reg(...)} term, but without the option to change the prior.}
 
 \item{data}{data frame with n rows in which the variables specified in model components (if any) can be found.}
 
 \item{family}{character string describing the data distribution. The default is 'gaussian'.
-Other options are 'binomial' for the binomial distribution and 'negbinomial' for the negative binomial distribution.
-For the binomial and negative binomial distributions logistic and log link functions are used by default, respectively.
-In the case of binary data a probit link function is also supported for the binomial/Bernoulli distribution.}
+Other options are 'binomial' for the binomial distribution and 'negbinomial' for the negative binomial distribution,
+and "poisson" for the Poisson distribution.
+For the binomial distribution logistic and probit link functions are supported, the latter only
+for binary data. For the negative binomial and Poisson distributions a log link function is assumed.
+Note that posterior inference based on the Poisson distribution is implemented only approximately,
+as a special case of the negative binomial distribution.
+For categorical or multinomial data, \code{family = "multinomial"} can be used. The implementation
+is based on a stick-breaking representation of the multinomial distribution, and the logistic link
+function relates each category except the last to a linear predictor. The categories can be
+referenced in the model specification formula by 'cat_'.}
 
 \item{ny}{in case \code{family="binomial"} the (vector of) numbers of trials.
 It can be either a numeric vector or the name of a variable in \code{data}.
 Defaults to a vector of 1s.}
 
-\item{ry}{in case \code{family="negbinomial"} the dispersion parameter or vector
-of dispersion parameters. Use \code{r.mod} instead if the (scalar)
-dispersion parameter should be inferred from the data. If neither
-\code{ry} nor \code{r.mod} is specified a default chi-squared
-prior with 1 degree of freedom is assumed.}
+\item{ry}{in case \code{family="negbinomial"} the known, i.e. fixed part of the (reciprocal)
+dispersion parameter. It can be specified either as a numeric vector or the name of a
+numeric variable in \code{data}. The overall dispersion parameter is the product of \code{ry}
+with a positive scalar factor modelled as specified by argument \code{r.mod}. By default
+\code{ry} is taken to be 1. For \code{family = "poisson"} a single value can be specified,
+determining how well the Poisson distribution is approximated by the negative binomial distribution.
+The value should be large enough such that the negative binomial's overdispersion
+becomes negligible, but not too large as this might result in slow MCMC mixing. The default is
+\code{ry=100} in this case.}
 
 \item{r.mod}{prior specification for a scalar (reciprocal) dispersion parameter
-of the negative binomial distribution, in case the dispersion parameter is
-to be inferred. The prior can be specified by a call to a prior specification function.
-Currently \code{\link{pr_invchisq}}, \code{\link{pr_gig}} and \code{\link{pr_fixed}}
-are supported.}
+of the negative binomial distribution. The prior can be specified by a call to a prior
+specification function. Currently \code{\link{pr_invchisq}}, \code{\link{pr_gig}} and
+\code{\link{pr_fixed}} are supported. The default is a chi-squared prior with 1 degree
+of freedom. To set the overall dispersion parameter to the value(s) specified by \code{ry},
+use \code{r.mod = pr_fixed(value=1)}.}
 
 \item{sigma.fixed}{for Gaussian models, if \code{TRUE} the residual standard deviation parameter 'sigma_' is fixed at 1. In that case
 argument \code{sigma.mod} is ignored. This is convenient for Fay-Herriot type models with (sampling) variances assumed to be known.
@@ -116,7 +129,7 @@ A sampler object, which is the main input for the MCMC simulation
  \code{start} are not created.
 }
 \description{
-This sets up a sampler object, based on the specification of a model. The object contains functions to
+This function sets up a sampler object, based on the specification of a model. The object contains functions to
 draw a set of model parameters from their prior and conditional posterior distributions, and
 to generate starting values for the MCMC simulation. The functions share a common environment
 containing precomputed quantities such as design matrices based on the model and the data.
@@ -139,6 +152,10 @@ passed as a list with possible elements
   \item{recompute.e}{when \code{FALSE} residuals or linear predictors are only computed at the start of the simulation.
     This may give a modest speedup but in some cases may be less accurate due to roundoff error accumulation.
     Default is \code{TRUE}.}
+  \item{CG}{for a conjugate gradient iterative algorithm instead of Cholesky updates for sampling
+    the model's coefficients. This must be a list with possible components \code{max.it},
+    \code{stop.criterion}, \code{verbose}, \code{preconditioner} and \code{scale},
+    see \code{\link{setup_CG_sampler}}}. This is currently an experimental feature.
 }
 }
 \examples{
@@ -166,6 +183,10 @@ J.H. Albert and S. Chib (1993).
  D. Bates, M. Maechler, B. Bolker and S.C. Walker (2015).
    Fitting Linear Mixed-Effects Models Using lme4.
    Journal of Statistical Software 67(1), 1-48.
+
+ S.W. Linderman, M.J. Johnson and R.P. Adams (2015).
+   Dependent multinomial models made easy: Stick-breaking with the Polya-gamma augmentation.
+   Advances in Neural Information Processing Systems, 3456–3464.
 
  N. Polson, J.G. Scott and J. Windle (2013).
    Bayesian Inference for Logistic Models Using Polya-Gamma Latent Variables.

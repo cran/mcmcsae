@@ -4,21 +4,22 @@
 \name{mcmcsae-package}
 \alias{mcmcsae-package}
 \alias{mcmcsae}
-\title{MCMC Small Area Estimation}
+\title{Markov Chain Monte Carlo Small Area Estimation}
 \description{
 Fit multi-level models with possibly correlated random effects using MCMC.
 }
 \details{
-Functions to fit multi-level models with Gaussian and binomial or negative
-binomial likelihoods using MCMC. Models with a linear predictor consisting
-of various possibly correlated random effects are supported, allowing
+Functions to fit multi-level models with Gaussian, binomial, multinomial,
+negative binomial or Poisson likelihoods using MCMC. Models with a linear predictor
+consisting of various possibly correlated random effects are supported, allowing
 flexible modeling of temporal, spatial or other kinds of dependence structures.
-For Gaussian models the variance can be modeled too. By modeling unit-level
-variances it is possible to account for outliers.
+For Gaussian models the variance can be modeled too. By modeling variances
+at the unit level the marginal distribution can be changed to a Student-t or Laplace
+distribution, which may account better for outliers.
 The package has been developed with applications to small area estimation
 in official statistics in mind. The posterior samples for the model
 parameters can be passed to a prediction function to generate samples from
 the posterior predictive distribution for user-defined quantities such as
 finite population domain means. For model assessment, posterior predictive
-checks and DIC/WAIC criteria are supported.
+checks and DIC/WAIC criteria can easily be computed.
 }

@@ -2,11 +2,11 @@
 % Please edit documentation in R/model_eval.R
 \name{residuals-fitted-values}
 \alias{residuals-fitted-values}
-\alias{fitted.draws}
-\alias{residuals.draws}
-\title{Extract draws of fitted values or residuals from a draws object}
+\alias{fitted.mcdraws}
+\alias{residuals.mcdraws}
+\title{Extract draws of fitted values or residuals from an mcdraws object}
 \usage{
-\method{fitted}{draws}(
+\method{fitted}{mcdraws}(
   object,
   mean.only = FALSE,
   units = NULL,
@@ -17,7 +17,7 @@
   ...
 )
 
-\method{residuals}{draws}(
+\method{residuals}{mcdraws}(
   object,
   mean.only = FALSE,
   units = NULL,
@@ -28,7 +28,7 @@
 )
 }
 \arguments{
-\item{object}{a draws object.}
+\item{object}{an object of class \code{mcdraws}.}
 
 \item{mean.only}{if \code{TRUE} only the vector of posterior means is returned. In that case
 the subsequent arguments are ignored. Default is \code{FALSE}.}

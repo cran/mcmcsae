@@ -12,21 +12,14 @@ get_response <- function(formula, data=NULL) {
   }
 }
 
-has_offset <- function(formula, data=NULL) {
-  tf <- terms(formula, data=data)
-  !is.null(attr(tf, "offset"))
-}
-
 get_offset <- function(formula, data=NULL) {
+  if (is.integer(data) && length(data) == 1L) data <- NULL
   tf <- terms(formula, data=data)
   ind <- attr(tf, "offset")
-  if (!is.null(ind)) {
-    if (length(ind) > 1L) stop("only a single offset allowed in 'formula'")
-    vars <- as.list(attr(tf, "variables"))[-1L]
-    eval(vars[[ind]], data, environment(formula))
-  } else {
-    NULL
-  }
+  if (is.null(ind)) return(NULL)
+  if (length(ind) > 1L) stop("only a single offset allowed in 'formula'")
+  vars <- as.list(attr(tf, "variables"))[-1L]
+  eval(vars[[ind]], data, environment(formula))
 }
 
 get_vars <- function(formula, rhs.only=TRUE) {
@@ -81,8 +74,8 @@ standardize_formula <- function(formula, specials=c("reg", "mec", "gen"), defaul
   } else {
     remainder <- attr(tf, "term.labels")
   }
+  e <- environment(formula)
   if (length(remainder) || has_explicit_intercept(formula) || (!length(idx) && attr(tf, "intercept") == 1L)) {
-    e <- environment(formula)
     if (length(remainder)) {
       if (attr(tf, "intercept") == 0L) {
         formula <- paste0(default, "( ~ 0 +", paste(remainder, collapse=" + "), ")")
@@ -101,11 +94,10 @@ standardize_formula <- function(formula, specials=c("reg", "mec", "gen"), defaul
       formula <- paste(rownames(attr(tf, "factors"))[[attr(tf, "offset")]], "+", formula)
     }
     if (attr(tf, "response") > 0L) {
-      formula <- as.formula(paste(deparse(attr(tf, "variables")[[attr(tf, "response") + 1L]]), "~", formula))
+      formula <- as.formula(paste(deparse(attr(tf, "variables")[[attr(tf, "response") + 1L]]), "~", formula), env=e)
     } else {
-      formula <- as.formula(paste("~", formula))
+      formula <- as.formula(paste("~", formula), env=e)
     }
-    environment(formula) <- e
   }
   formula
 }

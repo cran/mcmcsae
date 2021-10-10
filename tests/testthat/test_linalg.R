@@ -119,6 +119,17 @@ test_that("tab to dgC conversion works", {
   expect_error(as(matrix(c(1,1,1,0), 2, 2), "tabMatrix"))
 })
 
+test_that("tabMatrix column selection works", {
+  m <- matrix(c(1,0,1,0,1,0,0,0,0), 3, 3)
+  M <- as(m, "tabMatrix")
+  expect_identical(M[, 1], m[, 1])
+  expect_identical(Ctab2mat(M[, 1, drop=FALSE]), m[, 1, drop=FALSE])
+  expect_identical(Ctab2mat(M[, c(1, 3)]), m[, c(1, 3)])
+  expect_identical(Ctab2mat(M[, -2]), m[, -2])
+  expect_identical(M[, c(-2, -3)], c(1, 0, 1))
+  expect_identical(Ctab2mat(M[, c(-2, -3), drop=FALSE]), m[, c(-2, -3), drop=FALSE])
+})
+
 test_that("crossprod_sym works", {
   n <- 25L
   q <- runif(n)
@@ -159,6 +170,18 @@ test_that("crossprod_sym works", {
   expect_equal(crossprod_sym(M, q), crossprod_sym(M, Q))
   expect_equal(as(crossprod(M, Qsym %*% M), "symmetricMatrix"), crossprod_sym(M, Qsym))
   expect_equivalent(as(crossprod(M, Qmat %*% M), "matrix"), crossprod_sym(M, Qmat))
+})
+
+test_that("crossprod_sym2 works", {
+  n <- 11L; m <- 5L
+  M1 <- matrix(runif(n*m), n, m)
+  expect_equal(crossprod_sym2(M1), crossprod(M1))
+  M2 <- diag(runif(n)) %*% M1
+  expect_equal(crossprod_sym2(M1, M2), crossprod(M1, M2))
+  M1 <- as(M1, "dgCMatrix")
+  M2 <- as(M2, "dgCMatrix")
+  expect_equal(crossprod_sym2(M1), crossprod(M1))
+  expect_equal(crossprod_sym2(M1, M2), as(crossprod(M1, M2), "symmetricMatrix"))
 })
 
 test_that("(re)defined S4 methods work", {

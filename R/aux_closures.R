@@ -31,19 +31,11 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
       },
       matddi = {
         rm(template)
-        update <- function(M1, M2, w1=1, w2=1) {
-          out <- w1 * M1
-          out <- add_diagC(out, w2 * ddi_diag(M2))
-          out
-        }
+        update <- function(M1, M2, w1=1, w2=1) add_diagC(w1 * M1, w2 * ddi_diag(M2))
       },
       ddimat = {
         rm(template)
-        update <- function(M1, M2, w1=1, w2=1) {
-          out <- w2 * M2
-          out <- add_diagC(out, w1 * ddi_diag(M1))
-          out
-        }
+        update <- function(M1, M2, w1=1, w2=1) add_diagC(w2 * M2, w1 * ddi_diag(M1))
       },
       matdsC = {
         IM <- cbind(M2@i + 1L, rep.int(1:M2@Dim[2L], diff(M2@p)))  # one-based index
@@ -57,13 +49,13 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
         }
       },
       dsCmat = {
-        IM <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))  # one-based index
-        symm <- which(IM[, 1L] != IM[, 2L])  # rows that should be added in order to symmetrize the result
+        IM <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))
+        symm <- which(IM[, 1L] != IM[, 2L])
         rm(template)
         update <- function(M1, M2, w1=1, w2=1) {
           out <- w2 * M2
           out[IM] <- out[IM] + w1 * M1@x
-          out[IM[symm, 2:1, drop=FALSE]] <- out[IM[symm, 2:1, drop=FALSE]] + w1 * M1@x[symm]  # for symmetry
+          out[IM[symm, 2:1, drop=FALSE]] <- out[IM[symm, 2:1, drop=FALSE]] + w1 * M1@x[symm]
           out
         }
       },
@@ -97,7 +89,7 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
         }
       },
       {
-        warning("possibly inefficient (sparse) matrix addition")
+        warning("possibly inefficient (sparse) matrix addition", immediate.=TRUE)
         update <- function(M1, M2, w1=1, w2=1) w1 * M1 + w2 * M2
       }
     )
@@ -111,20 +103,16 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
       },
       matddiNUL = {
         template <- as.matrix(M0)
-        update <- function(M1, M2, w1=1, w2=1) {
-          out <- template
-          out <- add_diagC(out, w1 * ddi_diag(M1))
-          out
-        }
+        update <- function(M1, M2, w1=1, w2=1) add_diagC(template, w1 * ddi_diag(M1))
       },
       matdsCNUL = {
-        IM <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))  # one-based index
-        symm <- which(IM[, 1L] != IM[, 2L])  # rows that should be added in order to symmetrize the result
+        IM <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))
+        symm <- which(IM[, 1L] != IM[, 2L])
         template <- as.matrix(M0)
         update <- function(M1, M2, w1=1, w2=1) {
           out <- template
           out[IM] <- out[IM] + w1 * M1@x
-          out[IM[symm, 2:1, drop=FALSE]] <- out[IM[symm, 2:1, drop=FALSE]] + w1 * M1@x[symm]  # for symmetry
+          out[IM[symm, 2:1, drop=FALSE]] <- out[IM[symm, 2:1, drop=FALSE]] + w1 * M1@x[symm]
           out
         }
       },
@@ -173,77 +161,63 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
       },
       matmatddi = {
         template <- as.matrix(M0)
-        update <- function(M1, M2, w1=1, w2=1) {
-          out <- template + w1 * M1
-          out <- add_diagC(out, w2 * ddi_diag(M2))
-          out
-        }
+        update <- function(M1, M2, w1=1, w2=1) add_diagC(template + w1 * M1, w2 * ddi_diag(M2))
       },
       matddimat = {
         template <- as.matrix(M0)
-        update <- function(M1, M2, w1=1, w2=1) {
-          out <- template + w2 * M2
-          out <- add_diagC(out, w1 * ddi_diag(M1))
-          out
-        }
+        update <- function(M1, M2, w1=1, w2=1) add_diagC(template + w2 * M2, w1 * ddi_diag(M1))
       },
       matddiddi = {
         template <- as.matrix(M0)
-        update <- function(M1, M2, w1=1, w2=1) {
-          out <- template
-          out <- add_diagC(out, w1 * ddi_diag(M1) + w2 * ddi_diag(M2))
-          out
-        }
+        update <- function(M1, M2, w1=1, w2=1) add_diagC(template, w1 * ddi_diag(M1) + w2 * ddi_diag(M2))
       },
       matmatdsC = {
-        IM <- cbind(M2@i + 1L, rep.int(1:M2@Dim[2L], diff(M2@p)))  # one-based index
-        symm <- which(IM[, 1L] != IM[, 2L])  # rows that should be added in order to symmetrize the result
+        IM <- cbind(M2@i + 1L, rep.int(1:M2@Dim[2L], diff(M2@p)))
+        symm <- which(IM[, 1L] != IM[, 2L])
         template <- as.matrix(M0)
         update <- function(M1, M2, w1=1, w2=1) {
           out <- template + w1 * M1
           out[IM] <- out[IM] + w2 * M2@x
-          out[IM[symm, 2:1, drop=FALSE]] <- out[IM[symm, 2:1, drop=FALSE]] + w2 * M2@x[symm]  # for symmetry
+          out[IM[symm, 2:1, drop=FALSE]] <- out[IM[symm, 2:1, drop=FALSE]] + w2 * M2@x[symm]
           out
         }
       },
       matdsCmat = {
-        IM <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))  # one-based index
-        symm <- which(IM[, 1L] != IM[, 2L])  # rows that should be added in order to symmetrize the result
+        IM <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))
+        symm <- which(IM[, 1L] != IM[, 2L])
         template <- as.matrix(M0)
         update <- function(M1, M2, w1=1, w2=1) {
           out <- template + w2 * M2
           out[IM] <- out[IM] + w1 * M1@x
-          out[IM[symm, 2:1, drop=FALSE]] <- out[IM[symm, 2:1, drop=FALSE]] + w1 * M1@x[symm]  # for symmetry
+          out[IM[symm, 2:1, drop=FALSE]] <- out[IM[symm, 2:1, drop=FALSE]] + w1 * M1@x[symm]
           out
         }
       },
       matdsCddi = {
-        IM <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))  # one-based index
-        symm <- which(IM[, 1L] != IM[, 2L])  # rows that should be added in order to symmetrize the result
+        IM <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))
+        symm <- which(IM[, 1L] != IM[, 2L])
         template <- as.matrix(M0)
         update <- function(M1, M2, w1=1, w2=1) {
           out <- template
           out[IM] <- out[IM] + w1 * M1@x
-          out[IM[symm, 2:1, drop=FALSE]] <- out[IM[symm, 2:1, drop=FALSE]] + w1 * M1@x[symm]  # for symmetry
-          out <- add_diagC(out, w2 * ddi_diag(M2))
-          out
+          out[IM[symm, 2:1, drop=FALSE]] <- out[IM[symm, 2:1, drop=FALSE]] + w1 * M1@x[symm]
+          add_diagC(out, w2 * ddi_diag(M2))
         }
       },
       matddidsC = {
-        IM <- cbind(M2@i + 1L, rep.int(1:M2@Dim[2L], diff(M2@p)))  # one-based index
-        symm <- which(IM[, 1L] != IM[, 2L])  # rows that should be added in order to symmetrize the result
+        IM <- cbind(M2@i + 1L, rep.int(1:M2@Dim[2L], diff(M2@p)))
+        symm <- which(IM[, 1L] != IM[, 2L])
         template <- as.matrix(M0)
         update <- function(M1, M2, w1=1, w2=1) {
-          out <- template
-          out <- add_diagC(out, w1 * ddi_diag(M1))
+          out <- add_diagC(template, w1 * ddi_diag(M1))
           out[IM] <- out[IM] + w2 * M2@x
-          out[IM[symm, 2:1, drop=FALSE]] <- out[IM[symm, 2:1, drop=FALSE]] + w2 * M2@x[symm]  # for symmetry
+          out[IM[symm, 2:1, drop=FALSE]] <- out[IM[symm, 2:1, drop=FALSE]] + w2 * M2@x[symm]
           out
         }
       },
       matdsCdsC = {
-        IM1 <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))  # one-based index
-        symm1 <- which(IM1[, 1L] != IM1[, 2L])  # rows that should be added in order to symmetrize the result
+        IM1 <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))
+        symm1 <- which(IM1[, 1L] != IM1[, 2L])
         IM2 <- cbind(M2@i + 1L, rep.int(1:M2@Dim[2L], diff(M2@p)))
         symm2 <- which(IM2[, 1L] != IM2[, 2L])
         template <- as.matrix(M0)
@@ -298,7 +272,7 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
         }
       },
       {
-        warning("possibly inefficient (sparse) matrix addition")
+        warning("possibly inefficient (sparse) matrix addition", immediate.=TRUE)
         template <- M0
         if (is.null(M2))
           update <- function(M1, M2, w1=1, w2=1) template + w1 * M1

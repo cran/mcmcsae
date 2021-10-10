@@ -9,10 +9,17 @@ It is used to derive a (sparse) precision matrix for a set of coefficient, and p
 a set of linear constraints to be imposed on the coefficient vector.
 \describe{
   \item{iid(f)}{Independent effects corresponding to the levels of factor \code{f}.}
-  \item{RW1(f, circular=FALSE)}{First-order random walk.}
+  \item{RW1(f, circular=FALSE, w=NULL)}{First-order random walk over the levels of factor \code{f}.
+    The random walk can be made circular and different (fixed) weights can be attached to the innovations.
+    If specified, \code{w} must be a positive numeric vector of length one less than the number of
+    factor levels. For example, if the levels correspond to different times, it would often be
+    reasonable to choose \code{w} proportional to the reciprocal time differences. For equidistant
+    times there is generally no need to specify \code{w}.}
   \item{RW2(f)}{Second-order random walk.}
-  \item{AR1(f, phi)}{First-order autoregressive correlation structure among the levels of \code{f}.
-    Required argument \code{phi} (fixed number for now).}
+  \item{AR1(f, phi, w=NULL)}{First-order autoregressive correlation structure among
+    the levels of \code{f}. Required argument is the (fixed) autoregressive parameter \code{phi}.
+    For irregularly spaced AR(1) processes weights can be specified, in the same way as for
+    \code{RW1}.}
   \item{season(f, period)}{Dummy seasonal with period \code{period}.}
   \item{spatial(f, poly.df, snap, queen, derive.constraints=FALSE)}{CAR spatial correlation.
     Argument \code{poly.df} should be an object of class \code{SpatialPolygonsDataFrame} obtained
@@ -20,6 +27,17 @@ a set of linear constraints to be imposed on the coefficient vector.
     package \pkg{maptools}. Arguments \code{snap} and \code{queen} are passed to \code{\link[spdep]{poly2nb}}.
     If \code{derive.constraints=TRUE} the constraint matrix for an IGMRF model component
     is formed by computing the singular vectors of the precision matrix.}
-  \item{custom(f, QD)}{A custom precision or incidence matrix associated with factor f can be passed to argument \code{QD}.}
+  \item{custom(f, D=NULL, Q=NULL, R=NULL, derive.constraints=NULL)}{Either a custom precision or incidence
+    matrix associated with factor f can be passed to argument \code{Q} or \code{D}. Optionally a
+    constraint matrix can be supplied as \code{R}, or constraints can be derived from the null space
+    of the precision matrix by setting \code{derive.constraints=TRUE}.}
 }
+}
+\references{
+B. Allevius (2018).
+   On the precision matrix of an irregularly sampled AR(1) process.
+   arXiv:1801.03791.
+ H. Rue and L. Held (2005).
+   Gaussian Markov Random Fields.
+   Chapman & Hall/CRC.
 }

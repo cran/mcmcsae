@@ -19,26 +19,18 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   }
 
   # start with empty matrices
-  X <- matrix(0, e$n, 0L)  # block design matrix; used to produce (weighted) X'X matrix
-  #QT <- matrix(0, 0L, 0L)  # (template for) joint prior precision matrix
+  X <- matrix(0, e$n, 0L)  # block design matrix
   ind <- 0L
   for (mc in mcs) {
     if (mc$type == "gen" && mc$gl)
       X <- cbind(X, cbind(mc$X, zeroMatrix(e$n, mc$glp$q)))
     else
       X <- cbind(X, mc$X)
-    #if (mc$type == "gen") {
-    #  QT <- bdiag(QT, mc$Q)
-    #  #rm("Q", envir=mc)  # individual Q matrices no longer needed (we still have kron_prod closures)
-    #} else {
-    #  QT <- bdiag(QT, mc$Q0)
-    #}
     vec_list[[mc$name]] <- (ind + 1L):ncol(X)
     ind <- ncol(X)
   }
   rm(ind)
   X <- economizeMatrix(X)
-  #QT0 <- economizeMatrix(QT, sparse=TRUE, symmetric=TRUE, drop.zeros=TRUE)
 
   # template for (updating) blocked precision matrix
   # each mc$Q for gen is either ddi or dsC; the same holds true for mc$Q0 for reg and mec
@@ -79,61 +71,66 @@ create_mc_block <- function(mcs, e=parent.frame()) {
     Qvector
   }
 
-  if (e$modeled.Q)
-    XX <- crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e$n, 0.9, 1.1)), e$Q0))
-  else
-    XX <- economizeMatrix(crossprod_sym(X, e$Q0), symmetric=TRUE, drop.zeros=TRUE)
+  if (is.null(e$control$CG)) {
+    if (e$modeled.Q)
+      XX <- crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e$n, 0.9, 1.1)), e$Q0))
+    else
+      XX <- economizeMatrix(crossprod_sym(X, e$Q0), symmetric=TRUE, drop.zeros=TRUE)
 
-  # derive constraint matrix, if any
-  if (any(sapply(mcs, function(mc) !is.null(mc$R)))) {
-    R <- zeroMatrix(0L, 0L)
-    for (mc in mcs) {
-      if (is.null(mc$R)) {
-        if (mc$type == "gen" && mc$gl)
-          R <- rbind(R, zeroMatrix(mc$q + mc$glp$q, ncol(R)))
-        else
-          R <- rbind(R, zeroMatrix(mc$q, ncol(R)))
-      } else {
-        if (mc$type == "gen" && mc$gl)
-          R <- bdiag(R, mc$glp$R)
-        else
-          R <- bdiag(R, mc$R)
+    # derive constraint matrix, if any
+    if (any(sapply(mcs, function(mc) !is.null(mc$R)))) {
+      R <- zeroMatrix(0L, 0L)
+      for (mc in mcs) {
+        if (is.null(mc$R)) {
+          if (mc$type == "gen" && mc$gl)
+            R <- rbind(R, zeroMatrix(mc$q + mc$glp$q, ncol(R)))
+          else
+            R <- rbind(R, zeroMatrix(mc$q, ncol(R)))
+        } else {
+          if (mc$type == "gen" && mc$gl)
+            R <- bdiag(R, mc$glp$R)
+          else
+            R <- bdiag(R, mc$R)
+        }
       }
+      if (nrow(R) != ncol(X)) stop("incompatible dimensions of design and constraint matrices")
+      # TODO remove individual R matrices as they are not needed in the single block sampler
+      #      add support for additional constraints defined over the whole coefficient vector
+      # In the case of constraints the XX + Q matrix often becomes singular
+      # sampling from such a IGMRF can be done by first adding a multiple of tcrossprod(R) to it (Rue and Held, 2005)
+      # most convenient is to add it to XX;
+      # But this is not always required. Better add as little as is necessary to get pd (takes up lots of memory for lengthy random walks ...)
+      # Another option is to add a multiple of I to XX + Q and correct with MH
+    } else {
+      R <- NULL
     }
-    if (nrow(R) != ncol(X)) stop("incompatible dimensions of design and constraint matrices")
-    # TODO remove individual R matrices as they are not needed in the single block sampler
-    #      add support for additional constraints defined over the whole coefficient vector
-    # In the case of constraints the XX + Q matrix often becomes singular
-    # sampling from such a IGMRF can be done by first adding a multiple of tcrossprod(R) to it (Rue and Held, 2005)
-    # most convenient is to add it to XX;
-    # But this is not always required. Better add as little as is necessary to get pd (takes up lots of memory for lengthy random walks ...)
-    # Another option is to add a multiple of I to XX + Q and correct with MH
-  } else {
-    R <- NULL
-  }
 
-  if (any(sapply(mcs, function(mc) !is.null(mc$S)))) {
-    S <- zeroMatrix(0L, 0L)
-    for (mc in mcs) {
-      if (is.null(mc$S))
-        S <- rbind(S, zeroMatrix(mc$q, ncol(S)))
-      else
-        S <- bdiag(S, mc$S)
+    if (any(sapply(mcs, function(mc) !is.null(mc$S)))) {
+      S <- zeroMatrix(0L, 0L)
+      for (mc in mcs) {
+        if (is.null(mc$S))
+          S <- rbind(S, zeroMatrix(mc$q, ncol(S)))
+        else
+          S <- bdiag(S, mc$S)
+      }
+      if (nrow(S) != ncol(X)) stop("incompatible dimensions of design and constraint matrices")
+      # TODO remove individual S matrices as they are not needed in the single block sampler
+      #      add support for additional constraints defined over the whole coefficient vector
+    } else {
+      S <- NULL
     }
-    if (nrow(S) != ncol(X)) stop("incompatible dimensions of design and constraint matrices")
-    # TODO remove individual S matrices as they are not needed in the single block sampler
-    #      add support for additional constraints defined over the whole coefficient vector
-  } else {
-    S <- NULL
-  }
 
-  sparse_template(environment(), update.XX=e$modeled.Q || any(sapply(mcs, `[[`, "type") == "mec"),
-                  add.outer.R=e$control$add.outer.R, prior.only=e$prior.only)
+    sparse_template(environment(), update.XX=e$modeled.Q || any(sapply(mcs, `[[`, "type") == "mec"),
+                    add.outer.R=e$control$add.outer.R, prior.only=e$prior.only)
+
+  } else {
+    # TODO check that the only constraints are GMRF constraints
+    CG_sampler <- do.call(setup_CG_sampler, c(list(mbs=mcs, X=X, sampler=e), e$control$CG))
+  }
 
   if (e$compute.weights) {
     # form the q_all x m matrix corresponding to the linear predictor as represented componentwise in linpred
     # TODO do we really need to store both X and t(X) in this case?
-    #if (all(sapply(e$linpred, is.character)) && all(unlist(e$linpred) == "X")) {
     if (is.null(e$linpred)) {
       linpred <- economizeMatrix(t(X), strip.names=FALSE)
     } else {
@@ -141,18 +138,6 @@ create_mc_block <- function(mcs, e=parent.frame()) {
       # TODO as this matrix is passed to Cholesky's solve method it must be matrix or dgCMatrix
     }
   }
-
-  #get_Qvector <- function(p, tau) {
-  #  Qvector <- NULL
-  #  for (mc in mcs)
-  #    if (mc$type == "gen")
-  #      Qvector <- c(Qvector, p[[mc$name_Q]])
-  #    else if (class(QT)[1L] == "ddiMatrix")
-  #      Qvector <- c(Qvector, tau * mc$Q0@x)
-  #    else
-  #      Qvector <- c(Qvector, tau * mc$Q0@x[mc$Q0@x != 0])
-  #  Qvector
-  #}
 
   if (e$prior.only) return(environment())
 
@@ -180,20 +165,26 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   for (mc in mcs)
     if (mc$type == "mec")
       draw <- add(draw, bquote(X[, vec_list[[.(mc$name)]]] <- p[[.(mc$name_X)]]))
-  if (e$modeled.Q) {
-    if (e$Q0.type == "symm")
-      draw <- add(draw, quote(XX <- crossprod_sym(X, p[["QM_"]])))
-    else
-      draw <- add(draw, quote(XX <- crossprod_sym(X, p[["Q_"]])))
-  } else if (any(sapply(mcs, `[[`, "type") == "mec")) {
-    draw <- add(draw, quote(XX <- crossprod_sym(X, e$Q0)))
-  }
-  draw <- add(draw, quote(Qlist <- update(XX, QT, 1, 1/tau)))
   if (e$single.block && !e$modeled.Q && !any(sapply(mcs, `[[`, "type") == "mec") && e$family$link != "probit")
     Xy <- crossprod_mv(X, e$Q0 %m*v% e$y_eff())
   else
     draw <- add(draw, quote(Xy <- crossprod_mv(X, e$Q_e(p))))
-  draw <- add(draw, bquote(coef <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else bquote(p[["sigma_"]])), Q=Qlist$Q, Imult=Qlist$Imult, Xy=Xy)[[.(name)]]))
+  if (is.null(e$control$CG)) {
+    if (e$modeled.Q) {
+      if (e$Q0.type == "symm")
+        draw <- add(draw, quote(XX <- crossprod_sym(X, p[["QM_"]])))
+      else
+        draw <- add(draw, quote(XX <- crossprod_sym(X, p[["Q_"]])))
+    } else if (any(sapply(mcs, `[[`, "type") == "mec")) {
+      draw <- add(draw, quote(XX <- crossprod_sym(X, e$Q0)))
+    }
+    draw <- add(draw, quote(Qlist <- update(XX, QT, 1, 1/tau)))
+    draw <- add(draw, bquote(coef <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else bquote(p[["sigma_"]])), Q=Qlist$Q, Imult=Qlist$Imult, Xy=Xy)[[.(name)]]))
+  } else {
+    draw <- add(draw, quote(CGstart <- vector("numeric", ncol(X))))
+    draw <- add(draw, quote(for (mc in mcs) CGstart[vec_list[[mc$name]]] <- p[[mc$name]]))
+    draw <- add(draw, quote(coef <- CG_sampler$draw(p, Xy, X, QT, e, start=CGstart)))
+  }
   # split coef and assign to the separate coefficient batches
   draw <- add(draw, quote(
     for (mc in mcs) {
@@ -228,18 +219,29 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   # END draw function
 
   start <- function(p) {}
-  start <- add(start, bquote(coef <- MVNsampler$start(p, .(e$scale_y))[[.(name)]]))
-  start <- add(start, quote(
-    for (mc in mcs) {
-      if (mc$type == "gen" && mc$gl) {
-        u <- coef[vec_list[[mc$name]]]
-        if (is.null(p[[mc$name]])) p[[mc$name]] <- u[mc$i.v]
-        if (is.null(p[[mc$name_gl]])) p[[mc$name_gl]] <- u[mc$i.alpha]
-      } else {
-        if (is.null(p[[mc$name]])) p[[mc$name]] <- coef[vec_list[[mc$name]]]
+  if (is.null(e$control$CG)) {
+    start <- add(start, bquote(coef <- MVNsampler$start(p, e$scale_sigma)[[.(name)]]))
+    start <- add(start, quote(
+      for (mc in mcs) {
+        if (mc$type == "gen" && mc$gl) {
+          u <- coef[vec_list[[mc$name]]]
+          if (is.null(p[[mc$name]])) p[[mc$name]] <- u[mc$i.v]
+          if (is.null(p[[mc$name_gl]])) p[[mc$name_gl]] <- u[mc$i.alpha]
+        } else {
+          if (is.null(p[[mc$name]])) p[[mc$name]] <- coef[vec_list[[mc$name]]]
+        }
       }
-    }
-  ))
+    ))
+  } else {
+    start <- add(start, quote(
+      for (mc in mcs) {
+        if (mc$type == "gen" && mc$fastGMRFprior)
+          p[[mc$name]] <- mc$rprior(p)[[mc$name]]
+        else
+          p[[mc$name]] <- Crnorm(mc$q, sd=e$scale_sigma)
+      }
+    ))
+  }
   # TODO check formats of user-provided start values
   start <- add(start, quote(p))
 

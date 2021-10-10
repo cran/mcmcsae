@@ -122,11 +122,12 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     reduce <- FALSE
     eq <- FALSE
   } else {
+    R <- economizeMatrix(R, vec.as.diag=FALSE)
     if (nrow(R) != n || ncol(R) > n) stop("incompatible constraint matrix 'R'")
     if (is.null(r)) {
       r <- rep.int(0, ncol(R))
     } else {
-      r <- as.vector(r)
+      r <- as.numeric(r)
       if (length(r) != ncol(R)) stop("length of 'r' should equal the number of columns of 'R'")
     }
     # TODO check that R has full column rank
@@ -146,12 +147,13 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       S <- cbind(S, -S)
       s <- c(lower, -upper)
     }
+    S <- economizeMatrix(S, vec.as.diag=FALSE)
     if (nrow(S) != n) stop("incompatible constraint matrix 'S'")
     ncS <- ncol(S)
     if (is.null(s)) {
       s <- rep.int(0, ncS)
     } else {
-      s <- as.vector(s)
+      s <- as.numeric(s)
       if (length(s) != ncS) stop("length of 's' should equal the number of columns of 'S'")
     }
     ineq <- TRUE
@@ -214,7 +216,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     if (ineq) {
       # transform s and S to the frame defined by z2 - mu_z2_given_z1 (with vanishing mean)
       s <- s - crossprod_mv(S, x0)
-      S <- economizeMatrix(crossprod(Q2, S), drop.zeros=TRUE)
+      S <- economizeMatrix(crossprod(Q2, S), drop.zeros=TRUE, allow.tabMatrix=FALSE)
       if (method == "HMC") {
         # define VS as Q^-1 S = V S
         VS <- economizeMatrix(cholQ$solve(S), allow.tabMatrix=FALSE)
@@ -613,7 +615,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
         if (print.info) {
           viol <- crossprod_mv(S, x) < s
           if (any(viol))
-            cat("\nviolated constraints:", names(bounces)[viol])  # print violated constraints
+            cat("\nviolated constraints:", names(bounces)[viol])
         }
         repeat {
           Sv <- crossprod_mv(S, v)
@@ -662,7 +664,10 @@ create_TMVN_sampler <- function(Q, perm=NULL,
 
           # next wall hit happens within simulation period
           h <- i_hit[h]  # index w.r.t. all inequalities
-          if (print.info) bounces[h] <- bounces[h] + 1L
+          if (print.info) {
+            cat("h = ", h, "; th = ", th, "\n")
+            bounces[h] <- bounces[h] + 1L
+          }
           if (th > 0) {
             costh <- cos(th)
             sinth <- sin(th)
@@ -693,17 +698,18 @@ create_TMVN_sampler <- function(Q, perm=NULL,
         }
       }  # END if (ineq)
 
+      # compute final state (new draw)
       if (reduce) {
         if (zero.mu)
-          p[[name.tr]] <- v * sin(T.HMC) + x * cos(T.HMC)  # final state (new draw for x)
+          p[[name.tr]] <- v * sin(T.HMC) + x * cos(T.HMC)
         else
-          p[[name.tr]] <- mu + v * sin(T.HMC) + (x - mu) * cos(T.HMC)  # final state (new draw for x)
+          p[[name.tr]] <- mu + v * sin(T.HMC) + (x - mu) * cos(T.HMC)
         p[[name]] <- x0 + Q2 %m*v% p[[name.tr]]
       } else {
         if (zero.mu)
-          p[[name]] <- v * sin(T.HMC) + x * cos(T.HMC)  # final state (new draw for x)
+          p[[name]] <- v * sin(T.HMC) + x * cos(T.HMC)
         else
-          p[[name]] <- mu + v * sin(T.HMC) + (x - mu) * cos(T.HMC)  # final state (new draw for x)
+          p[[name]] <- mu + v * sin(T.HMC) + (x - mu) * cos(T.HMC)
       }
 
       p
@@ -748,6 +754,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
           p[[name.tr]] <- res$x
         } else {
           # a start value at the original scale is provided; transform to projected form
+          if (length(p[[name]]) != n) stop("wrong length of start value for '", name, "'")
           # TODO check that the start value satisfies all constraints
           if (eq) {
             z2.start <- crossprod_mv(Q2, p[[name]] - x0)
@@ -757,8 +764,10 @@ create_TMVN_sampler <- function(Q, perm=NULL,
             else
               z2.start <- p[[name]] - mu
           }
-          p[[name.tr]] <- cholQ$crossprodL(z2.start)
+          p[[name.tr]] <- cholQ$Ltimes(z2.start)
         }
+      } else {
+        if (length(p[[name.tr]]) != n2) stop("wrong length of start value for '", name.tr, "'")
       }
       p
     }
@@ -844,7 +853,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
   #}
 
   # TODO remove more unused quantities
-  rm(n, use.cholV)
+  rm(use.cholV)
   if (method != "HMC") rm(T.HMC)
   if (method != "HMC" || !ineq) rm(print.info)
 

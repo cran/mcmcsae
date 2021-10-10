@@ -8,6 +8,13 @@ intercept_only <- function(formula) {
   #isTRUE(all.equal(formula, ~ 1))
 }
 
+n_row <- function(data) {
+  if (is.integer(data) && length(data) == 1L)
+    data
+  else
+    nrow(data)
+}
+
 # set up binary file for writing and write header
 write_header <- function(con, n.iter, n.chain, n.par, parnames=NULL, single.prec=FALSE) {
   writeBin(as.integer(c(n.iter, n.chain, n.par)), con)

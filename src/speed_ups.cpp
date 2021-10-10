@@ -134,7 +134,7 @@ Eigen::VectorXd Cdense_numeric_prod(const Eigen::Map<Eigen::MatrixXd> & A, const
 // [[Rcpp::export(rng=false)]]
 Eigen::VectorXd Cdense_numeric_crossprod(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::Map<Eigen::VectorXd> & y) {
   if (A.rows() != y.size()) stop("incompatible dimensions");
-  return A.adjoint() * y;
+  return A.transpose() * y;
 }
 
 //’ Crossproduct of a sparse matrix with a vector
@@ -154,7 +154,7 @@ Eigen::VectorXd Csparse_numeric_crossprod(const Eigen::MappedSparseMatrix<double
 //’ @param B a numeric matrix.
 //’ @return The matrix product \code{AB}.
 // [[Rcpp::export(rng=false)]]
-Eigen::MatrixXd Cmatmat(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::Map<Eigen::MatrixXd> & B) {
+Eigen::MatrixXd Cdense_dense_prod(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::Map<Eigen::MatrixXd> & B) {
   int n = A.cols();
   if (B.rows() != n) stop("incompatible matrices");
   return A * B;
@@ -166,7 +166,7 @@ Eigen::MatrixXd Cmatmat(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::Map<
 //’ @param y a matrix.
 //’ @return The matrix product \code{Ay}.
 // [[Rcpp::export(rng=false)]]
-Eigen::MatrixXd Csparse_matrix_prod(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::MatrixXd> & y) {
+Eigen::MatrixXd Csparse_dense_prod(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::MatrixXd> & y) {
   if (A.cols() != y.rows()) stop("incompatible dimensions");
   return A * y;
 }
@@ -177,11 +177,10 @@ Eigen::MatrixXd Csparse_matrix_prod(const Eigen::MappedSparseMatrix<double> & A,
 //’ @param B a numeric compressed, sparse, column-oriented matrix.
 //’ @return The matrix product \code{AB}.
 // [[Rcpp::export(rng=false)]]
-Eigen::MatrixXd Cmatrix_sparse_prod(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::MappedSparseMatrix<double> & B) {
+Eigen::MatrixXd Cdense_sparse_prod(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::MappedSparseMatrix<double> & B) {
   if (A.cols() != B.rows()) stop("incompatible dimensions");
   return A * B;
 }
-
 
 //’ Matrix product of a symmetric sparse (dsC) matrix with a matrix
 //’
@@ -190,7 +189,7 @@ Eigen::MatrixXd Cmatrix_sparse_prod(const Eigen::Map<Eigen::MatrixXd> & A, const
 //’ @return The matrix product \code{Ay}.
 // NB it is assumed that the symmetric matrix is stored in the upper triangular part
 // [[Rcpp::export(rng=false)]]
-Eigen::MatrixXd CsparseS_matrix_prod(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::MatrixXd> & y) {
+Eigen::MatrixXd CsparseS_dense_prod(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::MatrixXd> & y) {
   if (A.cols() != y.rows()) stop("incompatible dimensions");
   return A.selfadjointView<Eigen::Upper>() * y;
 }
@@ -202,7 +201,7 @@ Eigen::MatrixXd CsparseS_matrix_prod(const Eigen::MappedSparseMatrix<double> & A
 //’ @return The matrix product \code{MQ}.
 // NB it is assumed that the symmetric matrix is stored in the upper triangular part
 // [[Rcpp::export(rng=false)]]
-Eigen::MatrixXd Cmatrix_sparseS_prod(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::MappedSparseMatrix<double> & Q) {
+Eigen::MatrixXd Cdense_sparseS_prod(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::MappedSparseMatrix<double> & Q) {
   if (M.cols() != Q.rows()) stop("incompatible dimensions");
   return M * Q.selfadjointView<Eigen::Upper>();
 }
@@ -218,15 +217,49 @@ Eigen::MatrixXd Cdense_diag_prod(const Eigen::Map<Eigen::MatrixXd> & M, const Ei
   return M * d.asDiagonal();
 }
 
+//’ Matrix crossproduct of two dense matrices
+//’
+//’ @param A a numeric matrix.
+//’ @param B a numeric matrix.
+//’ @return The matrix product \code{A'B}.
+// [[Rcpp::export(rng=false)]]
+Eigen::MatrixXd Cdense_dense_crossprod(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::Map<Eigen::MatrixXd> & B) {
+  int n = A.rows();
+  if (B.rows() != n) stop("incompatible matrices");
+  return A.adjoint() * B;
+}
+
 //’ Matrix product of the transpose of a sparse matrix with a matrix
 //’
 //’ @param A a numeric compressed, sparse, column-oriented matrix.
-//’ @param y a matrix.
-//’ @return The matrix product \code{A'y}.
+//’ @param B a matrix.
+//’ @return The matrix product \code{A'B}.
 // [[Rcpp::export(rng=false)]]
-Eigen::MatrixXd Csparse_matrix_crossprod(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::MatrixXd> & y) {
-  if (A.rows() != y.rows()) stop("incompatible dimensions");
-  return A.transpose() * y;
+Eigen::MatrixXd Csparse_dense_crossprod(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::MatrixXd> & B) {
+  if (A.rows() != B.rows()) stop("incompatible dimensions");
+  return A.transpose() * B;
+}
+
+//’ Matrix product of the transpose of a matrix with a sparse matrix
+//’
+//’ @param A a matrix.
+//’ @param B a numeric compressed, sparse, column-oriented matrix.
+//’ @return The matrix product \code{A'B}.
+// [[Rcpp::export(rng=false)]]
+Eigen::MatrixXd Cdense_sparse_crossprod(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::MappedSparseMatrix<double> & B) {
+  if (A.rows() != B.rows()) stop("incompatible dimensions");
+  return A.transpose() * B;
+}
+
+//’ Matrix product of the transpose of a matrix with a diagonal matrix represented by a vector
+//’
+//’ @param M a dense matrix.
+//’ @param d a numeric vector representing a diagonal matrix.
+//’ @return The matrix product \code{M diag(d)}.
+// [[Rcpp::export(rng=false)]]
+Eigen::MatrixXd Cdense_diag_crossprod(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::Map<Eigen::VectorXd> & d) {
+  if (M.rows() != d.size()) stop("incompatible dimensions");
+  return M.transpose() * d.asDiagonal();
 }
 
 //’ Product of a matrix with the transpose of a sparse matrix
@@ -235,7 +268,7 @@ Eigen::MatrixXd Csparse_matrix_crossprod(const Eigen::MappedSparseMatrix<double>
 //’ @param A a numeric compressed, sparse, column-oriented matrix.
 //’ @return The tcrossproduct \code{yA'}.
 // [[Rcpp::export(rng=false)]]
-Eigen::MatrixXd Cmatrix_sparse_tcrossprod(const Eigen::Map<Eigen::MatrixXd> & y, const Eigen::MappedSparseMatrix<double> & A) {
+Eigen::MatrixXd Cdense_sparse_tcrossprod(const Eigen::Map<Eigen::MatrixXd> & y, const Eigen::MappedSparseMatrix<double> & A) {
   if (y.cols() != A.cols()) stop("incompatible dimensions");
   return y * A.transpose();
 }
@@ -360,7 +393,7 @@ NumericMatrix Cdense_crossprod_sym2(const NumericMatrix & A, const NumericMatrix
   for (i = 0; i < n; i++) {
     for (j = 0; j <= i; j++) {
       z = 0;
-      for (k = 0; k < rank - 4; k += 4) {
+      for (k = 0; k < rank - 3; k += 4) {
         z += (A(k,i) * B(k,j) + A(k+1,i) * B(k+1,j)) + (A(k+2,i) * B(k+2,j) + A(k+3,i) * B(k+3,j));
       }
       for (; k < rank; k++) {

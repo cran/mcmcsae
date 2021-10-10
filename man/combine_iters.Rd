@@ -2,15 +2,15 @@
 % Please edit documentation in R/parallel.R
 \name{combine_iters}
 \alias{combine_iters}
-\title{Combine multiple draws objects to a single one by combining their draws}
+\title{Combine multiple mcdraws objects into a single one by combining their draws}
 \usage{
 combine_iters(...)
 }
 \arguments{
-\item{...}{objects of class \code{draws}}
+\item{...}{objects of class \code{mcdraws}}
 }
 \value{
-A combined object of class \code{draws} where the number of stored
+A combined object of class \code{mcdraws} where the number of stored
  draws equals the sum of the numbers of draws in the input objects.
 }
 \description{

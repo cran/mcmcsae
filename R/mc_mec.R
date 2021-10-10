@@ -110,15 +110,15 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL, Q0=NULL, b0=NULL,
     if (all(sapply(vs, length) == 3L)) {
       if (!all(sapply(vs, function(x) identical(x[[1L]], as.name("|"))))) stop("invalid 'formula' argument")
       V.in.formula <- TRUE
-      formula.X <- as.formula(paste0("~ 0 + ", paste(sapply(vs, function(x) deparse(x[[2L]])), collapse=" + ")))
-      formula.V <- as.formula(paste0("~ 0 + ", paste(sapply(vs, function(x) deparse(x[[3L]])), collapse=" + ")))
-      X <- model_Matrix(formula.X, data=e$data, remove.redundant=FALSE, sparse=sparse)
-      V <- model_Matrix(formula.V, data=e$data, remove.redundant=FALSE, sparse=sparse)
+      formula.X <- as.formula(paste0("~ 0 + ", paste(sapply(vs, function(x) deparse(x[[2L]])), collapse=" + ")), env=environment(formula))
+      formula.V <- as.formula(paste0("~ 0 + ", paste(sapply(vs, function(x) deparse(x[[3L]])), collapse=" + ")), env=environment(formula))
+      X <- model_matrix(formula.X, e$data, sparse=sparse)
+      V <- model_matrix(formula.V, e$data, sparse=sparse)
     } else {
       if (all(sapply(vs, length) <= 2L)) {
         V.in.formula <- FALSE
-        formula.X <- as.formula(paste0("~ 0 + ", paste(sapply(vs, deparse), collapse=" + ")))
-        X <- model_Matrix(formula.X, data=e$data, remove.redundant=FALSE, sparse=sparse)
+        formula.X <- as.formula(paste0("~ 0 + ", paste(sapply(vs, deparse), collapse=" + ")), env=environment(formula))
+        X <- model_matrix(formula.X, e$data, sparse=sparse)
       } else {
         stop("invalid 'formula' argument")
       }
@@ -196,9 +196,9 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL, Q0=NULL, b0=NULL,
   make_predict <- function(newdata) {
     if (!V.in.formula) stop("for out-of-sample prediction with mec components make sure to specify the",
                             "measurement error variances using the formula argument")
-    Xnew <- model_Matrix(formula.X, data=newdata, remove.redundant=FALSE, sparse=sparse)
+    Xnew <- model_matrix(formula.X, newdata, sparse=sparse)
     dimnames(Xnew) <- list(NULL, NULL)
-    Vnew <- model_Matrix(formula.V, data=newdata, remove.redundant=FALSE, sparse=sparse)
+    Vnew <- model_matrix(formula.V, newdata, sparse=sparse)
     dimnames(Vnew) <- list(NULL, NULL)
     if (any(Vnew < 0)) stop("negative measurement error variance(s) in 'newdata'")
     i.me.new <- which(apply(Vnew, 1L, function(x) all(x > 0)))  # TODO add tolerance + allow list of matrix

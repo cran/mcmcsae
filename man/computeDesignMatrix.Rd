@@ -2,21 +2,30 @@
 % Please edit documentation in R/models.R
 \name{computeDesignMatrix}
 \alias{computeDesignMatrix}
-\title{Compute list of design matrices for all terms in a model formula}
+\title{Compute a list of design matrices for all terms in a model formula,
+or based on a sampler environment}
 \usage{
-computeDesignMatrix(formula, data)
+computeDesignMatrix(formula = NULL, data = NULL, sampler = NULL, labels = TRUE)
 }
 \arguments{
 \item{formula}{model formula.}
 
 \item{data}{data frame to be used in deriving the design matrices.}
+
+\item{sampler}{a sampler environment (as created by e.g. by \code{\link{create_sampler}}).}
+
+\item{labels}{if \code{TRUE}, column names are assigned.}
 }
 \value{
 A list of design matrices.
 }
 \description{
-The output is a list of dense or sparse design matrices for the specified model components with respect to
-\code{data}. The design matrices contain appropriate column names.
+If \code{sampler} is provided instead of \code{formula}, the design matrices
+are based on the model used to create the sampler environment. In that case, if
+\code{data} is \code{NULL}, the design matrices stored in \code{sampler} are returned,
+otherwise the design matrices are computed for the provided data based on the sampler's model.
+The output is a list of dense or sparse design matrices for the model components
+with respect to \code{data}.
 }
 \examples{
 n <- 1000
@@ -24,10 +33,14 @@ dat <- data.frame(
   x = rnorm(n),
   f = factor(sample(1:50, n, replace=TRUE))
 )
-str(X <- computeDesignMatrix(~ x, dat)[[1]])
-X <- computeDesignMatrix(
-  ~ reg(~x, name="beta") + gen(~x, factor=~f, name="v"), dat
-)
+str(computeDesignMatrix(~ x, dat)[[1]])
+model <- ~ reg(~x, name="beta") + gen(~x, factor=~f, name="v")
+X <- computeDesignMatrix(model, dat)
 str(X)
+sampler <- create_sampler(model, dat, prior.only=TRUE)
+str(computeDesignMatrix(sampler=sampler))
+str(computeDesignMatrix(sampler=sampler, labels=FALSE))
+newdata <- data.frame(x=rnorm(10), f=dat$f[1:10])
+str(computeDesignMatrix(sampler=sampler, data=newdata))
 
 }

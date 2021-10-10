@@ -4,10 +4,10 @@
 \alias{get_draw}
 \title{Extract a list of parameter values for a single draw}
 \usage{
-get_draw(object, iter, chain)
+get_draw(obj, iter, chain)
 }
 \arguments{
-\item{object}{an object of class draws.}
+\item{obj}{an object of class \code{mcdraws}.}
 
 \item{iter}{iteration number.}
 

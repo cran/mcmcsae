@@ -114,12 +114,12 @@
 #'  seed RNG streams for all workers.
 #' @param export a character vector with names of objects to export to the workers. This may
 #'  be needed for parallel execution if expressions in \code{pred} depend on global variables.
-#' @return An object of class \code{draws} containing posterior draws as well as some meta information.
+#' @return An object of class \code{mcdraws} containing posterior draws as well as some meta information.
 MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L,
                     burnin=if (from.prior) 0L else 250L, start=NULL,
                     store, store.all=FALSE, pred=NULL,
                     store.mean, store.sds=FALSE,
-                    to.file=NULL, filename="MCMCdraws_", write.single.prec=FALSE,
+                    to.file=NULL, filename="MCdraws_", write.single.prec=FALSE,
                     verbose=TRUE, n.progress=n.iter %/% 10L,
                     trace.convergence=NULL, stop.on.convergence=FALSE, convergence.bound=1.05,
                     plot.trace=NULL, add.to.plot=TRUE, plot.type="l",
@@ -141,13 +141,11 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
   if (n.chain < 1L) stop("'n.chain' must be at least 1")
   chains <- seq_len(n.chain)
 
-  if (is.null(cl)) {
+  if (is.null(cl))
     n.cores <- min(as.integer(n.cores)[1L], n.chain)
-  } else {
+  else
     n.cores <- length(cl)
-  }
   if (n.cores > 1L) {
-    # parallel computation
     if (n.cores > parallel::detectCores()) stop("too many cores")
     if (is.null(cl)) {
       cl <- setup_cluster(n.cores, seed, export)
@@ -217,7 +215,8 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
         p[[ch]] <- start[[ch]]
       }
     }
-    # if sampler provides a start function, use it to generate start values for which no values have been provided by the user
+    # if sampler provides a start function, use it to generate start values
+    #   for parameters for which no values have been provided by the user
     if (!is.null(sampler$start)) {
       # NB currently we rely on sampler$start to not overwrite existing (user-provided) start values
       #    might also skip assignment of user-provided parameters here (TODO)
@@ -293,7 +292,7 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
   if (length(trace.convergence)) store <- union(store, sapply(trace.convergence, `[[`, "name"))
   if (length(plot.trace)) store <- union(store, sapply(plot.trace, `[[`, "name"))
 
-  out <- list()  # output object
+  out <- list()
 
   out[["_means"]] <- list()
 
@@ -359,7 +358,7 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
     write.to.file <- FALSE
   }
 
-  rm(test_draw, timing)  # remove objects no longer needed
+  rm(test_draw, timing)
 
   # accept/reject vectors for MH parameters
   # MH parameters are assumed to be scalar parameters
@@ -510,7 +509,7 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
       }
     }
     # class attributes set at the end of the simulation for faster assignment
-    class(out) <- "draws"
+    class(out) <- "mcdraws"
     for (v in store) {
       if (!is.null(sampler$coef.names))
         attr(out[[v]], "labels") <- sampler$coef.names[[v]]
@@ -550,6 +549,10 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
 #'   mcbeta <- to_mcmc(sim$beta)
 #'   geweke.diag(mcbeta)
 #' }
+#' if (require("posterior", quietly=TRUE)) {
+#'   mcbeta <- to_draws_array(sim$beta)
+#'   mcbeta
+#' }
 #' str(as.array(sim$beta))
 #' str(as.matrix(sim$beta))
 #'
@@ -579,11 +582,11 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
 #' bayesplot::mcmc_recover_intervals(as.matrix(sim$u), ex$pars$u)
 #' }
 #'
-#' @param x a component of a draws object corresponding to a scalar or vector model parameter.
+#' @param x a component of an mcdraws object corresponding to a scalar or vector model parameter.
 #' @param colnames whether column names should be set.
 #' @param ... currently ignored.
-#' @return The draws component coerced to a \code{\link[coda]{mcmc.list}},
-#'  an array, or a matrix.
+#' @return The draws component coerced to an \code{\link[coda]{mcmc.list}} object,
+#'  a \code{\link[posterior]{draws_array}} object, an array, or a matrix.
 #' @name MCMC-object-conversion
 NULL
 
@@ -598,6 +601,13 @@ to_mcmc <- function(x) {
   out <- lapply(out, `attr<-`, which="class", value="mcmc")
   class(out) <- "mcmc.list"
   out
+}
+
+#' @export
+#' @rdname MCMC-object-conversion
+to_draws_array <- function(x) {
+  if (class(x) != "dc") stop("not an object of class 'dc'")
+  posterior::as_draws_array(as.array.dc(x))
 }
 
 #' @method as.array dc
@@ -629,7 +639,7 @@ as.matrix.dc <- function(x, colnames=TRUE, ...) {
   out
 }
 
-#' Get the parameter names from a draws object
+#' Get the parameter names from an mcdraws object
 #' 
 #' @examples
 #' data(iris)
@@ -640,9 +650,9 @@ as.matrix.dc <- function(x, colnames=TRUE, ...) {
 #' par_names(sim)
 #'
 #' @export
-#' @param draws a draws object.
-#' @return The names of the parameters whose MCMC simulations are stored in \code{draws}.
-par_names <- function(draws) draws[["_info"]][["parnames"]]
+#' @param obj an mcdraws object.
+#' @return The names of the parameters whose MCMC simulations are stored in \code{obj}.
+par_names <- function(obj) obj[["_info"]][["parnames"]]
 
 #' Read MCMC draws from a file
 #'
@@ -650,7 +660,7 @@ par_names <- function(draws) draws[["_info"]][["parnames"]]
 #'
 #' @examples
 #' \dontrun{
-#' # NB this example creates a file "MCMCdraws_e_.RData" in the working directory
+#' # NB this example creates a file "MCdraws_e_.RData" in the working directory
 #' n <- 100
 #' dat <- data.frame(x=runif(n), f=as.factor(sample(1:5, n, replace=TRUE)))
 #' gd <- generate_data(~ reg(~ x + f, Q0=1, name="beta"), data=dat)
@@ -668,7 +678,7 @@ par_names <- function(draws) draws[["_info"]][["parnames"]]
 #' @param filename name of the file in which the draws are stored.
 #' @return An object of class \code{dc} containing MCMC draws for a (vector) parameter.
 # TODO read subsets
-read_draws <- function(name, filename=paste0("MCMCdraws_", name, ".dat")) {
+read_draws <- function(name, filename=paste0("MCdraws_", name, ".dat")) {
   con <- file(filename, "rb")
   info <- read_header(con)
   n.iter <- info[["n.iter"]]
@@ -685,10 +695,10 @@ read_draws <- function(name, filename=paste0("MCMCdraws_", name, ".dat")) {
   out
 }
 
-#' Select chains, samples and parameters from a draws component
+#' Select chains, samples and parameters from a draws component (dc) object
 #' 
 #' @noRd
-#' @param dc a component of a draws object.
+#' @param dc an object of class \code{dc}.
 #' @param vars an integer vector indicating which parameters to select.
 #' @param chains an integer vector indicating which chains to select.
 #' @param draws an integer vector indicating which samples to select.
@@ -698,7 +708,7 @@ get_from <- function(dc, vars=seq_len(nvars(dc)), chains=seq_len(nchains(dc)), d
   lapply(dc[chains], function(x) x[draws, vars, drop=FALSE])
 }
 
-#' Select a subset of chains, samples and parameters from a draws component
+#' Select a subset of chains, samples and parameters from a draws component (dc) object
 #' 
 #' @examples
 #' n <- 300
@@ -714,7 +724,7 @@ get_from <- function(dc, vars=seq_len(nvars(dc)), chains=seq_len(nchains(dc)), d
 #' 
 #' @export
 #' @method subset dc
-#' @param x a draws component object.
+#' @param x a draws component (dc) object.
 #' @param chains an integer vector indicating which chains to select.
 #' @param draws an integer vector indicating which samples to select.
 #' @param vars an integer vector indicating which parameters to select.
@@ -743,7 +753,7 @@ get_name_range <- function(composite.name, default.first=TRUE) {
   list(name=spl[1L], range=range)
 }
 
-#' Summarize a draws component object
+#' Summarize a draws component (dc) object
 #'
 #' @examples
 #' \donttest{
@@ -801,7 +811,7 @@ summary.dc <- function(object, probs=c(0.05, 0.5, 0.95), na.rm=FALSE, time=NULL,
   out
 }
 
-#' Summarize a draws object
+#' Summarize an mcdraws object
 #'
 #' @examples
 #' \donttest{
@@ -814,8 +824,8 @@ summary.dc <- function(object, probs=c(0.05, 0.5, 0.95), na.rm=FALSE, time=NULL,
 #' }
 #'
 #' @export
-#' @method summary draws
-#' @param object an object of class \code{draws}.
+#' @method summary mcdraws
+#' @param object an object of class \code{mcdraws}, typically generated by function \code{\link{MCMCsim}}.
 #' @param vnames optional character vector to select a subset of parameters.
 #' @param probs vector of probabilities at which to evaluate quantiles.
 #' @param na.rm whether to remove NA/NaN draws in computing the summaries.
@@ -825,8 +835,8 @@ summary.dc <- function(object, probs=c(0.05, 0.5, 0.95), na.rm=FALSE, time=NULL,
 #'  may speed things up a little, but if an out of memory error occurs it may be a good idea to use a smaller number
 #'  and try again. The default is 100.
 #' @param ... arguments passed to \code{\link{n_eff}}.
-#' @return A list of class \code{draws_summary} summarizing \code{object}.
-summary.draws <- function(object, vnames=NULL, probs=c(0.05, 0.5, 0.95), na.rm=FALSE, efficiency=FALSE, abbr=FALSE, batch.size=100L, ...) {
+#' @return A list of class \code{mcdraws_summary} summarizing \code{object}.
+summary.mcdraws <- function(object, vnames=NULL, probs=c(0.05, 0.5, 0.95), na.rm=FALSE, efficiency=FALSE, abbr=FALSE, batch.size=100L, ...) {
   if (is.null(vnames)) vnames <- par_names(object)
   time <- if (efficiency) object[["_info"]]$time else NULL
   out <- list()
@@ -842,7 +852,7 @@ summary.draws <- function(object, vnames=NULL, probs=c(0.05, 0.5, 0.95), na.rm=F
       out[[v]] <- summary(object[[v]], probs, na.rm, time, abbr, batch.size=batch.size, cl=object[["_cluster"]], ...)
     }
   }
-  class(out) <- "draws_summary"
+  class(out) <- "mcdraws_summary"
   out
 }
 
@@ -864,8 +874,9 @@ summary.draws <- function(object, vnames=NULL, probs=c(0.05, 0.5, 0.95), na.rm=F
 #'  If \code{NULL}, all elements are displayed.
 #' @param tail if \code{TRUE} the last instead of first at most \code{max.lines} are displayed.
 #' @param sort column name on which to sort the output.
+#' @param max.label.length if specified, printed row labels will be abbreviated to at most this length.
 #' @param ... passed on to \code{print.default}.
-print.dc_summary <- function(x, digits=3L, max.lines=1000L, tail=FALSE, sort=NULL, ...) {
+print.dc_summary <- function(x, digits=3L, max.lines=1000L, tail=FALSE, sort=NULL, max.label.length=NULL, ...) {
   nlines <- if (is.null(max.lines)) nrow(x) else min(max.lines, nrow(x))
   if (tail)
     rows <- (nrow(x)):(nrow(x) - nlines + 1L)
@@ -877,18 +888,21 @@ print.dc_summary <- function(x, digits=3L, max.lines=1000L, tail=FALSE, sort=NUL
     options(max.print=nlines*ncol(x))
   }
   if (is.null(sort)) {
-    print(x[rows, ], digits=digits, ...)
+    z <- x[rows, , drop=FALSE]
   } else {
     if (!is.character(sort) || !all(sort %in% colnames(x))) stop("'sort' should be a column name of 'x'")
-    print(x[order(x[, sort])[rows], ], digits=digits, ...)
+    z <- x[order(x[, sort])[rows], , drop=FALSE]
   }
+  if (!is.null(max.label.length))
+    dimnames(z)[[1L]] <- abbreviate(rownames(z), minlength=max.label.length, strict=TRUE)
+  print(z, digits=digits, ...)
   suppressed <- nrow(x) - nlines
   if (suppressed > 0L) cat("...", suppressed, "elements suppressed ...\n")
 }
 
 #' Print a summary of MCMC simulation results
 #'
-#' Display a summary of a \code{draws} object, output by \code{\link{MCMCsim}}.
+#' Display a summary of an \code{mcdraws} object, as output by \code{\link{MCMCsim}}.
 #'
 #' @examples
 #' \donttest{
@@ -899,8 +913,8 @@ print.dc_summary <- function(x, digits=3L, max.lines=1000L, tail=FALSE, sort=NUL
 #' }
 #'
 #' @export
-#' @method print draws_summary
-#' @param x an object of class \code{draws_summary} as output by \code{summary.draws}.
+#' @method print mcdraws_summary
+#' @param x an object of class \code{mcdraws_summary} as output by \code{\link{summary.mcdraws}}.
 #' @param digits number of digits to use, defaults to 3.
 #' @param max.lines maximum number of elements per vector parameter to display.
 #'  If \code{NULL}, all elements are displayed.
@@ -908,7 +922,7 @@ print.dc_summary <- function(x, digits=3L, max.lines=1000L, tail=FALSE, sort=NUL
 #'  are displayed.
 #' @param sort column name on which to sort the output.
 #' @param ... passed on to \code{print.default}.
-print.draws_summary <- function(x, digits=3L, max.lines=10L, tail=FALSE, sort=NULL, ...) {
+print.mcdraws_summary <- function(x, digits=3L, max.lines=10L, tail=FALSE, sort=NULL, ...) {
   for (i in seq_along(x)) {
     cat(names(x)[i], ":\n")
     print(x[[i]], digits=digits, max.lines=max.lines, tail=tail, sort=sort, ...)  # print an object of class 'dc'
@@ -916,7 +930,7 @@ print.draws_summary <- function(x, digits=3L, max.lines=10L, tail=FALSE, sort=NU
   }
 }
 
-#' Get and set the variable labels of a draws component for a vector-valued parameter
+#' Get and set the variable labels of a draws component object for a vector-valued parameter
 #'
 #' @examples
 #' \donttest{
@@ -930,7 +944,7 @@ print.draws_summary <- function(x, digits=3L, max.lines=10L, tail=FALSE, sort=NU
 #' }
 #'
 ## @method labels dc
-#' @param object a component of a draws object.
+#' @param object a draws component object.
 #' @param value a vector of labels.
 #' @param ... currently not used.
 #' @return The extractor function returns the variable labels.
@@ -967,8 +981,8 @@ labels.dc <- function(object, ...) attr(object, "labels")
 #' nvars(subset(sim$u, vars=1:2))
 #' }
 #'
-#' @param object a draws object or component of a draws object.
-#' @param dc a component of a draws object.
+#' @param obj an mcdraws object or a draws component (dc) object.
+#' @param dc a draws component object.
 #' @return The number of chains or retained samples per chain or
 #'  the number of variables.
 #' @name nchains-ndraws-nvars
@@ -976,19 +990,21 @@ NULL
 
 #' @export
 #' @rdname nchains-ndraws-nvars
-nchains <- function(object) {
-  switch(class(object)[1L],
-    draws = object[["_info"]]$n.chain,
-    dc=, list = length(object)  # NB object not necessarily (yet) of class 'dc' when called from MCMCsim
+nchains <- function(obj) {
+  switch(class(obj)[1L],
+    mcdraws = obj[["_info"]]$n.chain,
+    dc=, list = length(obj),  # NB object not necessarily (yet) of class 'dc' when called from MCMCsim
+    stop("unexpected input")
   )
 }
 
 #' @export
 #' @rdname nchains-ndraws-nvars
-ndraws <- function(object) {
-  switch(class(object)[1L],
-    draws = object[["_info"]]$n.draw,
-    dc=, list = dim(object[[1L]])[1L]
+ndraws <- function(obj) {
+  switch(class(obj)[1L],
+    mcdraws = obj[["_info"]]$n.draw,
+    dc=, list = dim(obj[[1L]])[1L],
+    stop("unexpected input")
   )
 }
 
@@ -1015,7 +1031,7 @@ nvars <- function(dc) dim(dc[[1L]])[2L]
 #' R_hat(sim$v_sigma)
 #' }
 #'
-#' @param dc a component of a draws object corresponding to a model parameter.
+#' @param dc a draws component (dc) object corresponding to a model parameter.
 #' @param useFFT whether to use the Fast Fourier Transform algorithm. Default is \code{TRUE} as this is typically faster.
 #' @param lag.max the lag up to which autocorrelations are computed in case \code{useFFT=FALSE}.
 #' @param cl a cluster for parallel computation.
@@ -1141,17 +1157,17 @@ ac_fft <- function(x, demean=TRUE) {
 #' }
 #'
 #' @export
-#' @param object a draws object, i.e. the output of function \code{MCMCsim}.
+#' @param obj an mcdraws object, i.e. the output of function \code{\link{MCMCsim}}.
 #' @param aggregate.chains whether to return averages over chains or results per chain.
 #' @return A list of acceptance rates.
-acceptance_rates <- function(object, aggregate.chains=FALSE) {
+acceptance_rates <- function(obj, aggregate.chains=FALSE) {
   if (aggregate.chains)
-    lapply(object[["_accept"]], function(x) Reduce("+", x)/length(x))
+    lapply(obj[["_accept"]], function(x) Reduce("+", x)/length(x))
   else 
-    object[["_accept"]]
+    obj[["_accept"]]
 }
 
-#' Get means or standard deviations of parameters from the MCMC output in a draws object
+#' Get means or standard deviations of parameters from the MCMC output in an mcdraws object
 #'
 #' @examples
 #' \donttest{
@@ -1171,7 +1187,7 @@ acceptance_rates <- function(object, aggregate.chains=FALSE) {
 # note: get_sds returns slightly different values than summary
 # TODO more stable online variance computation
 #'
-#' @param draws an object of class \code{draws}.
+#' @param obj an object of class \code{mcdraws}.
 #' @param vnames optional character vector to select a subset of parameters.
 #' @return A list with simulation means or standard deviations.
 #' @name posterior-moments
@@ -1179,37 +1195,36 @@ NULL
 
 #' @export
 #' @rdname posterior-moments
-get_means <- function(draws, vnames=NULL) {
+get_means <- function(obj, vnames=NULL) {
   # first extract mean only components and average over chains
-  out <- draws[["_means"]]
+  out <- obj[["_means"]]
   if (length(out) && !is.null(vnames)) out <- out[names(out) %in% vnames]
-  nc <- nchains(draws)
-  if (length(out)) {
+  nc <- nchains(obj)
+  if (length(out))
     for (v in seq_along(out)) out[[v]] <- Reduce(`+`, out[[v]]) / nc
-  }
   # append posterior means of draws components
-  if (is.null(vnames)) vnames <- par_names(draws)
-  vnames <- vnames[!(vnames %in% names(out)) & vnames %in% par_names(draws)]
-  ni <- ndraws(draws)  # draws per chain
-  c(out, lapply(draws[vnames], function(x) Reduce(`+`, lapply(x, function(ch) .colMeans(ch, ni, ncol(ch)))) / nc))
+  if (is.null(vnames)) vnames <- par_names(obj)
+  vnames <- vnames[!(vnames %in% names(out)) & vnames %in% par_names(obj)]
+  ni <- ndraws(obj)  # draws per chain
+  c(out, lapply(obj[vnames], function(x) Reduce(`+`, lapply(x, function(ch) .colMeans(ch, ni, ncol(ch)))) / nc))
 }
 
 #' @export
 #' @rdname posterior-moments
-get_sds <- function(draws, vnames=NULL) {
-  out <- draws[["_sds"]]
+get_sds <- function(obj, vnames=NULL) {
+  out <- obj[["_sds"]]
   if (length(out) && !is.null(vnames)) out <- out[names(out) %in% vnames]
   if (length(out)) {
-    nc <- nchains(draws)
-    ni <- ndraws(draws)
+    nc <- nchains(obj)
+    ni <- ndraws(obj)
     # include between-chain component
     for (v in names(out))
-      out[[v]] <- sqrt((1/(nc*ni - 1L))*((ni - 1L)*rowSums(do.call(cbind, out[[v]])^2) + ni*(nc - 1L)*apply(do.call(cbind, draws[["_means"]][[v]]), 1L, var)))
+      out[[v]] <- sqrt((1/(nc*ni - 1L))*((ni - 1L)*rowSums(do.call(cbind, out[[v]])^2) + ni*(nc - 1L)*apply(do.call(cbind, obj[["_means"]][[v]]), 1L, var)))
   }
   # append posterior sds of draws components
-  if (is.null(vnames)) vnames <- par_names(draws)
-  vnames <- vnames[!(vnames %in% names(out)) & vnames %in% par_names(draws)]
-  c(out, lapply(draws[vnames], function(x) unname(colSds(as.matrix.dc(x, colnames=FALSE)))))
+  if (is.null(vnames)) vnames <- par_names(obj)
+  vnames <- vnames[!(vnames %in% names(out)) & vnames %in% par_names(obj)]
+  c(out, lapply(obj[vnames], function(x) unname(colSds(as.matrix.dc(x, colnames=FALSE)))))
 }
 
 #' Extract a list of parameter values for a single draw
@@ -1223,18 +1238,18 @@ get_sds <- function(draws, vnames=NULL) {
 #' }
 #'
 #' @export
-#' @param object an object of class draws.
+#' @param obj an object of class \code{mcdraws}.
 #' @param iter iteration number.
 #' @param chain chain number.
 #' @return A list with all parameter values of draw \code{iter} from chain \code{chain}.
-get_draw <- function(object, iter, chain) {
+get_draw <- function(obj, iter, chain) {
   p <- list()
-  for (v in object[["_info"]][["parnames"]])
-    p[[v]] <- object[[v]][[chain]][iter, ]
+  for (v in obj[["_info"]][["parnames"]])
+    p[[v]] <- obj[[v]][[chain]][iter, ]
   p
 }
 
-#' Transform one or more draws components into a new one by applying a function
+#' Transform one or more draws component objects into a new one by applying a function
 #'
 #' @examples
 #' \donttest{
@@ -1247,18 +1262,17 @@ get_draw <- function(object, iter, chain) {
 #' }
 #'
 #' @export
-#' @param ... draws component object(s).
+#' @param ... draws component object(s) of class \code{dc}.
 #' @param fun a function to apply. This function should take as many arguments as there are input objects.
 #'  The arguments can be arbitrarily named, but they are assumed to be in the same order as the input objects.
 #'  The function should return a vector.
 #' @param to.matrix if \code{TRUE} the output is in matrix format; otherwise it is a draws component object.
 #' @param labels optional labels for the output object.
-#' @return Either a matrix or a draws component.
+#' @return Either a matrix or a draws component object.
 # TODO add option chain.wise to alow application of a vectorised function to each chain at once
 transform_dc <- function(..., fun, to.matrix=FALSE, labels=NULL) {
   objs <- list(...)
   nobj <- length(objs)
-  # TODO simpler and faster code for nobj=1
   nc <- nchains(objs[[1L]])
   ni <- ndraws(objs[[1L]])
   fun <- match.fun(fun)

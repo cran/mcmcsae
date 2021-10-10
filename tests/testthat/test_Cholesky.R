@@ -1,7 +1,6 @@
 
 context("Cholesky solves")
 
-# for reproducibility, even across platforms:
 set.seed(1, kind="Mersenne-Twister", normal.kind="Inversion")
 
 test_that("Cholesky for ddiMatrix works", {
@@ -49,7 +48,7 @@ test_that("Cholesky for matrix works", {
   expect_equal(ch$solve(y1), solve(M, y1))
   expect_equal(crossprod(ch$cholM[, order(attr(ch$cholM, "pivot"))]), M)
   x <- rnorm(n)
-  expect_equal(ch$crossprodL(x), ch$cholM[, order(attr(ch$cholM, "pivot"))] %m*v% x)
+  expect_equal(ch$Ltimes(x), ch$cholM[, order(attr(ch$cholM, "pivot"))] %m*v% x)
 })
 
 test_that("Cholesky for dsCMatrix works", {
@@ -59,7 +58,7 @@ test_that("Cholesky for dsCMatrix works", {
   # in-place update only works for same sparsity pattern!!
   M <- M + Diagonal(n)
   ch$update(M)
-  cholM <- Cholesky_dsC(M, perm=FALSE, LDL=FALSE, super=1L)
+  cholM <- Cholesky_dsC(M, perm=FALSE, LDL=FALSE, super=NA)
   y0 <- rnorm(n)
   y1 <- matrix(rnorm(3*n), n, 3)
   y2 <- rsparsematrix(n, 10, 0.1)
@@ -78,7 +77,7 @@ test_that("Cholesky for dsCMatrix works", {
   ch <- build_chol(M, perm=TRUE)
   M <- M + Diagonal(x=runif(n))
   ch$update(M)
-  cholM <- Cholesky_dsC(M, perm=TRUE, LDL=FALSE, super=1L)
+  cholM <- Cholesky_dsC(M, perm=TRUE, LDL=FALSE, super=NA)
   expect_equal(ch$solve(y0), solve(cholM, y0)@x)
   expect_equal(ch$solve(y1), array(solve(cholM, y1)@x, dim(y1)))
   expect_equal(ch$solve(y2), solve(cholM, y2))

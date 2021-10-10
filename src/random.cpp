@@ -5,8 +5,8 @@ using namespace Rcpp;
 
 
 // constants used in approximate Polya-Gamma sampling
-static const double PI2 = M_PI*M_PI;
-static const double eps = std::numeric_limits<double>::epsilon();
+static const double PI2 = M_PI * M_PI;
+static const double EPS = 10.0 * std::numeric_limits<double>::epsilon();
 
 
 //’ Draw a vector of (approximate) Polya-Gamma variates
@@ -28,7 +28,7 @@ NumericVector CrPGapprox(const int n, const NumericVector & b, const NumericVect
   NumericVector out = no_init(n);
   for (int i = 0; i < n; ++i) {
     bi = nb == 1 ? b[0] : b[i];
-    if (bi < eps) {
+    if (bi < EPS) {
       out[i] = 0;
     } else {
       hzi = nz == 1 ? 0.5*z[0] : 0.5*z[i];
@@ -105,8 +105,6 @@ double do_rgig1(double lambda, double chi, double psi) {
   return as<double>(fun(1, lambda, chi, psi));
 }
 
-#define ZTOL (DOUBLE_EPS*10.0)
-
 //’ Draw a vector of generalized inverse gaussian (GiG) variates
 //’
 //’ @param n the size of the vector.
@@ -128,7 +126,7 @@ NumericVector Crgig(const int n, const NumericVector & p, const NumericVector & 
     ai = na == 1 ? a[0] : a[i];
     bi = nb == 1 ? b[0] : b[i];
     // parameter translation: lambda=p, chi=b, psi=a
-    if (ai < ZTOL || bi < ZTOL) {
+    if (ai < EPS || bi < EPS) {
       if (pi > 0.0) {
         out[i] = R::rgamma(pi, 2.0/ai);
       } else {
@@ -155,32 +153,35 @@ NumericVector Crgig(const int n, const NumericVector & p, const NumericVector & 
 // values of \code{y} less than or equal to \code{2*m}. 
 //’
 //’ @param y data vector.
-//’ @param r scalar dispersion parameter.
+//’ @param r dispersion parameter, can be scalar or vector.
 //’ @param m positive integer; larger values give more accuracy but slower performance.
 //’ @return A vector of (approximate) CRT variates.
 // [[Rcpp::export(rng=true)]]
-IntegerVector CrCRT(const NumericVector & y, const double r, const int m=20) {
+IntegerVector CrCRT(const NumericVector & y, const NumericVector & r, const int m=20) {
   double prob, lambda;
   int m_expl;
   const int two_m = 2 * m;
   const int n = y.size();
+  const int nr = r.size();
+  double ri = r[0];
   IntegerVector out(n);
   for (int i = 0; i < n; i++) {
+    if (nr > 1) ri = r[i];
     if (y[i] <= two_m) {
       // exact CRT sampling
       for (int j = 0; j < y[i]; j++) {
-        prob = r / (r + j);
+        prob = ri / (ri + j);
         if (R::runif(0, 1) < prob) out[i]++;
       }
     } else {
-      m_expl = std::min(m, (int)r);
+      m_expl = std::min(m, (int)ri);
       // first m_expl Bernoulli draws
       for (int j = 0; j < m_expl; j++) {
-        prob = r / (r + j);
+        prob = ri / (ri + j);
         if (R::runif(0, 1) < prob) out[i]++;
       }
       // then approximate remaining y[i] - m_expl draws
-      lambda = r * (R::digamma(y[i] + r) - R::digamma(m_expl + r));
+      lambda = ri * (R::digamma(y[i] + ri) - R::digamma(m_expl + ri));
       out[i] += R::rpois(lambda);
     }
   }

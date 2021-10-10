@@ -4,7 +4,7 @@
 \alias{read_draws}
 \title{Read MCMC draws from a file}
 \usage{
-read_draws(name, filename = paste0("MCMCdraws_", name, ".dat"))
+read_draws(name, filename = paste0("MCdraws_", name, ".dat"))
 }
 \arguments{
 \item{name}{name of the parameter to load the corresponding file with posterior draws for.}
@@ -19,7 +19,7 @@ Read draws written to file by \code{\link{MCMCsim}} used with argument \code{to.
 }
 \examples{
 \dontrun{
-# NB this example creates a file "MCMCdraws_e_.RData" in the working directory
+# NB this example creates a file "MCdraws_e_.RData" in the working directory
 n <- 100
 dat <- data.frame(x=runif(n), f=as.factor(sample(1:5, n, replace=TRUE)))
 gd <- generate_data(~ reg(~ x + f, Q0=1, name="beta"), data=dat)

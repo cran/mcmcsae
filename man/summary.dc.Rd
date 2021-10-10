@@ -2,7 +2,7 @@
 % Please edit documentation in R/MCMCsim.R
 \name{summary.dc}
 \alias{summary.dc}
-\title{Summarize a draws component object}
+\title{Summarize a draws component (dc) object}
 \usage{
 \method{summary}{dc}(
   object,
@@ -35,7 +35,7 @@ but if an out of memory error occurs it may be a good idea to use a smaller numb
 A matrix with summaries of class \code{dc_summary}.
 }
 \description{
-Summarize a draws component object
+Summarize a draws component (dc) object
 }
 \examples{
 \donttest{

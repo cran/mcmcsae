@@ -5,6 +5,8 @@
 \alias{f_gaussian}
 \alias{f_binomial}
 \alias{f_negbinomial}
+\alias{f_poisson}
+\alias{f_multinomial}
 \title{Functions for specifying a sampling distribution and link function}
 \usage{
 f_gaussian(link = "identity")
@@ -12,11 +14,17 @@ f_gaussian(link = "identity")
 f_binomial(link = c("logit", "probit"))
 
 f_negbinomial(link = "logit")
+
+f_poisson(link = "log")
+
+f_multinomial(link = "logit", K = NULL)
 }
 \arguments{
 \item{link}{the name of a link function. Currently the only allowed link functions are:
 \code{"identity"} for (log-)Gaussian sampling distributions, \code{"logit"} (default) and \code{"probit"}
 for binomial distributions and \code{"log"} for negative binomial sampling distributions.}
+
+\item{K}{number of categories for multinomial model; this must be specified for prior predictive sampling}
 }
 \value{
 A family object.

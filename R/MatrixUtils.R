@@ -26,7 +26,7 @@ detect_redundancy <- function(X, method="chol", tol=NULL) {
     pivot <- attr(test, "pivot")
   } else {
     if (is.null(tol)) tol <- 1e-9
-    test <- qr.default(X, tol=tol)  # use qr on XX instead of X for (memory-)performance reasons
+    test <- qr.default(X, tol=tol)
     rank <- test$rank
     pivot <- test$pivot
   }
@@ -40,6 +40,10 @@ detect_redundancy <- function(X, method="chol", tol=NULL) {
 ## @export
 ## @rdname redundancy
 remove_redundancy <- function(X, method="chol", tol=NULL) {
+  # first remove trivial redundancy: zero columns
+  zerocols <- which(zero_col(X))
+  if (length(zerocols)) X <- X[, -zerocols, drop=FALSE]
+  # remove remaining redundancy
   # assuming X is n x p with n > p --> detect redundancy in X'X typically more efficient
   rcols <- detect_redundancy(crossprod(X), method, tol)
   if (is.null(rcols)) X else X[, -rcols, drop=FALSE]
@@ -125,7 +129,7 @@ crossprod_mv <- function(M, v) {
       class(M) <- .dgC.class.attr
       CsparseS_numeric_prod(M, v)
     },
-    dtCMatrix = {  # possibly used by crossprodL method of cholesky object
+    dtCMatrix = {  # possibly used by Ltimes method of cholesky object
       class(M) <- .dgC.class.attr  # convert M to dgC
       Csparse_numeric_crossprod(M, v)
     },
@@ -176,39 +180,63 @@ scale_mat <- function(Q, scale) {
   )
 }
 
-# matrix - matrix multiplication
+# product of two matrices, at least one of which is a dense matrix
 # assume that either M1 or M2 is matrix
 # numeric vector input represents diagonal matrix
-# length 1 numeric vector is allowed and implies scalar multiplication
+# length 1 numeric vector is allowed: scalar multiplication
 `%m*m%` <- function(M1, M2) {
   switch(class(M1)[1L],
     matrix =
       switch(class(M2)[1L],
-        matrix = Cmatmat(M1, M2),
-        dgCMatrix = Cmatrix_sparse_prod(M1, M2),
+        matrix = Cdense_dense_prod(M1, M2),
+        dgCMatrix = Cdense_sparse_prod(M1, M2),
         dsCMatrix = {
           class(M2) <- .dgC.class.attr
-          Cmatrix_sparseS_prod(M1, M2)
+          Cdense_sparseS_prod(M1, M2)
         },
         numeric =
           if (length(M2) == 1L)
             if (M2 == 1) M1 else M2 * M1
           else
             Cdense_diag_prod(M1, M2),
+        ddiMatrix =
+          if (length(M2@x))
+            Cdense_diag_prod(M1, M2@x)
+          else
+            M1,
         stop("unsupported matrix product")
       ),
-    dgCMatrix = Csparse_matrix_prod(M1, M2),
+    dgCMatrix = Csparse_dense_prod(M1, M2),
     dsCMatrix = {
       class(M1) <- .dgC.class.attr
-      CsparseS_matrix_prod(M1, M2)
+      CsparseS_dense_prod(M1, M2)
     },
-    tabMatrix = Ctab_matrix_prod(M1, M2),
-    ddiMatrix =
-      if (length(M1@x))
-        M1@x * M2
-      else
-        M2,
+    tabMatrix = Ctab_dense_prod(M1, M2),
+    ddiMatrix = if (length(M1@x)) M1@x * M2 else M2,
     stop("unsupported matrix product")
+  )
+}
+
+# crossprod of two matrices, at least one of which is a dense matrix
+# numeric vector input represents diagonal matrix
+# length 1 numeric vector is allowed: scalar multiplication
+crossprod_mm <- function(M1, M2) {
+  switch(class(M1)[1L],
+    matrix =
+      switch(class(M2)[1L],
+        matrix = Cdense_dense_crossprod(M1, M2),
+        dgCMatrix = Cdense_sparse_crossprod(M1, M2),
+        ddiMatrix =
+          if (length(M2@x))
+            Cdense_diag_crossprod(M1, M2@x)
+              else
+            t.default(M1),
+        stop("unsupported matrix crossproduct")
+      ),
+    dgCMatrix = Csparse_dense_crossprod(M1, M2),
+    tabMatrix = Ctab_dense_crossprod(M1, M2),
+    ddiMatrix = if (length(M1@x)) M1@x * M2 else M2,
+    stop("unsupported matrix crossproduct")
   )
 }
 
@@ -221,7 +249,7 @@ crossprod_sym <- function(M, Q) {
   switch(class(M)[1L],
     matrix =
       switch(classQ,
-        matrix = Cdense_crossprod_sym2(M, Cmatmat(Q, M)),
+        matrix = Cdense_crossprod_sym2(M, Cdense_dense_prod(Q, M)),
         dsCMatrix = Cdense_crossprod_sym2(M, Q %m*m% M),
         ddiMatrix = 
           if (Q@diag == "U")
@@ -377,19 +405,19 @@ setMethod("%*%", signature("ddiMatrix", "matrix"), function(x, y) {
 # NB the RcppEigen version is faster (especially for small x)
 #' @rdname Matrix-methods
 setMethod("%*%", signature("dgCMatrix", "matrix"), function(x, y)
-  Csparse_matrix_prod(x, y)
+  Csparse_dense_prod(x, y)
 )
 
 #' @rdname Matrix-methods
 setMethod("%*%", signature("dsCMatrix", "matrix"), function(x, y) {
   if (x@uplo != "U") stop("uplo must be 'U'")
   class(x) <- .dgC.class.attr
-  CsparseS_matrix_prod(x, y)
+  CsparseS_dense_prod(x, y)
 })
 
 #' @rdname Matrix-methods
 setMethod("%*%", signature("tabMatrix", "matrix"), function(x, y)
-  Ctab_matrix_prod(x, y)
+  Ctab_dense_prod(x, y)
 )
 
 #' @rdname Matrix-methods
@@ -416,12 +444,12 @@ setMethod("%*%", signature("CsparseMatrix", "tabMatrix"), function(x, y)
 
 #' @rdname Matrix-methods
 setMethod("tcrossprod", signature("matrix", "dgCMatrix"), function(x, y)
-  Cmatrix_sparse_tcrossprod(x, y)
+  Cdense_sparse_tcrossprod(x, y)
 )
 
 #' @rdname Matrix-methods
 setMethod("tcrossprod", signature("matrix", "tabMatrix"), function(x, y)
-  Cmatrix_tab_tcrossprod(x, y)
+  Cdense_tab_tcrossprod(x, y)
 )
 
 #' @rdname Matrix-methods
@@ -438,7 +466,7 @@ setMethod("crossprod", signature=c("tabMatrix", "missing"), function(x, y)
 
 #' @rdname Matrix-methods
 setMethod("crossprod", signature("tabMatrix", "matrix"), function(x, y)
-  Ctab_matrix_crossprod(x, y)
+  Ctab_dense_crossprod(x, y)
 )
 
 #' @rdname Matrix-methods
@@ -454,7 +482,7 @@ setMethod("crossprod", signature("tabMatrix", "tabMatrix"), function(x, y)
 # used in fast GMRF prior sampler
 #' @rdname Matrix-methods
 setMethod("crossprod", signature=c("dgCMatrix", "matrix"), function(x, y)
-  Csparse_matrix_crossprod(x, y)
+  Csparse_dense_crossprod(x, y)
 )
 
 # test for unit Diagonal Matrix
@@ -520,10 +548,17 @@ economizeDiagMatrix <- function(M, strip.names=TRUE, vec.diag=FALSE) {
 #' @param drop.zeros whether explicit zeros should be dropped. Only relevant for dgC/dsCMatrix. \code{FALSE} by default.
 #' @param vec.diag if \code{TRUE} a diagonal matrix is represented by a vector. In addition, if all elements
 #'  of the vector are equal then it is reduced to a scalar.
+#' @param vec.as.diag if \code{TRUE}, the default, vector input is expanded to a diagonal matrix with
+#'  this vector at its diagonal. Otherwise, vector \code{M} is interpreted as a single-column matrix.  
 #' @return the matrix in an efficient (memory and performance-wise) format.
 economizeMatrix <- function(M, sparse=NULL, symmetric=FALSE, strip.names=TRUE,
-                            allow.tabMatrix=TRUE, drop.zeros=FALSE, vec.diag=FALSE) {
-  if (is.vector(M)) M <- Cdiag(M)
+                            allow.tabMatrix=TRUE, drop.zeros=FALSE, vec.diag=FALSE, vec.as.diag=TRUE) {
+  if (is.vector(M)) {
+    if (vec.as.diag)
+      M <- Cdiag(M)
+    else
+      M <- matrix(M, ncol=1L)
+  }
   if (!is_a_matrix(M)) stop("not a matrix or Matrix")
   if (anyNA(M)) stop("economizeMatrix: missing values in input matrix")
   if (symmetric && !identical(sparse, FALSE) && isDiagonal(M)) {
@@ -593,13 +628,14 @@ setMethod("solve", signature("ddiMatrix", "numeric"), function(a, b)
 #' @param sep the levels of the combined factor are obtained by concatenating the levels
 #'  of all factors using this separator. Default is ':'.
 #' @param lex.order passed to \code{\link[base]{interaction}}.
+#' @param enclos enclosure to look for objects not found in \code{data}.
 #' @return the combined (interaction) factor variable.
-combine_factors <- function(fvars, data, drop=FALSE, sep=":", lex.order=FALSE) {
+combine_factors <- function(fvars, data, drop=FALSE, sep=":", lex.order=FALSE, enclos=.GlobalEnv) {
   if (length(fvars)) {
-    fac <- eval_in(fvars[1L], data)
+    fac <- eval_in(fvars[1L], data, enclos)
     # keep all levels, including those of empty combinations, even combinations of empty levels
     for (f in fvars[-1L])
-      fac <- interaction(fac, eval_in(f, data), drop=drop, sep=sep, lex.order=lex.order)
+      fac <- interaction(fac, eval_in(f, data, enclos), drop=drop, sep=sep, lex.order=lex.order)
   } else {
     fac <- NULL
   }
@@ -609,7 +645,7 @@ combine_factors <- function(fvars, data, drop=FALSE, sep=":", lex.order=FALSE) {
 # take the kronecker product of two sparse precision or incidence matrices
 # the result is always sparse (ddi, dsC in case of precision matrix or dgC in case of non-symmetric matrix)
 # in kronecker product the indices of the first factor run slowest
-#   --> kronecker(Q2, Q1) to match the order of combine_factors(f1, f2)
+#   --> kronecker(Q2, Q1) to match the order of interaction(f1, f2)
 cross <- function(Q1, Q2) {
   c1 <- class(Q1)[1L]
   c2 <- class(Q2)[1L]

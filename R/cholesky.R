@@ -23,7 +23,7 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
     # perm can still change below depending on type
   }
 
-  # define update, solve and crossprodL methods with arguments
+  # define update, solve and Ltimes methods with arguments
   # update
   #   parent: new matrix to be decomposed; in case of sparse matrix the same zero pattern is assumed
   #   mult: mult*I is added to parent before decomposition
@@ -31,8 +31,7 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
   #   rhs: right hand side, of type numeric, matrix or dgCMatrix
   #   system: the type of system to be solved, see Matrix package
   #   systemP: if TRUE modifies system Lt to LtP and L to PtL; has no effect if PERM=FALSE or system="A" or type="ddiMatrix"
-  # crossprodL takes the crossprod of L (in case of permutations P'L which need not be lower triangular!) with rhs
-  #   rhs: for now assumed to be a numeric vector
+  # Ltimes left-multiplies a vector/matrix by L (in case of permutations P'L which need not be lower triangular!) or its transpose
   switch(type,
     numeric=, ddiMatrix = {  # diagonal represented as vector case (including trivial scalar case)
       perm <- FALSE
@@ -40,7 +39,7 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
         if (Imult != 0) stop("unit ddiMatrix assumed fixed")
         cholM <- M
         update <- function(parent, mult=0) if (mult != 0) stop("unit ddiMatrix assumed fixed")
-        crossprodL <- function(rhs) rhs
+        Ltimes <- function(x, transpose=TRUE) x
         solve <- function(rhs, system="A", systemP=FALSE) rhs
       } else {
         if (type == "ddiMatrix") {
@@ -50,7 +49,7 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
           cholM <- sqrt(M + Imult)
           update <- function(parent, mult=0) cholM <<- sqrt(parent + mult)
         }
-        crossprodL <- function(rhs) cholM * rhs
+        Ltimes <- function(x, transpose=TRUE) cholM * x
         solve <- function(rhs, system="A", systemP=FALSE) {
           switch(class(rhs)[1L],
             numeric=, matrix =
@@ -89,7 +88,15 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
         update <- function(parent, mult=0) cholM <<- .updateCHMfactor(cholM, parent, mult)
       }
       if (perm) {
-        crossprodL <- function(rhs) crossprod_mv(as(cholM, "Matrix"), rhs[P])
+        # TODO check whether the permutation is handled correctly in the transpose=FALSE case
+        Ltimes <- function(x, transpose=TRUE) {
+          L <- as(cholM, "Matrix")
+          if (transpose) {
+            if (is.vector(x)) crossprod_mv(L, x[P]) else crossprod_mv(L, x[P, , drop=FALSE])
+          } else {
+            if (is.vector(x)) (L %m*v% x)[iP] else (L %m*v% x)[iP, , drop=FALSE]
+          }
+        }
         solve <- function(rhs, system="A", systemP=FALSE) {
           switch(class(rhs)[1L],
             numeric =
@@ -120,7 +127,14 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
           )
         }
       } else {
-        crossprodL <- function(rhs) crossprod_mv(as(cholM, "Matrix"), rhs)
+        Ltimes <- function(x, transpose=TRUE) {
+          L <- as(cholM, "Matrix")
+          if (is.vector(x)) {
+            if (transpose) crossprod_mv(L, x) else L %m*v% x
+          } else {
+            if (transpose) crossprod_mm(L, x) else L %m*m% x
+          }
+        }
         solve <- function(rhs, system="A", systemP=FALSE)
           switch(class(rhs)[1L],
             numeric = cCHMf_solve(cholM, rhs, .solve.systems[system]),
@@ -131,13 +145,12 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
       }
     },
     matrix = {  # LDL, super ignored
-      # NB chol stores upper triangular matix, i.e. Lt
-      if (Imult == 0) {
+      # NB chol stores upper triangular matrix, i.e. Lt
+      if (Imult == 0)
         cholM <- chol.default(M, pivot=perm)
-      } else {
+      else
         cholM <- chol.default(add_diagC(M, rep.int(Imult, size)), pivot=perm)
-      }
-      if (perm) {  # NB this assumes that permutation never changes....CHECK!!!
+      if (perm) {  # this assumes that permutation never changes...CHECK!!
         P <- attr(cholM, "pivot")
         iP <- invPerm(P)
       }
@@ -152,7 +165,14 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
         }
       }
       if (perm) {
-        crossprodL <- function(rhs) cholM %m*v% rhs[P]
+        # TODO check whether the permutation is handled correctly in the transpose=FALSE case
+        Ltimes <- function(x, transpose=TRUE) {
+          if (is.vector(x)) {
+            if (transpose) cholM %m*v% x[P] else crossprod_mv(cholM, x)[iP]
+          } else {
+            if (transpose) cholM %m*m% x[P, , drop=FALSE] else crossprod_mm(cholM, x)[iP, , drop=FALSE]
+          }
+        }
         solve <- function(rhs, system="A", systemP=FALSE) {
           switch(class(rhs)[1L],
             numeric =
@@ -173,7 +193,13 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
           )
         }
       } else {
-        crossprodL <- function(rhs) cholM %m*v% rhs
+        Ltimes <- function(x, transpose=TRUE) {
+          if (is.vector(x)) {
+            if (transpose) cholM %m*v% x else crossprod_mv(cholM, x)
+          } else {
+            if (transpose) cholM %m*m% x else crossprod_mm(cholM, x)
+          }
+        }
         solve <- function(rhs, system="A", systemP=FALSE) {
           switch(class(rhs)[1L],
             numeric =

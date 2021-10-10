@@ -2,7 +2,7 @@
 % Please edit documentation in R/MCMCsim.R
 \name{subset.dc}
 \alias{subset.dc}
-\title{Select a subset of chains, samples and parameters from a draws component}
+\title{Select a subset of chains, samples and parameters from a draws component (dc) object}
 \usage{
 \method{subset}{dc}(
   x,
@@ -13,7 +13,7 @@
 )
 }
 \arguments{
-\item{x}{a draws component object.}
+\item{x}{a draws component (dc) object.}
 
 \item{chains}{an integer vector indicating which chains to select.}
 
@@ -27,7 +27,7 @@
 The selected part of the draws component as an object of class \code{dc}.
 }
 \description{
-Select a subset of chains, samples and parameters from a draws component
+Select a subset of chains, samples and parameters from a draws component (dc) object
 }
 \examples{
 n <- 300

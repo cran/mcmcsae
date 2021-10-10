@@ -99,10 +99,22 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
   type <- "reg"
   if (name == "") stop("missing model component name")
 
-  if (is.null(X))
-    X <- model_Matrix(formula, data=e$data, remove.redundant=remove.redundant, sparse=sparse)
-  else
-    X <- economizeMatrix(X, strip.names=FALSE)
+  if (is.null(X)) {
+    if (e$family$family == "multinomial") {
+      edat <- new.env(parent = .GlobalEnv)
+      X <- NULL
+      for (k in seq_len(e$Km1)) {
+        edat$cat_ <- factor(rep.int(e$cats[k], e$n0), levels=e$cats[-length(e$cats)])
+        X <- rbind(X, model_matrix(formula, data=e$data, sparse=sparse, enclos=edat))
+      }
+      rm(edat)
+    } else {
+      X <- model_matrix(formula, e$data, sparse=sparse)
+    }
+    if (remove.redundant) X <- remove_redundancy(X)
+  }
+  X <- economizeMatrix(X, sparse=sparse, strip.names=FALSE)
+
   if (nrow(X) != e$n) stop("design matrix with incompatible number of rows")
   e$coef.names[[name]] <- colnames(X)
   X <- unname(X)
@@ -137,6 +149,28 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
   }
 
   linpred <- function(p) X %m*v% p[[name]]
+
+  make_predict <- function(newdata) {
+    nnew <- nrow(newdata)
+    if (e$family$family == "multinomial") {
+      edat <- new.env(parent = .GlobalEnv)
+      Xnew <- NULL
+      for (k in seq_len(e$Km1)) {
+        edat$cat_ <- factor(rep.int(e$cats[k], nnew), levels=e$cats[-length(e$cats)])
+        Xnew <- rbind(Xnew, model_matrix(formula, data=newdata, sparse=sparse, enclos=edat))
+      }
+      rm(edat)
+    } else {
+      Xnew <- model_matrix(formula, newdata, sparse=sparse)
+    }
+    # for prediction do not (automatically) remove redundant columns!
+    if (remove.redundant)
+      Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
+    # check that X has the right number of columns
+    if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
+    # TODO check the category names as well; allow oos categories; insert missing categories in newdata
+    economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE)
+  }
 
   rprior <- function(p) {}
   rprior <- add(rprior, bquote(b0 + drawMVN_Q(Q0, sd=.(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])))))

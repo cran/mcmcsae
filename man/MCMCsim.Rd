@@ -18,7 +18,7 @@ MCMCsim(
   store.mean,
   store.sds = FALSE,
   to.file = NULL,
-  filename = "MCMCdraws_",
+  filename = "MCdraws_",
   write.single.prec = FALSE,
   verbose = TRUE,
   n.progress = n.iter\%/\%10L,
@@ -112,7 +112,7 @@ seed RNG streams for all workers.}
 be needed for parallel execution if expressions in \code{pred} depend on global variables.}
 }
 \value{
-An object of class \code{draws} containing posterior draws as well as some meta information.
+An object of class \code{mcdraws} containing posterior draws as well as some meta information.
 }
 \description{
 Given a sampler object this function runs a MCMC simulation and stores the

@@ -7,6 +7,7 @@
 
 cholmod_common c;
 
+
 /* .Call calls */
 extern SEXP _mcmcsae_add_diagC(SEXP, SEXP);
 extern SEXP _mcmcsae_Cbacksolve(SEXP, SEXP);
@@ -20,20 +21,23 @@ extern SEXP _mcmcsae_cCHMf_spsolve(SEXP, SEXP, SEXP);
 extern SEXP _mcmcsae_Cdense_crossprod_sym(SEXP, SEXP);
 extern SEXP _mcmcsae_Cdense_crossprod_sym0(SEXP);
 extern SEXP _mcmcsae_Cdense_crossprod_sym2(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_dense_crossprod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_dense_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_diag_crossprod(SEXP, SEXP);
 extern SEXP _mcmcsae_Cdense_diag_prod(SEXP, SEXP);
 extern SEXP _mcmcsae_Cdense_kron(SEXP, SEXP);
 extern SEXP _mcmcsae_Cdense_numeric_crossprod(SEXP, SEXP);
 extern SEXP _mcmcsae_Cdense_numeric_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_sparse_crossprod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_sparse_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_sparse_tcrossprod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_sparseS_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_tab_tcrossprod(SEXP, SEXP);
 extern SEXP _mcmcsae_Cdiag(SEXP);
 extern SEXP _mcmcsae_Cdiag_sparse_prod(SEXP, SEXP);
 extern SEXP _mcmcsae_CdiagU(SEXP);
 extern SEXP _mcmcsae_Cforwardsolve(SEXP, SEXP);
 extern SEXP _mcmcsae_CforwardsolveM(SEXP, SEXP);
-extern SEXP _mcmcsae_Cmatmat(SEXP, SEXP);
-extern SEXP _mcmcsae_Cmatrix_sparse_prod(SEXP, SEXP);
-extern SEXP _mcmcsae_Cmatrix_sparse_tcrossprod(SEXP, SEXP);
-extern SEXP _mcmcsae_Cmatrix_sparseS_prod(SEXP, SEXP);
-extern SEXP _mcmcsae_Cmatrix_tab_tcrossprod(SEXP, SEXP);
 extern SEXP _mcmcsae_CrCRT(SEXP, SEXP, SEXP);
 extern SEXP _mcmcsae_Crepgen(SEXP, SEXP, SEXP);
 extern SEXP _mcmcsae_Crgig(SEXP, SEXP, SEXP, SEXP);
@@ -46,18 +50,18 @@ extern SEXP _mcmcsae_Cscale_dense(SEXP, SEXP);
 extern SEXP _mcmcsae_Cscale_sparse(SEXP, SEXP);
 extern SEXP _mcmcsae_Csparse_crossprod_sym(SEXP, SEXP);
 extern SEXP _mcmcsae_Csparse_crossprod_sym2(SEXP, SEXP);
+extern SEXP _mcmcsae_Csparse_dense_crossprod(SEXP, SEXP);
 extern SEXP _mcmcsae_Csparse_dense_crossprod_sym(SEXP, SEXP);
+extern SEXP _mcmcsae_Csparse_dense_prod(SEXP, SEXP);
 extern SEXP _mcmcsae_Csparse_diag_crossprod_sym(SEXP, SEXP);
-extern SEXP _mcmcsae_Csparse_matrix_crossprod(SEXP, SEXP);
-extern SEXP _mcmcsae_Csparse_matrix_prod(SEXP, SEXP);
 extern SEXP _mcmcsae_Csparse_numeric_crossprod(SEXP, SEXP);
 extern SEXP _mcmcsae_Csparse_numeric_prod(SEXP, SEXP);
 extern SEXP _mcmcsae_Csparse_sym_twist(SEXP, SEXP);
-extern SEXP _mcmcsae_CsparseS_matrix_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_CsparseS_dense_prod(SEXP, SEXP);
 extern SEXP _mcmcsae_CsparseS_numeric_prod(SEXP, SEXP);
 extern SEXP _mcmcsae_Ctab(SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP _mcmcsae_Ctab_matrix_crossprod(SEXP, SEXP);
-extern SEXP _mcmcsae_Ctab_matrix_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_Ctab_dense_crossprod(SEXP, SEXP);
+extern SEXP _mcmcsae_Ctab_dense_prod(SEXP, SEXP);
 extern SEXP _mcmcsae_Ctab_numeric_crossprod(SEXP, SEXP);
 extern SEXP _mcmcsae_Ctab_numeric_prod(SEXP, SEXP, SEXP);
 extern SEXP _mcmcsae_Ctab_unary_crossprod(SEXP);
@@ -85,20 +89,23 @@ static const R_CallMethodDef CallEntries[] = {
     {"_mcmcsae_Cdense_crossprod_sym",        (DL_FUNC) &_mcmcsae_Cdense_crossprod_sym,        2},
     {"_mcmcsae_Cdense_crossprod_sym0",       (DL_FUNC) &_mcmcsae_Cdense_crossprod_sym0,       1},
     {"_mcmcsae_Cdense_crossprod_sym2",       (DL_FUNC) &_mcmcsae_Cdense_crossprod_sym2,       2},
+    {"_mcmcsae_Cdense_dense_crossprod",      (DL_FUNC) &_mcmcsae_Cdense_dense_crossprod,      2},
+    {"_mcmcsae_Cdense_dense_prod",           (DL_FUNC) &_mcmcsae_Cdense_dense_prod,           2},
+    {"_mcmcsae_Cdense_diag_crossprod",       (DL_FUNC) &_mcmcsae_Cdense_diag_crossprod,       2},
     {"_mcmcsae_Cdense_diag_prod",            (DL_FUNC) &_mcmcsae_Cdense_diag_prod,            2},
     {"_mcmcsae_Cdense_kron",                 (DL_FUNC) &_mcmcsae_Cdense_kron,                 2},
     {"_mcmcsae_Cdense_numeric_crossprod",    (DL_FUNC) &_mcmcsae_Cdense_numeric_crossprod,    2},
     {"_mcmcsae_Cdense_numeric_prod",         (DL_FUNC) &_mcmcsae_Cdense_numeric_prod,         2},
+    {"_mcmcsae_Cdense_sparse_crossprod",     (DL_FUNC) &_mcmcsae_Cdense_sparse_crossprod,     2},
+    {"_mcmcsae_Cdense_sparse_prod",          (DL_FUNC) &_mcmcsae_Cdense_sparse_prod,          2},
+    {"_mcmcsae_Cdense_sparse_tcrossprod",    (DL_FUNC) &_mcmcsae_Cdense_sparse_tcrossprod,    2},
+    {"_mcmcsae_Cdense_sparseS_prod",         (DL_FUNC) &_mcmcsae_Cdense_sparseS_prod,         2},
+    {"_mcmcsae_Cdense_tab_tcrossprod",       (DL_FUNC) &_mcmcsae_Cdense_tab_tcrossprod,       2},
     {"_mcmcsae_Cdiag",                       (DL_FUNC) &_mcmcsae_Cdiag,                       1},
     {"_mcmcsae_Cdiag_sparse_prod",           (DL_FUNC) &_mcmcsae_Cdiag_sparse_prod,           2},
     {"_mcmcsae_CdiagU",                      (DL_FUNC) &_mcmcsae_CdiagU,                      1},
     {"_mcmcsae_Cforwardsolve",               (DL_FUNC) &_mcmcsae_Cforwardsolve,               2},
     {"_mcmcsae_CforwardsolveM",              (DL_FUNC) &_mcmcsae_CforwardsolveM,              2},
-    {"_mcmcsae_Cmatmat",                     (DL_FUNC) &_mcmcsae_Cmatmat,                     2},
-    {"_mcmcsae_Cmatrix_sparse_prod",         (DL_FUNC) &_mcmcsae_Cmatrix_sparse_prod,         2},
-    {"_mcmcsae_Cmatrix_sparse_tcrossprod",   (DL_FUNC) &_mcmcsae_Cmatrix_sparse_tcrossprod,   2},
-    {"_mcmcsae_Cmatrix_sparseS_prod",        (DL_FUNC) &_mcmcsae_Cmatrix_sparseS_prod,        2},
-    {"_mcmcsae_Cmatrix_tab_tcrossprod",      (DL_FUNC) &_mcmcsae_Cmatrix_tab_tcrossprod,      2},
     {"_mcmcsae_CrCRT",                       (DL_FUNC) &_mcmcsae_CrCRT,                       3},
     {"_mcmcsae_Crepgen",                     (DL_FUNC) &_mcmcsae_Crepgen,                     3},
     {"_mcmcsae_Crgig",                       (DL_FUNC) &_mcmcsae_Crgig,                       4},
@@ -111,18 +118,18 @@ static const R_CallMethodDef CallEntries[] = {
     {"_mcmcsae_Cscale_sparse",               (DL_FUNC) &_mcmcsae_Cscale_sparse,               2},
     {"_mcmcsae_Csparse_crossprod_sym",       (DL_FUNC) &_mcmcsae_Csparse_crossprod_sym,       2},
     {"_mcmcsae_Csparse_crossprod_sym2",      (DL_FUNC) &_mcmcsae_Csparse_crossprod_sym2,      2},
+    {"_mcmcsae_Csparse_dense_crossprod",     (DL_FUNC) &_mcmcsae_Csparse_dense_crossprod,     2},
     {"_mcmcsae_Csparse_dense_crossprod_sym", (DL_FUNC) &_mcmcsae_Csparse_dense_crossprod_sym, 2},
+    {"_mcmcsae_Csparse_dense_prod",          (DL_FUNC) &_mcmcsae_Csparse_dense_prod,          2},
     {"_mcmcsae_Csparse_diag_crossprod_sym",  (DL_FUNC) &_mcmcsae_Csparse_diag_crossprod_sym,  2},
-    {"_mcmcsae_Csparse_matrix_crossprod",    (DL_FUNC) &_mcmcsae_Csparse_matrix_crossprod,    2},
-    {"_mcmcsae_Csparse_matrix_prod",         (DL_FUNC) &_mcmcsae_Csparse_matrix_prod,         2},
     {"_mcmcsae_Csparse_numeric_crossprod",   (DL_FUNC) &_mcmcsae_Csparse_numeric_crossprod,   2},
     {"_mcmcsae_Csparse_numeric_prod",        (DL_FUNC) &_mcmcsae_Csparse_numeric_prod,        2},
     {"_mcmcsae_Csparse_sym_twist",           (DL_FUNC) &_mcmcsae_Csparse_sym_twist,           2},
-    {"_mcmcsae_CsparseS_matrix_prod",        (DL_FUNC) &_mcmcsae_CsparseS_matrix_prod,        2},
+    {"_mcmcsae_CsparseS_dense_prod",         (DL_FUNC) &_mcmcsae_CsparseS_dense_prod,         2},
     {"_mcmcsae_CsparseS_numeric_prod",       (DL_FUNC) &_mcmcsae_CsparseS_numeric_prod,       2},
     {"_mcmcsae_Ctab",                        (DL_FUNC) &_mcmcsae_Ctab,                        5},
-    {"_mcmcsae_Ctab_matrix_crossprod",       (DL_FUNC) &_mcmcsae_Ctab_matrix_crossprod,       2},
-    {"_mcmcsae_Ctab_matrix_prod",            (DL_FUNC) &_mcmcsae_Ctab_matrix_prod,            2},
+    {"_mcmcsae_Ctab_dense_crossprod",        (DL_FUNC) &_mcmcsae_Ctab_dense_crossprod,        2},
+    {"_mcmcsae_Ctab_dense_prod",             (DL_FUNC) &_mcmcsae_Ctab_dense_prod,             2},
     {"_mcmcsae_Ctab_numeric_crossprod",      (DL_FUNC) &_mcmcsae_Ctab_numeric_crossprod,      2},
     {"_mcmcsae_Ctab_numeric_prod",           (DL_FUNC) &_mcmcsae_Ctab_numeric_prod,           3},
     {"_mcmcsae_Ctab_unary_crossprod",        (DL_FUNC) &_mcmcsae_Ctab_unary_crossprod,        1},
@@ -144,10 +151,8 @@ void R_init_mcmcsae(DllInfo *dll) {
     R_useDynamicSymbols(dll, FALSE);
     
     M_R_cholmod_start(&c);
-    c.error_handler = M_R_cholmod_error;
 }
 
 void R_unload_mcmcsae(DllInfo *dll) {
     M_cholmod_finish(&c);
 }
-

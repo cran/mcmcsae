@@ -46,16 +46,16 @@ vfac <- function(factor="local_",
       e$coef.names[[name]] <- levels(e$data[[factor]])
     }
   )
-  H <- ncol(X)
+  q <- ncol(X)
 
   if (e$Q0.type == "symm") {
     # check that scale factor is compatible with block-diagonal structure of Q0
-    if (sum(abs(commutator(e$Q0, Diagonal(x = X %m*v% sin(1.23*seq_len(H)))))) > sqrt(.Machine$double.eps)) stop("'formula.V' incompatible with 'Q0'")
+    if (sum(abs(commutator(e$Q0, Diagonal(x = X %m*v% sin(1.23*seq_len(q)))))) > sqrt(.Machine$double.eps)) stop("'formula.V' incompatible with 'Q0'")
   }
 
   prior <- switch(prior$type,
-    invchisq = pr_invchisq(prior$df, prior$scale, H, !e$prior.only),
-    exp = pr_exp(prior$scale, H, !e$prior.only)
+    invchisq = pr_invchisq(prior$df, prior$scale, q, !e$prior.only),
+    exp = pr_exp(prior$scale, q, !e$prior.only)
   )
 
   compute_Qfactor <- function(p) X %m*v% (1 / p[[name]])
@@ -64,7 +64,7 @@ vfac <- function(factor="local_",
   make_predict_Vfactor <- function(newdata) {
     if (factor == "local_") {
       # "local_" corresponds to unit-level, e.g. Student-t sampling distribution
-      Hnew <- nrow(newdata)
+      qnew <- nrow(newdata)
     } else {
       # TODO allow random generation for oos-levels more generally (currently only for Student-t sampling)
       Xnew <- aggrMatrix(newdata[[factor]])
@@ -86,14 +86,14 @@ vfac <- function(factor="local_",
               # for this case we need to store the common scale parameter!
               stop("TBI: oos prediction for common scale")
             } else {
-              pred <- add(pred, bquote(draw_betaprime(.(Hnew), 0.5*prior$scale$df, 0.5*df, df/prior$psi0)))
+              pred <- add(pred, bquote(draw_betaprime(.(qnew), 0.5*prior$scale$df, 0.5*df, df/prior$psi0)))
             }
           } else {
-            pred <- add(pred, bquote(1 / rchisq_scaled(.(Hnew), df, prior$scale)))
+            pred <- add(pred, bquote(1 / rchisq_scaled(.(qnew), df, prior$scale)))
           }
         },
         exp = {  # Laplace marginal sampling distribution
-          pred <- add(pred, quote(rexp(Hnew)))
+          pred <- add(pred, quote(rexp(qnew)))
         }
       )
     } else {
@@ -144,8 +144,8 @@ vfac <- function(factor="local_",
         # create list with blocks of Q0 corresponding to the subdivision by factor
         Q0.list <- list()
         X.ind <- list()
-        fac <- rep.int(0, H)
-        for (i in seq_len(H)) {
+        fac <- rep.int(0, q)
+        for (i in seq_len(q)) {
           X.ind[[i]] <- which(X@perm == i - 1L)  # NB tabMatrix 0-based
           Q0.list[[i]] <- e$Q0[X.ind[[i]], X.ind[[i]]]
         }
@@ -234,8 +234,8 @@ vfac <- function(factor="local_",
     start <- add(start, bquote(if (length(p[[.(name_df)]]) != 1L) stop("wrong length for start value '", name_df, "'")))
   }
   # starting values 1 seem better than drawing from prior
-  start <- add(start, bquote(if (is.null(p[[.(name)]])) p[[.(name)]] <- rep.int(1, .(H))))
-  start <- add(start, bquote(if (length(p[[.(name)]]) != .(H)) stop("wrong length for start value '", name, "'")))
+  start <- add(start, bquote(if (is.null(p[[.(name)]])) p[[.(name)]] <- rep.int(1, .(q))))
+  start <- add(start, bquote(if (length(p[[.(name)]]) != .(q)) stop("wrong length for start value '", name, "'")))
   start <- add(start, quote(p))
 
   if (length(e$Vmod) > 1L || e$Q0.type == "unit") rm(e)

@@ -11,7 +11,7 @@ generate_data(
   ny = NULL,
   ry,
   r.mod,
-  sigma.fixed = (family != "gaussian"),
+  sigma.fixed = !isTRUE(family == "gaussian"),
   sigma.mod = NULL,
   Q0 = NULL,
   formula.V = NULL,

@@ -26,11 +26,19 @@
     </style>
 
 
-<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  code {
+    white-space: pre;
+  }
+  .sourceCode {
+    overflow: visible;
+  }
+</style>
 <style type="text/css" data-origin="pandoc">
 pre > code.sourceCode { white-space: pre; position: relative; }
 pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
 div.sourceCode { margin: 1em 0; }
 pre.sourceCode { margin: 0; }
@@ -155,7 +163,7 @@ div.csl-indent {
 
 
 
-<p>The basic area-level model <span class="citation">(Battese, Harter, and Fuller 1988; Rao and Molina 2015)</span> is given by <span class="math display">\[
+<p>The basic unit-level model <span class="citation">(Battese, Harter, and Fuller 1988; Rao and Molina 2015)</span> is given by <span class="math display">\[
 y_j = \beta&#39; x_j + v_{i[j]} + \epsilon_j\,,\\
 v_i \stackrel{\mathrm{iid}}{\sim} {\cal N}(0, \sigma_v^2) \qquad \epsilon_j \stackrel{\mathrm{iid}}{\sim} {\cal N}(0, \sigma^2)
 \]</span> where <span class="math inline">\(j\)</span> runs from 1 to <span class="math inline">\(n\)</span>, the number of unit-level observations, <span class="math inline">\(\beta\)</span> is a vector of regression coefficients for given covariates <span class="math inline">\(x_j\)</span>, and <span class="math inline">\(v_i\)</span> are random area intercepts.</p>
@@ -174,12 +182,12 @@ v_i \stackrel{\mathrm{iid}}{\sim} {\cal N}(0, \sigma_v^2) \qquad \epsilon_j \sta
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>sim <span class="ot">&lt;-</span> <span class="fu">MCMCsim</span>(sampler, <span class="at">store.all=</span><span class="cn">TRUE</span>, <span class="at">verbose=</span><span class="cn">FALSE</span>)</span>
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>(<span class="fu">summary</span>(sim))</span></code></pre></div>
 <pre><code>## llh_ :
-##      Mean        SD   t-value      MCSE     q0.05      q0.5     q0.95     n_eff     R_hat 
-## -1089.645     4.435  -245.691     0.127 -1097.336 -1089.401 -1082.719  1229.010     1.000 
+##       Mean   SD t-value  MCSE q0.05  q0.5 q0.95 n_eff R_hat
+## llh_ -1090 4.44    -246 0.127 -1097 -1089 -1083  1229     1
 ## 
 ## sigma_ :
-##     Mean       SD  t-value     MCSE    q0.05     q0.5    q0.95    n_eff    R_hat 
-## 5.62e+01 3.03e+00 1.85e+01 6.75e-02 5.14e+01 5.60e+01 6.14e+01 2.02e+03 1.00e+00 
+##        Mean   SD t-value   MCSE q0.05 q0.5 q0.95 n_eff R_hat
+## sigma_ 56.2 3.03    18.5 0.0675  51.4   56  61.4  2018     1
 ## 
 ## beta :
 ##                 Mean     SD t-value    MCSE   q0.05     q0.5    q0.95 n_eff R_hat
@@ -193,8 +201,8 @@ v_i \stackrel{\mathrm{iid}}{\sim} {\cal N}(0, \sigma_v^2) \qquad \epsilon_j \sta
 ## grad.sch       2.123  0.474    4.48 0.00898    1.33    2.130   2.8878  2790 1.000
 ## 
 ## v_sigma :
-##    Mean      SD t-value    MCSE   q0.05    q0.5   q0.95   n_eff   R_hat 
-##  22.971   6.403   3.587   0.208  13.314  22.504  33.958 945.927   1.002 
+##         Mean  SD t-value  MCSE q0.05 q0.5 q0.95 n_eff R_hat
+## v_sigma   23 6.4    3.59 0.208  13.3 22.5    34   946     1
 ## 
 ## v :
 ##                  Mean   SD   t-value  MCSE q0.05     q0.5  q0.95 n_eff R_hat
@@ -295,8 +303,8 @@ v_i \stackrel{\mathrm{iid}}{\sim} {\cal N}(0, \sigma_v^2)
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>sim <span class="ot">&lt;-</span> <span class="fu">MCMCsim</span>(sampler, <span class="at">store.all=</span><span class="cn">TRUE</span>, <span class="at">verbose=</span><span class="cn">FALSE</span>)</span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(sim)</span></code></pre></div>
 <pre><code>## llh_ :
-##      Mean        SD   t-value      MCSE     q0.05      q0.5     q0.95     n_eff     R_hat 
-##  -83.2891    2.4918  -33.4257    0.0607  -87.5277  -83.1962  -79.4361 1685.4346    1.0008 
+##       Mean   SD t-value   MCSE q0.05  q0.5 q0.95 n_eff R_hat
+## llh_ -83.3 2.49   -33.4 0.0607 -87.5 -83.2 -79.4  1685     1
 ## 
 ## beta :
 ##                  Mean     SD t-value     MCSE   q0.05      q0.5    q0.95 n_eff R_hat
@@ -310,8 +318,8 @@ v_i \stackrel{\mathrm{iid}}{\sim} {\cal N}(0, \sigma_v^2)
 ## grad.sch     0.014016 0.0316  0.4434 0.001113 -0.0347  0.012320  0.06888   807  1.00
 ## 
 ## v_sigma :
-##     Mean       SD  t-value     MCSE    q0.05     q0.5    q0.95    n_eff    R_hat 
-##   0.3754   0.2857   1.3141   0.0123   0.0297   0.3198   0.9167 535.1238   1.0121 
+##          Mean    SD t-value   MCSE  q0.05 q0.5 q0.95 n_eff R_hat
+## v_sigma 0.375 0.286    1.31 0.0123 0.0297 0.32 0.917   535  1.01
 ## 
 ## v :
 ##                   Mean    SD  t-value    MCSE  q0.05     q0.5 q0.95 n_eff R_hat

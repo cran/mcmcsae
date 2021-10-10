@@ -2,15 +2,15 @@
 % Please edit documentation in R/parallel.R
 \name{combine_chains}
 \alias{combine_chains}
-\title{Combine multiple draws objects to a single one by combining their chains}
+\title{Combine multiple mcdraws objects into a single one by combining their chains}
 \usage{
 combine_chains(...)
 }
 \arguments{
-\item{...}{objects of class \code{draws}.}
+\item{...}{objects of class \code{mcdraws}.}
 }
 \value{
-A combined object of class \code{draws} where the number of stored
+A combined object of class \code{mcdraws} where the number of stored
  chains equals the sum of the numbers of chains in the input objects.
 }
 \description{

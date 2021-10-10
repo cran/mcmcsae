@@ -74,7 +74,7 @@ NumericVector Ctab_numeric_prod(const SEXP A, const NumericVector & y, const boo
 //’ @param y a matrix.
 //’ @return The matrix product \code{Ay}.
 // [[Rcpp::export(rng=false)]]
-Eigen::MatrixXd Ctab_matrix_prod(const SEXP A, const Eigen::Map<Eigen::MatrixXd> & y) {
+Eigen::MatrixXd Ctab_dense_prod(const SEXP A, const Eigen::Map<Eigen::MatrixXd> & y) {
   if (!Rf_isS4(A) || !Rf_inherits(A, "tabMatrix")) stop("A is not a tabMatrix");
   const IntegerVector perm(as<S4>(A).slot("perm"));
   const IntegerVector Dim(as<S4>(A).slot("Dim"));
@@ -123,7 +123,7 @@ Eigen::MatrixXd Ctab_matrix_prod(const SEXP A, const Eigen::Map<Eigen::MatrixXd>
 //’ @param A a tabMatrix.
 //’ @return The matrix product \code{yA'}.
 // [[Rcpp::export(rng=false)]]
-Eigen::MatrixXd Cmatrix_tab_tcrossprod(const Eigen::Map<Eigen::MatrixXd> & y, const SEXP A) {
+Eigen::MatrixXd Cdense_tab_tcrossprod(const Eigen::Map<Eigen::MatrixXd> & y, const SEXP A) {
   if (!Rf_isS4(A) || !Rf_inherits(A, "tabMatrix")) stop("A is not a tabMatrix");
   const IntegerVector perm(as<S4>(A).slot("perm"));
   const IntegerVector Dim(as<S4>(A).slot("Dim"));
@@ -217,7 +217,7 @@ NumericVector Ctab_numeric_crossprod(const SEXP A, const NumericVector & y) {
 //’ @param y a numeric matrix.
 //’ @return The vector \code{A'y}.
 // [[Rcpp::export(rng=false)]]
-NumericMatrix Ctab_matrix_crossprod(const SEXP A, const NumericMatrix & y) {
+NumericMatrix Ctab_dense_crossprod(const SEXP A, const NumericMatrix & y) {
   if (!Rf_isS4(A) || !Rf_inherits(A, "tabMatrix")) stop("A is not a tabMatrix");
   const IntegerVector perm(as<S4>(A).slot("perm"));
   const IntegerVector Dim(as<S4>(A).slot("Dim"));

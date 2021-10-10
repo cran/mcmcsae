@@ -11,7 +11,7 @@ R_hat(dc)
 n_eff(dc, useFFT = TRUE, lag.max, cl = NULL)
 }
 \arguments{
-\item{dc}{a component of a draws object corresponding to a model parameter.}
+\item{dc}{a draws component (dc) object corresponding to a model parameter.}
 
 \item{useFFT}{whether to use the Fast Fourier Transform algorithm. Default is \code{TRUE} as this is typically faster.}
 

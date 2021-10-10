@@ -36,13 +36,13 @@ stop_cluster <- function(cl) {
   parallel::stopCluster(cl)
 }
 
-#' Combine multiple draws objects to a single one by combining their chains
+#' Combine multiple mcdraws objects into a single one by combining their chains
 #'
 #' This function can be used to combine the results of parallel simulations.
 #'
 #' @export
-#' @param ... objects of class \code{draws}.
-#' @return A combined object of class \code{draws} where the number of stored
+#' @param ... objects of class \code{mcdraws}.
+#' @return A combined object of class \code{mcdraws} where the number of stored
 #'  chains equals the sum of the numbers of chains in the input objects.
 combine_chains <- function(...) {
   dotargs <- list(...)
@@ -71,7 +71,7 @@ combine_chains <- function(...) {
     if (!is.null(attr(dotargs[[1L]][[v]], "labels"))) attr(out[[v]], "labels") <- attr(dotargs[[1L]][[v]], "labels")
     class(out[[v]]) <- "dc"
   }
-  class(out) <- "draws"
+  class(out) <- "mcdraws"
   out
 }
 
@@ -88,7 +88,7 @@ combine_chains_dc <- function(obj) {
   out
 }
 
-# obj can be of class draws or dc (the latter may also be a list)
+# obj can be of class mcdraws or dc (the latter may also be a list)
 split_chains <- function(obj, parts=NULL) {
   n.chain <- nchains(obj)
   if (is.null(parts)) {
@@ -99,11 +99,11 @@ split_chains <- function(obj, parts=NULL) {
   if (parts > n.chain || parts < 1L) stop("wrong input for 'parts'")
   chs <- rep(n.chain %/% parts, parts) + rep(1:0, c(n.chain %% parts, parts - n.chain %% parts))
   chs <- split(seq_len(n.chain), rep(seq_len(parts), chs))
-  out <- rep(list(NULL), parts)
+  out <- vector(mode="list", parts)
   obj_class <- class(obj)[1L]
-  if (!(obj_class %in% c("draws", "dc", "list"))) stop("unsupported class '", obj_class, "'")
+  if (!(obj_class %in% c("mcdraws", "dc", "list"))) stop("unsupported class '", obj_class, "'")
   for (k in seq_along(out)) {
-    if (obj_class == "draws") {
+    if (obj_class == "mcdraws") {
       out[[k]][["_info"]] <- obj[["_info"]]
       out[[k]][["_info"]]$n.chain <- length(chs[[k]])
       out[[k]][["_model"]] <- obj[["_model"]]
@@ -133,13 +133,13 @@ split_chains <- function(obj, parts=NULL) {
   out
 }
 
-#' Combine multiple draws objects to a single one by combining their draws
+#' Combine multiple mcdraws objects into a single one by combining their draws
 #'
 #' This function is used to combine the results of parallel posterior predictive simulations.
 #'
 #' @export
-#' @param ... objects of class \code{draws}
-#' @return A combined object of class \code{draws} where the number of stored
+#' @param ... objects of class \code{mcdraws}
+#' @return A combined object of class \code{mcdraws} where the number of stored
 #'  draws equals the sum of the numbers of draws in the input objects.
 combine_iters <- function(...) {
   dotargs <- list(...)
@@ -168,7 +168,7 @@ combine_iters <- function(...) {
     }
     class(out[[v]]) <- "dc"
   }
-  class(out) <- "draws"
+  class(out) <- "mcdraws"
   out
 }
 
@@ -196,26 +196,25 @@ combine_iters_dc <- function(obj) {
   out
 }
 
-# obj can be of class dc or draws
+# obj can be of class dc or mcdraws
 # parts: in how many parts
 # iters: subset of iterations; default is all iterations in obj
 split_iters <- function(obj, iters=NULL, parts=NULL) {
   parts <- as.integer(parts)
   if (length(parts) != 1L || parts < 1L) stop("wrong input for 'parts'")
-  if (is.null(iters)) {
+  if (is.null(iters))
     iters <- seq_len(ndraws(obj))
-  } else {
+  else
     if (!all(iters %in% seq_len(ndraws(obj)))) stop("non-existing iterations selected")
-  }
   n.iter <- length(iters)
   if (n.iter < parts) stop("cannot split ", n.iter, " draws in ", parts, " parts")
   its <- rep(n.iter %/% parts, parts) + rep(1:0, c(n.iter %% parts, parts - n.iter %% parts))
   its <- split(iters, rep(seq_len(parts), its))
-  out <- rep(list(NULL), parts)
+  out <- vector(mode="list", parts)
   obj_class <- class(obj)[1L]
-  if (!(obj_class %in% c("dc", "draws"))) stop("unsupported class '", obj_class, "'")
+  if (!(obj_class %in% c("dc", "mcdraws"))) stop("unsupported class '", obj_class, "'")
   for (k in seq_along(out)) {
-    if (obj_class == "draws") {
+    if (obj_class == "mcdraws") {
       out[[k]][["_info"]] <- obj[["_info"]]
       out[[k]][["_info"]]$n.draw <- length(its[[k]])
       out[[k]][["_model"]] <- obj[["_model"]]

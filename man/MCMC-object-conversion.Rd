@@ -3,26 +3,29 @@
 \name{MCMC-object-conversion}
 \alias{MCMC-object-conversion}
 \alias{to_mcmc}
+\alias{to_draws_array}
 \alias{as.array.dc}
 \alias{as.matrix.dc}
 \title{Convert a draws component object to another format}
 \usage{
 to_mcmc(x)
 
+to_draws_array(x)
+
 \method{as.array}{dc}(x, ...)
 
 \method{as.matrix}{dc}(x, colnames = TRUE, ...)
 }
 \arguments{
-\item{x}{a component of a draws object corresponding to a scalar or vector model parameter.}
+\item{x}{a component of an mcdraws object corresponding to a scalar or vector model parameter.}
 
 \item{...}{currently ignored.}
 
 \item{colnames}{whether column names should be set.}
 }
 \value{
-The draws component coerced to a \code{\link[coda]{mcmc.list}},
- an array, or a matrix.
+The draws component coerced to an \code{\link[coda]{mcmc.list}} object,
+ a \code{\link[posterior]{draws_array}} object, an array, or a matrix.
 }
 \description{
 Use \code{to_mcmc} to convert a draws component to class \code{\link[coda]{mcmc.list}},
@@ -41,6 +44,10 @@ summary(sim)
 if (require("coda", quietly=TRUE)) {
   mcbeta <- to_mcmc(sim$beta)
   geweke.diag(mcbeta)
+}
+if (require("posterior", quietly=TRUE)) {
+  mcbeta <- to_draws_array(sim$beta)
+  mcbeta
 }
 str(as.array(sim$beta))
 str(as.matrix(sim$beta))

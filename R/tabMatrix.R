@@ -242,8 +242,10 @@ setMethod("[", c(x="tabMatrix", i="index", j="missing", drop="logical"), functio
 setMethod("[", c(x="tabMatrix", i="missing", j="index", drop="logical"), function (x, i, j, ..., drop=TRUE) {
   if (is.character(j)) stop("indexing by name currently not supported for tabMatrix")
   j <- as.integer(j)
-  if (any(j < 0L)) stop("negative integer indexing currently not supported for tabMatrix")
-  if (any(j == 0L | j > x@Dim[2L])) stop("out of range")
+  #if (any(j < 0L)) stop("negative integer indexing currently not supported for tabMatrix")
+  if (all(j < 0L)) j <- seq_len(x@Dim[2L])[j]
+  #if (any(j == 0L | j > x@Dim[2L])) stop("out of range")
+  if (any(j <= 0L | j > x@Dim[2L])) stop("out of range")
   if (any(duplicated(j))) stop("duplicated column indices currently not supported for tabMatrix")
   if (drop && length(j) == 1L) {
     out <- rep.int(0, x@Dim[1L])
@@ -300,15 +302,16 @@ remove_levels <- function(f, l=1L) {
 }
 
 # factor (interaction) to tabMatrix
+# fvars looked up in data, which can either be a data.frame or an environment
 # contrasts: either "contr.treatment", "contr.SAS" or an integer vector of the same length as
 #   fvars specifying for each factor variable which level (by name) is considered the baseline.
 #   If left unspecified no levels are removed.
 # drop.unused.levels: drop unused levels of each factor
 # drop: drop empty cells in the interaction (which may result in more columns to be dropped)
-fac2tabM <- function(fvars, data, x=numeric(), xlab=character(), drop.unused.levels=FALSE, drop=FALSE, contrasts=NULL, varsep=":", catsep="$", lex.order=FALSE) {
+fac2tabM <- function(fvars, data, enclos=.GlobalEnv, x=numeric(), xlab=character(), drop.unused.levels=FALSE, drop=FALSE, contrasts=NULL, varsep=":", catsep="$", lex.order=FALSE) {
   if (missing(fvars) || !length(fvars)) stop("unexpected 'fvars' argument")
   for (f in seq_along(fvars)) {
-    fac <- eval_in(fvars[f], data)
+    fac <- eval_in(fvars[f], data, enclos)
     if (!is.factor(fac) || drop.unused.levels) fac <- factor(fac)
     if (!is.null(contrasts)) {
       # TODO instead of changing levels here, compute the indices of the final codes vector
@@ -356,13 +359,13 @@ tables2tabM <- function(formula, data, ...) {
     if (intercept_only(formula))
       return(list(new("tabMatrix", perm=rep.int(0L, n), reduced=FALSE, num=TRUE, x=rep.int(1, n), Dim=c(n, 1L))))
     else
-      stop("unexpected input")
+      stop("empty formula")
   }
   tnames <- colnames(tmat)
   vnames <- rownames(tmat)
   qvar <- !catvars(trms, data)  # quantitative variables
   qvar <- vnames[which(qvar)]
-  out <- setNames(rep(list(NULL), length(tnames)), tnames)
+  out <- setNames(vector(mode="list", length(tnames)), tnames)
   for (k in seq_along(tnames)) {
     countvars <- intersect(vnames[tmat[, k] > 0L], qvar)
     if (length(countvars)) {

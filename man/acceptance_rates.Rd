@@ -4,10 +4,10 @@
 \alias{acceptance_rates}
 \title{Return Metropolis-Hastings acceptance rates}
 \usage{
-acceptance_rates(object, aggregate.chains = FALSE)
+acceptance_rates(obj, aggregate.chains = FALSE)
 }
 \arguments{
-\item{object}{a draws object, i.e. the output of function \code{MCMCsim}.}
+\item{obj}{an mcdraws object, i.e. the output of function \code{\link{MCMCsim}}.}
 
 \item{aggregate.chains}{whether to return averages over chains or results per chain.}
 }

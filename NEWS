@@ -1,4 +1,17 @@
 
+version 0.7.0
+- renamed class 'draws' to 'mcdraws' to avoid name clash with R package
+  posterior
+- added function to_draws_array to convert a draws component to an object of
+  class draws_array, as defined in R package posterior
+- support for multinomial family
+- support for Poisson family, approximately, in terms of negative binomial
+- it is now possible to use weights to specify irregularly spaced AR1 or RW1
+  correlation structures
+- initial support for conjugate gradient coefficient sampler
+- experimental function for simulation-based calibration
+
+
 version 0.6.0
 - measurement in covariates model component mec() added
 - new function pr_gig to specify a Generalized Inverse Gaussian prior

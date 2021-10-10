@@ -101,36 +101,48 @@ Csparse_numeric_crossprod <- function(A, y) {
     .Call(`_mcmcsae_Csparse_numeric_crossprod`, A, y)
 }
 
-Cmatmat <- function(A, B) {
-    .Call(`_mcmcsae_Cmatmat`, A, B)
+Cdense_dense_prod <- function(A, B) {
+    .Call(`_mcmcsae_Cdense_dense_prod`, A, B)
 }
 
-Csparse_matrix_prod <- function(A, y) {
-    .Call(`_mcmcsae_Csparse_matrix_prod`, A, y)
+Csparse_dense_prod <- function(A, y) {
+    .Call(`_mcmcsae_Csparse_dense_prod`, A, y)
 }
 
-Cmatrix_sparse_prod <- function(A, B) {
-    .Call(`_mcmcsae_Cmatrix_sparse_prod`, A, B)
+Cdense_sparse_prod <- function(A, B) {
+    .Call(`_mcmcsae_Cdense_sparse_prod`, A, B)
 }
 
-CsparseS_matrix_prod <- function(A, y) {
-    .Call(`_mcmcsae_CsparseS_matrix_prod`, A, y)
+CsparseS_dense_prod <- function(A, y) {
+    .Call(`_mcmcsae_CsparseS_dense_prod`, A, y)
 }
 
-Cmatrix_sparseS_prod <- function(M, Q) {
-    .Call(`_mcmcsae_Cmatrix_sparseS_prod`, M, Q)
+Cdense_sparseS_prod <- function(M, Q) {
+    .Call(`_mcmcsae_Cdense_sparseS_prod`, M, Q)
 }
 
 Cdense_diag_prod <- function(M, d) {
     .Call(`_mcmcsae_Cdense_diag_prod`, M, d)
 }
 
-Csparse_matrix_crossprod <- function(A, y) {
-    .Call(`_mcmcsae_Csparse_matrix_crossprod`, A, y)
+Cdense_dense_crossprod <- function(A, B) {
+    .Call(`_mcmcsae_Cdense_dense_crossprod`, A, B)
 }
 
-Cmatrix_sparse_tcrossprod <- function(y, A) {
-    .Call(`_mcmcsae_Cmatrix_sparse_tcrossprod`, y, A)
+Csparse_dense_crossprod <- function(A, B) {
+    .Call(`_mcmcsae_Csparse_dense_crossprod`, A, B)
+}
+
+Cdense_sparse_crossprod <- function(A, B) {
+    .Call(`_mcmcsae_Cdense_sparse_crossprod`, A, B)
+}
+
+Cdense_diag_crossprod <- function(M, d) {
+    .Call(`_mcmcsae_Cdense_diag_crossprod`, M, d)
+}
+
+Cdense_sparse_tcrossprod <- function(y, A) {
+    .Call(`_mcmcsae_Cdense_sparse_tcrossprod`, y, A)
 }
 
 Cdiag_sparse_prod <- function(x, A) {
@@ -225,20 +237,20 @@ Ctab_numeric_prod <- function(A, y, ignore_x = FALSE) {
     .Call(`_mcmcsae_Ctab_numeric_prod`, A, y, ignore_x)
 }
 
-Ctab_matrix_prod <- function(A, y) {
-    .Call(`_mcmcsae_Ctab_matrix_prod`, A, y)
+Ctab_dense_prod <- function(A, y) {
+    .Call(`_mcmcsae_Ctab_dense_prod`, A, y)
 }
 
-Cmatrix_tab_tcrossprod <- function(y, A) {
-    .Call(`_mcmcsae_Cmatrix_tab_tcrossprod`, y, A)
+Cdense_tab_tcrossprod <- function(y, A) {
+    .Call(`_mcmcsae_Cdense_tab_tcrossprod`, y, A)
 }
 
 Ctab_numeric_crossprod <- function(A, y) {
     .Call(`_mcmcsae_Ctab_numeric_crossprod`, A, y)
 }
 
-Ctab_matrix_crossprod <- function(A, y) {
-    .Call(`_mcmcsae_Ctab_matrix_crossprod`, A, y)
+Ctab_dense_crossprod <- function(A, y) {
+    .Call(`_mcmcsae_Ctab_dense_crossprod`, A, y)
 }
 
 Ctab_unary_crossprod <- function(A) {

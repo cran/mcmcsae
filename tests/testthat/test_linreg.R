@@ -12,7 +12,7 @@ df <- data.frame(
 )
 df$y <- with(df, 1 + x1 + 2*x2 + 3*x3 + 4*x4 + rnorm(n))
 
-test_that("linear regression works, as well as fitted and residuals methods", {
+test_that("linear regression works, as well as fitted, residuals and predict methods", {
   sampler <- create_sampler(y ~ reg(~1+x1+x2+x3+x4, name="beta"), data=df)
   sim <- MCMCsim(sampler, n.iter=500, burnin=100, n.chain=2, verbose=FALSE)
   summ <- summary(sim)
@@ -20,6 +20,9 @@ test_that("linear regression works, as well as fitted and residuals methods", {
   expect_true((0.5 < summ$sigma_[, "Mean"]) && (summ$sigma_[, "Mean"] < 2))
   expect_equal(fitted(sim, mean.only=TRUE), as.vector(summary(fitted(sim))[, "Mean"]))
   expect_equal(residuals(sim, mean.only=TRUE), as.vector(summary(residuals(sim))[, "Mean"]))
+  expect_equal(nrow(summary(predict(sim, iters=sample(1:500, 100), show.progress=FALSE))), n)
+  expect_equal(nvars(predict(sim, X.=list(beta=model_matrix(~1+x1+x2+x3+x4, df[1:10, ])), show.progress=FALSE)), 10)
+  expect_equal(nvars(predict(sim, newdata=df[21, ], show.progress=FALSE)), 1)
 })
 
 test_that("single-site Gibbs sampler works", {

@@ -3,4 +3,4 @@
 CXX_STD = CXX11
 
 # suppress cran check warning about asserts in Eigen that may crash R
-PKG_CXXFLAGS = -DNDEBUG
+PKG_CXXFLAGS = -DNDEBUG -DSTRICT_R_HEADERS

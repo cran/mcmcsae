@@ -59,7 +59,7 @@ compute_DIC(sim)
 ```
 
 The output of function [`MCMCsim`](../html/MCMCsim.html) is
-an object of class `draws`.
+an object of class `mcdraws`.
 The package provides methods for the generic functions `summary`, `plot`, `predict`, `residuals` and `fitted` for this class.
 
 
@@ -77,7 +77,7 @@ $$
 Posterior draws for $\bar{Y}$ can be obtained by generating draws for the non-sampled
 population units, summing them and adding the sample sum.
 This is done in the next code chunk, where method
-[`predict`](../html/predict.draws.html) is used to generate
+[`predict`](../html/predict.mcdraws.html) is used to generate
 draws from the posterior predictive distribution for the new,
 unobserved, units.
 ```{r}

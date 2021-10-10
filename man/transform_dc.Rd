@@ -2,12 +2,12 @@
 % Please edit documentation in R/MCMCsim.R
 \name{transform_dc}
 \alias{transform_dc}
-\title{Transform one or more draws components into a new one by applying a function}
+\title{Transform one or more draws component objects into a new one by applying a function}
 \usage{
 transform_dc(..., fun, to.matrix = FALSE, labels = NULL)
 }
 \arguments{
-\item{...}{draws component object(s).}
+\item{...}{draws component object(s) of class \code{dc}.}
 
 \item{fun}{a function to apply. This function should take as many arguments as there are input objects.
 The arguments can be arbitrarily named, but they are assumed to be in the same order as the input objects.
@@ -18,10 +18,10 @@ The function should return a vector.}
 \item{labels}{optional labels for the output object.}
 }
 \value{
-Either a matrix or a draws component.
+Either a matrix or a draws component object.
 }
 \description{
-Transform one or more draws components into a new one by applying a function
+Transform one or more draws component objects into a new one by applying a function
 }
 \examples{
 \donttest{

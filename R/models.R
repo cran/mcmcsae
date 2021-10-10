@@ -14,10 +14,15 @@ check_mod_names <- function(x) {
   TRUE
 }
 
-#' Compute list of design matrices for all terms in a model formula
+#' Compute a list of design matrices for all terms in a model formula,
+#' or based on a sampler environment
 #'
-#' The output is a list of dense or sparse design matrices for the specified model components with respect to
-#' \code{data}. The design matrices contain appropriate column names.
+#' If \code{sampler} is provided instead of \code{formula}, the design matrices
+#' are based on the model used to create the sampler environment. In that case, if
+#' \code{data} is \code{NULL}, the design matrices stored in \code{sampler} are returned,
+#' otherwise the design matrices are computed for the provided data based on the sampler's model.
+#' The output is a list of dense or sparse design matrices for the model components
+#' with respect to \code{data}.
 #'
 #' @examples
 #' n <- 1000
@@ -25,34 +30,54 @@ check_mod_names <- function(x) {
 #'   x = rnorm(n),
 #'   f = factor(sample(1:50, n, replace=TRUE))
 #' )
-#' str(X <- computeDesignMatrix(~ x, dat)[[1]])
-#' X <- computeDesignMatrix(
-#'   ~ reg(~x, name="beta") + gen(~x, factor=~f, name="v"), dat
-#' )
+#' str(computeDesignMatrix(~ x, dat)[[1]])
+#' model <- ~ reg(~x, name="beta") + gen(~x, factor=~f, name="v")
+#' X <- computeDesignMatrix(model, dat)
 #' str(X)
+#' sampler <- create_sampler(model, dat, prior.only=TRUE)
+#' str(computeDesignMatrix(sampler=sampler))
+#' str(computeDesignMatrix(sampler=sampler, labels=FALSE))
+#' newdata <- data.frame(x=rnorm(10), f=dat$f[1:10])
+#' str(computeDesignMatrix(sampler=sampler, data=newdata))
 #'
 #' @export
 #' @param formula model formula.
 #' @param data data frame to be used in deriving the design matrices.
+#' @param sampler a sampler environment (as created by e.g. by \code{\link{create_sampler}}).
+#' @param labels if \code{TRUE}, column names are assigned.
 #' @return A list of design matrices.
-computeDesignMatrix <- function(formula, data) {
-  formula <- standardize_formula(formula, data=data)
-  out <- to_mclist(formula)
-  for (m in seq_along(out)) {
-    mc <- as.list(out[[m]])[-1L]
-    if (is.null(mc$formula))
-      mc$formula <- ~ 1
-    else
-      mc$formula <- as.formula(eval(mc$formula))
-    environment(mc$formula) <- environment(formula)
-    if (!is.null(mc$factor)) {
-      mc$factor <- as.formula(mc$factor)
-      environment(mc$factor) <- environment(formula)
+computeDesignMatrix <- function(formula=NULL, data=NULL, sampler=NULL, labels=TRUE) {
+  if (is.null(formula)) {
+    if (is.null(sampler)) stop("either 'formula' or 'sampler' must be provided")
+    if (!is.environment(sampler) || is.null(sampler$mod)) stop("not a sampler environment")
+    out <- list()
+    for (mc in sampler$mod) {
+      if (is.null(data))
+        out[[mc$name]] <- mc$X
+      else
+        out[[mc$name]] <- mc$make_predict(data)
+      if (labels) {
+        dimnames(out[[mc$name]])[[2L]] <- sampler$coef.names[[mc$name]]
+      }
     }
-    if (is.null(mc$remove.redundant)) mc$remove.redundant <- FALSE
-    if (is.null(mc$drop.empty.levels)) mc$drop.empty.levels <- FALSE
-    out[[m]] <- compute_X(mc$formula, mc$factor, mc$remove.redundant,
-                          mc$drop.empty.levels, mc$sparse, data)
+  } else {
+    formula <- standardize_formula(formula, data=data)
+    out <- to_mclist(formula)
+    for (m in seq_along(out)) {
+      mc <- as.list(out[[m]])[-1L]
+      if (is.null(mc$formula))
+        mc$formula <- ~ 1
+      else
+        mc$formula <- as.formula(eval(mc$formula))
+      environment(mc$formula) <- environment(formula)
+      if (!is.null(mc$factor))
+        mc$factor <- as.formula(mc$factor, env=environment(formula))
+      if (is.null(mc$remove.redundant)) mc$remove.redundant <- FALSE
+      if (is.null(mc$drop.empty.levels)) mc$drop.empty.levels <- FALSE
+      out[[m]] <- compute_X(mc$formula, mc$factor, mc$remove.redundant,
+          mc$drop.empty.levels, mc$sparse, data)
+      if (!labels) colnames(out[[m]]) <- NULL
+    }
   }
   out
 }
@@ -73,8 +98,8 @@ computeDesignMatrix <- function(formula, data) {
 compute_X <- function(formula=~1, factor=NULL,
                       remove.redundant=TRUE, drop.empty.levels=FALSE,
                       sparse=NULL, data=NULL) {
-  # TODO better criterion needed for sparsity of model_matrix: size of data and numbers of levels of factors
-  X0 <- model_Matrix(formula, data, remove.redundant=remove.redundant, sparse=sparse)
+  X0 <- model_matrix(formula, data, sparse=sparse)
+  if (remove.redundant) X0 <- remove_redundancy(X0)
   if (is.null(factor) || (inherits(factor, "formula") && intercept_only(factor)))
     return(X0)
   XA <- compute_XA(factor, data)
@@ -87,6 +112,8 @@ compute_X <- function(formula=~1, factor=NULL,
   X <- combine_X0_XA(X0, XA)
   if (length(cols2remove))
     attr(X, "factor.cols.removed") <- cols2remove
+  if (ncol(X0) > 1L)
+    attr(X, "formula.colnames") <- colnames(X0)
   X
 }
 
@@ -128,16 +155,16 @@ combine_X0_XA <- function(X0, XA) {
   economizeMatrix(out, strip.names=FALSE)
 }
 
-compute_XA <- function(factor=NULL, data=NULL) {
+compute_XA <- function(factor=NULL, data=NULL, enclos=.GlobalEnv) {
   if (is.null(factor) || (inherits(factor, "formula") && intercept_only(factor))) return(NULL)
-  factor.info <- get_factor_info(factor, data)
-  n <- nrow(data)
+  factor.info <- get_factor_info(factor, data, enclos=enclos)
+  n <- n_row(data)
   if ("spline" %in% factor.info$types) {  # B-spline design matrix components
     fs <- as.list(attr(terms(factor), "variables"))[-1L]
     out <- matrix(1, nrow=1L, ncol=n)
     labs <- ""
     for (f in seq_len(nrow(factor.info))) {
-      variable <- eval_in(factor.info$variables[f], data)
+      variable <- eval_in(factor.info$variables[f], data, enclos)
       switch(factor.info$types[f],
         spline = {
           # P-splines, i.e. penalized B-splines
@@ -162,14 +189,14 @@ compute_XA <- function(factor=NULL, data=NULL) {
     dimnames(out) <- list(NULL, labs)
     out
   } else {
-    fac <- combine_factors(factor.info$variables, data)
+    fac <- combine_factors(factor.info$variables, data, enclos=enclos)
     if (anyNA(fac)) stop("NA's in 'factor' not allowed")
     aggrMatrix(fac, facnames=TRUE)
   }
 }
 
 # extract information from the factor formula component of a model component list
-get_factor_info <- function(formula, data) {
+get_factor_info <- function(formula, data, enclos=.GlobalEnv) {
   fs <- as.list(attr(terms(formula), "variables"))[-1L]
   variables <- sapply(fs, function(x) if (is.symbol(x)) deparse(x) else deparse(x[[2L]]))
   types <- sapply(fs, function(x) if (inherits(x, "name")) "iid" else as.character(x[[1L]]))
@@ -188,18 +215,25 @@ get_factor_info <- function(formula, data) {
       ncols[f] <- n.knots - fs[[f]]$degree - 1L
     } else {
       if (variables[[f]] == "local_")
-        ncols[f] <- nrow(data)
+        ncols[f] <- n_row(data)
       else
-        ncols[f] <- nlevels(as.factor(eval_in(variables[f], data)))
+        ncols[f] <- nlevels(as.factor(eval_in(variables[f], data, enclos)))
     }
   }
   data.frame(types=types, variables=variables, n=ncols, stringsAsFactors=FALSE)
 }
 
 eval_in <- function(text, data, enclos=.GlobalEnv) {
-  if (text == "local_" && !("local_" %in% colnames(data))) return(seq_len(nrow(data)))
-  if (text == "global_" && !("global_" %in% colnames(data))) return(rep.int(1, nrow(data)))
-  eval(substitute(evalq(expr, data, enclos), list(expr=str2lang_(text))))
+  if (text == "local_" && !("local_" %in% colnames(data))) return(seq_len(n_row(data)))
+  if (text == "global_" && !("global_" %in% colnames(data))) return(rep.int(1, n_row(data)))
+  if (is.environment(data)) {
+    # if data is not a (pair)list/data.frame enclos is not searched, so do it manually if needed
+    tryCatch(
+      eval(substitute(evalq(expr, data, enclos), list(expr=str2lang_(text)))),
+      error = function(e) eval(substitute(evalq(expr, enclos), list(expr=str2lang_(text))))
+    )
+  } else
+    eval(substitute(evalq(expr, data, enclos), list(expr=str2lang_(text))))
 }
 
 #' Compute (I)GMRF incidence, precision and restriction matrices corresponding to a generic model component
@@ -230,15 +264,17 @@ eval_in <- function(text, data, enclos=.GlobalEnv) {
 #'  rows and columns of Q and rows of R) that are removed. This can be useful in the
 #'  case of empty domains.
 #' @param remove.redundant.R.cols whether to test for and remove redundant restrictions from restriction matrix R
+#' @param enclos enclosure to look for objects not found in \code{data}.
+#' @param n.parent for internal use; in case of custom factor, the number of frames up
+#'   the calling stack in which to evaluate any custom matrices
 #' @param ... further arguments passed to \code{economizeMatrix}.
 #' @return A list containing some or all of the components \code{D} (incidence matrix),
 #'  \code{Q} (precision matrix) and \code{R} (restriction matrix).
-compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2remove=NULL, remove.redundant.R.cols=TRUE, ...) {
+compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2remove=NULL,
+                                  remove.redundant.R.cols=TRUE, enclos=.GlobalEnv, n.parent=1L, ...) {
   out <- list()
   if (!D && !Q && !R) return(out)
-  if (D || Q) {
-    DQ <- CdiagU(1L)  # computations of D and Q are similar
-  }
+  if (D || Q) DQ <- CdiagU(1L)
   if (R) {
     out$R <- NULL
     nIGMRF <- 0L  # number of (singular) IGMRF factors
@@ -248,7 +284,7 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
     if (Q) out$Q <- DQ
     return(out)
   }
-  factor.info <- get_factor_info(factor, data)
+  factor.info <- get_factor_info(factor, data, enclos=enclos)
   fs <- as.list(attr(terms(factor), "variables"))[-1L]
   for (f in seq_len(nrow(factor.info))) {
     fcall <- fs[[f]]
@@ -265,7 +301,7 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
       Rcall <- fcall
       Rcall[[1L]] <- as.name(paste0("R_", Rcall[[1L]]))
     }
-    # NB partial matching by `$`, safe enough for us?
+    # NB partial matching by `$`, safe enough?
     switch(factor.info$types[f],
       spline = {
         penalty <- fcall$penalty
@@ -304,26 +340,29 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
       custom = {
         if (D || Q) {
           if (D) {
-            if (is.null(DQcall$D)) stop("missing argument 'D' in custom factor")
-            DQf <- economizeMatrix(eval(DQcall$D), sparse=TRUE)
+            if (is.null(DQcall[["D"]])) stop("missing argument 'D' in custom factor")
+            DQf <- economizeMatrix(eval(DQcall[["D"]], parent.frame(n.parent)), sparse=TRUE)
+            if (!is.null(DQcall[["Q"]])) warning("argument 'Q' in custom() ignored", immediate.=TRUE)
+          } else if (is.null(DQcall[["Q"]])) {
+            if (is.null(DQcall[["D"]])) stop("custom factor must specify either incidence matrix 'D' or precision matrix 'Q'")
+            DQf <- economizeMatrix(crossprod(eval(DQcall[["D"]], parent.frame(n.parent))), sparse=TRUE)
           } else {
-            if (is.null(DQcall$Q)) stop("missing argument 'Q' in custom factor")
-            DQf <- economizeMatrix(eval(DQcall$Q), sparse=TRUE, symmetric=TRUE)
+            DQf <- economizeMatrix(eval(DQcall[["Q"]], parent.frame(n.parent)), sparse=TRUE, symmetric=TRUE)
           }
           if (ncol(DQf) != factor.info$n[f]) stop("custom factor matrix has unexpected number of columns")
         }
         if (R) {
-          if (!is.null(Rcall$R)) {
-            Rf <- economizeMatrix(eval(Rcall$R), allow.tabMatrix=FALSE)
-            if (dim(Rf)[1L] != factor.info$n[f]) stop("wrong dimension of custom restriction matrix")
-            if (isTRUE(Rcall$derive.constraints)) warning("argument 'derive.constraints' ignored as restriction matrix 'R' is specified")
-          } else {
-            if (isTRUE(Rcall$derive.constraints)) {
+          if (is.null(Rcall[["R"]])) {
+            if (isTRUE(Rcall[["derive.constraints"]])) {
               if (!D && !Q) warning("cannot derive constraints as custom incidence or precision matrix unavailable")
               Rf <- derive_constraints(if (D) crossprod(DQf) else DQf)
             } else {
               Rf <- NULL
             }
+          } else {
+            Rf <- economizeMatrix(eval(Rcall[["R"]], parent.frame(n.parent)), allow.tabMatrix=FALSE)
+            if (dim(Rf)[1L] != factor.info$n[f]) stop("wrong dimension of custom restriction matrix")
+            if (isTRUE(Rcall[["derive.constraints"]])) warning("argument 'derive.constraints' ignored as restriction matrix 'R' is specified")
           }
         }
       },
@@ -381,7 +420,7 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
 }
 
 #######
-# functions to compute sparse precision matrices Q_
+# functions to compute sparse precision matrices Q_, incidence matrices D_
 #   and for IGMRFs associated constraint matrices R_
 
 #' Correlation structures
@@ -391,10 +430,17 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
 #' a set of linear constraints to be imposed on the coefficient vector.
 #' \describe{
 #'   \item{iid(f)}{Independent effects corresponding to the levels of factor \code{f}.}
-#'   \item{RW1(f, circular=FALSE)}{First-order random walk.}
+#'   \item{RW1(f, circular=FALSE, w=NULL)}{First-order random walk over the levels of factor \code{f}.
+#'     The random walk can be made circular and different (fixed) weights can be attached to the innovations.
+#'     If specified, \code{w} must be a positive numeric vector of length one less than the number of
+#'     factor levels. For example, if the levels correspond to different times, it would often be
+#'     reasonable to choose \code{w} proportional to the reciprocal time differences. For equidistant
+#'     times there is generally no need to specify \code{w}.}
 #'   \item{RW2(f)}{Second-order random walk.}
-#'   \item{AR1(f, phi)}{First-order autoregressive correlation structure among the levels of \code{f}.
-#'     Required argument \code{phi} (fixed number for now).}
+#'   \item{AR1(f, phi, w=NULL)}{First-order autoregressive correlation structure among
+#'     the levels of \code{f}. Required argument is the (fixed) autoregressive parameter \code{phi}.
+#'     For irregularly spaced AR(1) processes weights can be specified, in the same way as for
+#'     \code{RW1}.}
 #'   \item{season(f, period)}{Dummy seasonal with period \code{period}.}
 #'   \item{spatial(f, poly.df, snap, queen, derive.constraints=FALSE)}{CAR spatial correlation.
 #'     Argument \code{poly.df} should be an object of class \code{SpatialPolygonsDataFrame} obtained
@@ -402,46 +448,99 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
 #'     package \pkg{maptools}. Arguments \code{snap} and \code{queen} are passed to \code{\link[spdep]{poly2nb}}.
 #'     If \code{derive.constraints=TRUE} the constraint matrix for an IGMRF model component
 #'     is formed by computing the singular vectors of the precision matrix.}
-#'   \item{custom(f, QD)}{A custom precision or incidence matrix associated with factor f can be passed to argument \code{QD}.}
+#'   \item{custom(f, D=NULL, Q=NULL, R=NULL, derive.constraints=NULL)}{Either a custom precision or incidence
+#'     matrix associated with factor f can be passed to argument \code{Q} or \code{D}. Optionally a
+#'     constraint matrix can be supplied as \code{R}, or constraints can be derived from the null space
+#'     of the precision matrix by setting \code{derive.constraints=TRUE}.}
 #' }
 #' @name correlation
+#' @references
+#'  B. Allevius (2018).
+#'    On the precision matrix of an irregularly sampled AR(1) process.
+#'    arXiv:1801.03791.
+#'  H. Rue and L. Held (2005).
+#'    Gaussian Markov Random Fields.
+#'    Chapman & Hall/CRC.
 NULL
 
-D_iid <- Q_iid <- function(n) {
-  CdiagU(n)
-}
+D_iid <- Q_iid <- function(n) CdiagU(n)
 
-Q_AR1 <- function(n, phi) {
+# use weights w for irregular spacing, see Allevius 2018 research report
+Q_AR1 <- function(n, phi, w=NULL) {
   if (n < 2L) stop("AR1 model needs a sequence of at least 2 periods")
-  bandSparse(n, n, 0:1, list(c(1, rep.int(1 + phi^2, n-2L), 1), rep.int(-phi, n-1L)), symmetric=TRUE)
+  if (is.null(w)) {
+    bandSparse(n, n, 0:1, list(c(1, rep.int(1 + phi^2, n-2L), 1), rep.int(-phi, n-1L)), symmetric=TRUE)
+  } else {
+    # w_i to be interpreted as 1/(t_{i+1} - t_{i})
+    w <- as.numeric(w)
+    if (any(w <= 0) || length(w) != n-1L) stop("w must be a positive vector of length n-1")
+    phi2 <- phi^2
+    iw <- 1/w
+    d0 <- vector("numeric", n)
+    d0[1L] <- (1 - phi2) / (1 - phi2^iw[1L])
+    d0[2:(n-1L)] <- (1 - phi2)*(1 - phi2^(iw[1:(n-2L)] + iw[2:(n-1L)])) / ((1 - phi2^iw[1:(n-2L)])*(1 - phi2^iw[2:(n-1L)]))
+    d0[n] <- (1 - phi2) / (1 - phi2^iw[n-1L])
+    d1 <- - (1 - phi2) * phi^iw / (1 - phi2^iw)
+    bandSparse(n, n, 0:1, list(d0, d1), symmetric=TRUE)
+  }
 }
 
-D_AR1 <- function(n, phi) {
+D_AR1 <- function(n, phi, w=NULL) {
   if (n < 2L) stop("AR1 model needs a sequence of at least 2 periods")
-  # non-singular precision matrix, so quite different from RW1; what's the intuition here?
-  as(bandSparse(n, n, 0:1, list(c(rep.int(1, n-1L), sqrt(1 - phi^2)), rep.int(-phi, n-1L))), "dgCMatrix")
+  if (is.null(w)) {
+    as(bandSparse(n, n, 0:1, list(c(rep.int(1, n-1L), sqrt(1 - phi^2)), rep.int(-phi, n-1L))), "dgCMatrix")
+  } else {
+    # w_i to be interpreted as 1/(t_{i+1} - t_{i})
+    w <- as.numeric(w)
+    if (any(w <= 0) || length(w) != n-1L) stop("w must be a positive vector of length n-1")
+    phi2 <- phi^2
+    iw <- 1/w
+    d0 <- c(sqrt((1 - phi2)/(1 - phi2^iw)), sqrt(1 - phi2))
+    d1 <- - sqrt((1 - phi2)/(1 - phi2^iw)) * phi^iw
+    as(bandSparse(n, n, 0:1, list(d0, d1)), "dgCMatrix")
+  }
 }
 
-Q_RW1 <- function(n, circular=FALSE) {
+Q_RW1 <- function(n, circular=FALSE, w=NULL) {
   if (n < 2L) stop("RW1 model needs a sequence of at least 2 periods")
-  if (circular)
-    bandSparse(n, n, c(0L, 1L, n - 1L), list(rep.int(2, n), rep.int(-1, n-1L), -1L), symmetric=TRUE)
-  else
-    bandSparse(n, n, 0:1, list(c(1, rep.int(2, n-2L), 1), rep.int(-1, n-1L)), symmetric=TRUE)
+  if (is.null(w)) {
+    if (circular)
+      bandSparse(n, n, c(0L, 1L, n-1L), list(rep.int(2, n), rep.int(-1, n-1L), -1L), symmetric=TRUE)
+    else
+      bandSparse(n, n, 0:1, list(c(1, rep.int(2, n-2L), 1), rep.int(-1, n-1L)), symmetric=TRUE)
+  } else {
+    w <- as.numeric(w)
+    if (any(w <= 0) || length(w) != n-1L) stop("w must be a positive vector of length n-1")
+    if (circular) {
+      bandSparse(n, n, c(0L, 1L, n-1L), list(c(w, w[n-1L]) + c(w[n-1L], w), rep.int(-w, n-1L), -w[n-1L]), symmetric=TRUE)
+    } else {
+      d0 <- c(w, w[n-1L])
+      d0[2:(n-1L)] <- d0[2:(n-1L)] + w[1:(n-2L)]
+      bandSparse(n, n, 0:1, list(d0, rep.int(-w, n-1L)), symmetric=TRUE)
+    }
+  }
 }
 
 # incidence matrix for first-order random walk
-D_RW1 <- function(n, circular=FALSE) {
+D_RW1 <- function(n, w=NULL, circular=FALSE) {
   if (n < 2L) stop("RW1 model needs a sequence of at least 2 periods")
-  if (circular)
-    bandSparse(n, n, c(0L, 1L, 1L - n), list(rep.int(-1, n), rep.int(1, n), 1))
-  else
-    bandSparse(n - 1L, n, 0:1, list(rep.int(-1, n-1L), rep.int(1, n-1L)))
+  if (is.null(w)) {
+    if (circular)
+      bandSparse(n, n, c(0L, 1L, 1L-n), list(rep.int(-1, n), rep.int(1, n), 1))
+    else
+      bandSparse(n-1L, n, 0:1, list(rep.int(-1, n-1L), rep.int(1, n-1L)))
+  } else {
+    w <- as.numeric(w)
+    if (any(w <= 0) || length(w) != n-1L) stop("w must be a positive vector of length n-1")
+    sqrt.w <- sqrt(w)
+    if (circular)
+      bandSparse(n, n, c(0L, 1L, 1L-n), list(-c(sqrt.w, sqrt.w[n-1L]), c(sqrt.w, sqrt.w[n-1L]), sqrt.w[n-1L]))
+    else
+      bandSparse(n - 1L, n, 0:1, list(-sqrt.w, sqrt.w))
+  }
 }
 
-R_RW1 <- function(n) {
-  matrix(1, n, 1L)
-}
+R_RW1 <- function(n, w=NULL, circular=FALSE) matrix(1, n, 1L)
 
 Q_RW2 <- function(n) {
   if (n < 4L) stop("RW2 model needs a sequence of at least 4 periods")
@@ -585,17 +684,17 @@ is_proper_GMRF <- function(mc) {
 }
 
 # fast GMRF prior not possible for spatial as typically n_edges > n_vertices
-# fast GMRF prior currently only used for IGMRFs
 # fast GMRF prior only if any custom factor has (incidence) matrix D specified
+# fast GMRF prior currently only used for IGMRFs
 allow_fastGMRFprior <- function(mc) {
   if (is.null(mc$factor)) return(FALSE)
-  Qtypes <- sapply(attr(terms(mc$factor), "variables")[-1L], function(x) if (is.symbol(x)) "iid" else as.character(x[[1L]]))
+  factors <- attr(terms(mc$factor), "variables")
+  Qtypes <- sapply(factors[-1L], function(x) if (is.symbol(x)) "iid" else as.character(x[[1L]]))
   if (mc$Leroux_type != "none" || all(Qtypes %in% c("iid", "AR1"))) return(FALSE)
   if (any(Qtypes %in% "spatial")) return(FALSE)
-  custom_types <- which(Qtypes == "custom")
-  if (!length(custom_types)) return(TRUE)
-  for (f in custom_types)
-    if (is.null(attr(terms(mc$factor), "variables")[[f + 1L]]$D)) return(FALSE)
+  if (any(sapply(factors[-1L], function(x) !is.symbol(x) && isTRUE(x$circular)))) return(FALSE)
+  for (f in which(Qtypes == "custom"))
+    if (is.null(factors[[f + 1L]]$D)) return(FALSE)
   TRUE
 }
 

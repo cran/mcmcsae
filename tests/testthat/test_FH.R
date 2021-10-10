@@ -53,5 +53,5 @@ test_that("FH model with unit sampling variances runs", {
     sigma.fixed=TRUE, data=df
   )
   sim <- MCMCsim(sampler, n.iter=250, burnin=100, n.chain=2, verbose=FALSE)
-  expect_is(sim, "draws")
+  expect_is(sim, "mcdraws")
 })

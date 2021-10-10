@@ -182,13 +182,35 @@ gen <- function(formula = ~ 1, factor=NULL,
   }
   Leroux_update <- Leroux_type %in% c("general", "default")
 
+  varnames <- factor.cols.removed <- NULL
   if (is.null(X)) {
-    X <- compute_X(formula, factor, remove.redundant=remove.redundant,
-      drop.empty.levels=drop.empty.levels, sparse=sparse, data=e$data)
-    factor.cols.removed <- attr(X, "factor.cols.removed")
-    if (!is.null(factor.cols.removed)) attr(X, "factor.cols.removed") <- NULL
-  } else {
-    factor.cols.removed <- NULL
+    has.factor <- inherits(factor, "formula") && !intercept_only(factor)
+    XA <- NULL
+    if (e$family$family == "multinomial") {
+      edat <- new.env(parent = .GlobalEnv)
+      X0 <- NULL
+      for (k in seq_len(e$Km1)) {
+        edat$cat_ <- factor(rep.int(e$cats[k], e$n0), levels=e$cats[-length(e$cats)])
+        X0 <- rbind(X0, model_matrix(formula, e$data, sparse=sparse, enclos=edat))
+        if (has.factor) XA <- rbind(XA, compute_XA(factor, e$data, enclos=edat))
+      }
+      rm(edat)
+    } else {
+      X0 <- model_matrix(formula, e$data, sparse=sparse)
+      if (has.factor) XA <- compute_XA(factor, e$data)
+    }
+    if (remove.redundant) X0 <- remove_redundancy(X0)
+    varnames <- colnames(X0)
+    if (has.factor) {
+      if (drop.empty.levels) {
+        factor.cols.removed <- which(zero_col(XA))
+        if (length(factor.cols.removed)) XA <- XA[, -factor.cols.removed]
+      }
+      X <- combine_X0_XA(X0, XA)
+    } else {
+      X <- X0
+    }
+    rm(has.factor, X0, XA)
   }
   if (nrow(X) != e$n) stop("design matrix with incompatible number of rows")
   e$coef.names[[name]] <- colnames(X)
@@ -204,12 +226,19 @@ gen <- function(formula = ~ 1, factor=NULL,
   # NB constr currently only refers to QA, not Q0
   if (is.null(constr)) constr <- !is_proper_GMRF(self)
   if (is.null(GMRFmats)) {
+    if (e$family$family == "multinomial") {
+      edat <- new.env(parent = .GlobalEnv)
+      edat$cat_ <- e$cats[-length(e$cats)]  # K-1 categories; TODO for general GMRF prediction need all K categories?
+    } else {
+      edat <- .GlobalEnv
+    }
     GMRFmats <- compute_GMRF_matrices(factor, e$data,
       D=fastGMRFprior || !is.null(priorA),
       Q=!(fastGMRFprior || !is.null(priorA)),
       R=constr, sparse=if (in_block) TRUE else NULL,
-      cols2remove=factor.cols.removed, drop.zeros=TRUE
+      cols2remove=factor.cols.removed, drop.zeros=TRUE, enclos=edat, n.parent=2L
     )
+    rm(edat)
   }
   if (fastGMRFprior || !is.null(priorA)) {  # compute lD x l matrix DA
     DA <- GMRFmats$D
@@ -238,12 +267,18 @@ gen <- function(formula = ~ 1, factor=NULL,
 
   if (q0 == 1L) {
     var <- "scalar"  # single varying effect
-  } else {
-    if (is.null(var))
-      if (l == 1L) 
-        var <- "diagonal"  # single group, default ARD prior
-      else
-        var <- "unstructured"
+  } else if (is.null(var)) {
+    if (l == 1L)
+      var <- "diagonal"  # single group, default ARD prior
+    else if (q0 <= 1000L)
+      var <- "unstructured"
+    else {
+      warning("model component '", name, "': default variance structure changed
+        to 'diagonal' because of the large number ", q0, " of varying effects.
+        If you instead intend to model a full covariance matrix among all varying effects,
+        use var='unstructured', though it may be very slow.", immediate.=TRUE)
+      var <- "diagonal"
+    }
   }
 
   PX.defaults <- list(mu0=0, Q0=1, data.scale=TRUE, vector=var %in% c("diagonal", "unstructured"), sparse=NULL)
@@ -326,12 +361,8 @@ gen <- function(formula = ~ 1, factor=NULL,
   rm(R0, GMRFmats)
 
   # construct inequality restriction matrix (TODO S instead of S0, SA)
-  if (!is.null(S0)) {
-    if (nrow(S0) != q0) stop("incompatible matrix S0")
-  }
-  if (!is.null(SA)) {
-    if (nrow(SA) != l) stop("incompatible matrix SA")
-  }
+  if (!is.null(S0) && nrow(S0) != q0) stop("incompatible matrix S0")
+  if (!is.null(SA) && nrow(SA) != l) stop("incompatible matrix SA")
   S <- switch(paste0(is.null(SA), is.null(S0)),
     TRUETRUE = NULL,
     TRUEFALSE = kronecker(CdiagU(l), S0),
@@ -417,18 +448,13 @@ gen <- function(formula = ~ 1, factor=NULL,
   }
 
   # for both memory and speed efficiency define unit_Q case (random intercept and random slope with scalar var components, no constraints)
-  unit_Q <- is.null(priorA) && isUnitDiag(QA) && (var == "scalar" && is.null(Q0)) && !constr
+  #unit_Q <- is.null(priorA) && isUnitDiag(QA) && (var == "scalar" && is.null(Q0)) && !constr
+  unit_Q <- is.null(priorA) && isUnitDiag(QA) && (var == "scalar" && is.null(Q0)) && is.null(R)
 
   name_sigma <- paste0(name, "_sigma")
   if (var == "unstructured") name_rho <- paste0(name, "_rho")
 
   if (q0 > 1L) {  # add labels for sigma, rho, xi to e$coef.names
-    varnames <- try(colnames(model_Matrix(formula, e$data[1L, , drop=FALSE], remove.redundant=remove.redundant, sparse=sparse)), silent=TRUE)
-    if (inherits(varnames, "try-error")) {
-      # something wrong, which can happen for formulas like ~as.factor(area), as well as for character variables --> use full dataset
-      # TODO function that uses full dataset but only returns colnames
-      varnames <- colnames(model_Matrix(formula, e$data, remove.redundant=remove.redundant, sparse=sparse))
-    }
     if (var %in% c("unstructured", "diagonal") || (usePX && PX$vector)) {
       e$coef.names[[name_sigma]] <- varnames
       if (var == "unstructured")
@@ -443,8 +469,39 @@ gen <- function(formula = ~ 1, factor=NULL,
         e$coef.names[[name_gl]] <- as.vector(outer(varnames, e$coef.names[[name_gl]], FUN=paste, sep=":"))
     }
   }
+  rm(varnames)
 
   linpred <- function(p) X %m*v% p[[name]]
+
+  make_predict <- function(newdata) {
+    nnew <- nrow(newdata)
+    has.factor <- inherits(factor, "formula") && !intercept_only(factor)
+    if (e$family$family == "multinomial") {
+      edat <- new.env(parent = .GlobalEnv)
+      X0 <- NULL
+      if (has.factor) XA <- NULL
+      for (k in seq_len(e$Km1)) {
+        edat$cat_ <- factor(rep.int(e$cats[k], nnew), levels=e$cats[-length(e$cats)])
+        X0 <- rbind(X0, model_matrix(formula, data=newdata, sparse=sparse, enclos=edat))
+        if (has.factor) XA <- rbind(XA, compute_XA(factor, newdata, enclos=edat))
+      }
+      rm(edat)
+    } else {
+      X0 <- model_matrix(formula, newdata, sparse=sparse)
+      if (has.factor) XA <- compute_XA(factor, newdata)
+    }
+    if (has.factor)
+      Xnew <- combine_X0_XA(X0, XA)
+    else
+      Xnew <- X0
+    # for prediction do not (automatically) remove redundant columns!
+    if (remove.redundant || drop.empty.levels)
+      Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
+    # check that X has the right number of columns
+    if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
+    # TODO check the category names as well; allow oos categories; insert missing categories in newdata
+    economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE)
+  }
 
   if (gl) {  # group-level covariates
     glp <- eval(glp)
@@ -526,7 +583,7 @@ gen <- function(formula = ~ 1, factor=NULL,
 
   # draw coefficient from prior
   if (unit_Q) {  # slightly faster alternative for random intercept models (or random slope with scalar variance)
-    rprior <- add(rprior, bquote(p[[.(name)]] <- rnorm(.(q), sd=p[[.(name_sigma)]])))
+    rprior <- add(rprior, bquote(p[[.(name)]] <- Crnorm(.(q), sd=p[[.(name_sigma)]])))
   } else {
     if (fastGMRFprior) {
       rGMRFprior <- NULL  # to be created at the first occasion rprior is called
@@ -793,6 +850,10 @@ gen <- function(formula = ~ 1, factor=NULL,
     # store Qraw for next iteration -> saves reconstructing it from sigma, rho, xi
     draw <- add(draw, bquote(p[[.(name_Qraw)]] <- Qraw))
   }
+  if (!is.null(e$control$CG)) {
+    name_Qv <- paste0(name, "_Qv_")
+    draw <- add(draw, bquote(p[[.(name_Qv)]] <- Qv))
+  }
 
   # draw coefficients
   if (gl) {
@@ -837,13 +898,13 @@ gen <- function(formula = ~ 1, factor=NULL,
   if (!in_block) {
     if (gl) {
       # TODO conditional sampling if one of p[[.(name)]] and p[[.(name_gl)]] is provided
-      start <- add(start, bquote(coef <- MVNsampler$start(p, .(e$scale_y))[[.(name)]]))
+      start <- add(start, bquote(coef <- MVNsampler$start(p, e$scale_sigma)[[.(name)]]))
       #if (!is.null(glp$R))
       #  start <- add(start, quote(coef <- constrain_cholQ(coef, ops$ch, glp$R)))
       start <- add(start, bquote(if (is.null(p[[.(name)]])) p[[.(name)]] <- coef[i.v]))
       start <- add(start, bquote(if (is.null(p[[.(name_gl)]])) p[[.(name_gl)]] <- coef[i.alpha]))
     } else {
-      start <- add(start, bquote(if (is.null(p[[.(name)]])) p[[.(name)]] <- MVNsampler$start(p, .(e$scale_y))[[.(name)]]))
+      start <- add(start, bquote(if (is.null(p[[.(name)]])) p[[.(name)]] <- MVNsampler$start(p, e$scale_sigma)[[.(name)]]))
     }
   }
 

@@ -6,14 +6,15 @@
 \usage{
 model_matrix(
   formula,
-  data = environment(formula),
+  data = NULL,
   contrasts.arg = NULL,
   drop.unused.levels = FALSE,
   sparse = NULL,
   drop0 = TRUE,
   catsep = "",
   by = NULL,
-  tabM = FALSE
+  tabM = FALSE,
+  enclos = .GlobalEnv
 )
 }
 \arguments{
@@ -40,6 +41,8 @@ By default it is the empty string, reproducing the labels of \code{model.matrix}
 \item{by}{a vector by which to aggregate the result.}
 
 \item{tabM}{if \code{TRUE} return a list of tabMatrix objects.}
+
+\item{enclos}{enclosure to look for objects not found in \code{data}.}
 }
 \value{
 Design matrix X, either an ordinary matrix or a sparse \code{dgCMatrix}.

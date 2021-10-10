@@ -6,6 +6,11 @@
 
 using namespace Rcpp;
 
+#ifdef RCPP_USE_GLOBAL_ROSTREAM
+Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
+Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
+#endif
+
 // Crtuvn
 double Crtuvn(const double l, const double u);
 RcppExport SEXP _mcmcsae_Crtuvn(SEXP lSEXP, SEXP uSEXP) {
@@ -163,13 +168,13 @@ BEGIN_RCPP
 END_RCPP
 }
 // CrCRT
-IntegerVector CrCRT(const NumericVector& y, const double r, const int m);
+IntegerVector CrCRT(const NumericVector& y, const NumericVector& r, const int m);
 RcppExport SEXP _mcmcsae_CrCRT(SEXP ySEXP, SEXP rSEXP, SEXP mSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const NumericVector& >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const double >::type r(rSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type r(rSEXP);
     Rcpp::traits::input_parameter< const int >::type m(mSEXP);
     rcpp_result_gen = Rcpp::wrap(CrCRT(y, r, m));
     return rcpp_result_gen;
@@ -307,58 +312,58 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// Cmatmat
-Eigen::MatrixXd Cmatmat(const Eigen::Map<Eigen::MatrixXd>& A, const Eigen::Map<Eigen::MatrixXd>& B);
-RcppExport SEXP _mcmcsae_Cmatmat(SEXP ASEXP, SEXP BSEXP) {
+// Cdense_dense_prod
+Eigen::MatrixXd Cdense_dense_prod(const Eigen::Map<Eigen::MatrixXd>& A, const Eigen::Map<Eigen::MatrixXd>& B);
+RcppExport SEXP _mcmcsae_Cdense_dense_prod(SEXP ASEXP, SEXP BSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type A(ASEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type B(BSEXP);
-    rcpp_result_gen = Rcpp::wrap(Cmatmat(A, B));
+    rcpp_result_gen = Rcpp::wrap(Cdense_dense_prod(A, B));
     return rcpp_result_gen;
 END_RCPP
 }
-// Csparse_matrix_prod
-Eigen::MatrixXd Csparse_matrix_prod(const Eigen::MappedSparseMatrix<double>& A, const Eigen::Map<Eigen::MatrixXd>& y);
-RcppExport SEXP _mcmcsae_Csparse_matrix_prod(SEXP ASEXP, SEXP ySEXP) {
+// Csparse_dense_prod
+Eigen::MatrixXd Csparse_dense_prod(const Eigen::MappedSparseMatrix<double>& A, const Eigen::Map<Eigen::MatrixXd>& y);
+RcppExport SEXP _mcmcsae_Csparse_dense_prod(SEXP ASEXP, SEXP ySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::traits::input_parameter< const Eigen::MappedSparseMatrix<double>& >::type A(ASEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type y(ySEXP);
-    rcpp_result_gen = Rcpp::wrap(Csparse_matrix_prod(A, y));
+    rcpp_result_gen = Rcpp::wrap(Csparse_dense_prod(A, y));
     return rcpp_result_gen;
 END_RCPP
 }
-// Cmatrix_sparse_prod
-Eigen::MatrixXd Cmatrix_sparse_prod(const Eigen::Map<Eigen::MatrixXd>& A, const Eigen::MappedSparseMatrix<double>& B);
-RcppExport SEXP _mcmcsae_Cmatrix_sparse_prod(SEXP ASEXP, SEXP BSEXP) {
+// Cdense_sparse_prod
+Eigen::MatrixXd Cdense_sparse_prod(const Eigen::Map<Eigen::MatrixXd>& A, const Eigen::MappedSparseMatrix<double>& B);
+RcppExport SEXP _mcmcsae_Cdense_sparse_prod(SEXP ASEXP, SEXP BSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type A(ASEXP);
     Rcpp::traits::input_parameter< const Eigen::MappedSparseMatrix<double>& >::type B(BSEXP);
-    rcpp_result_gen = Rcpp::wrap(Cmatrix_sparse_prod(A, B));
+    rcpp_result_gen = Rcpp::wrap(Cdense_sparse_prod(A, B));
     return rcpp_result_gen;
 END_RCPP
 }
-// CsparseS_matrix_prod
-Eigen::MatrixXd CsparseS_matrix_prod(const Eigen::MappedSparseMatrix<double>& A, const Eigen::Map<Eigen::MatrixXd>& y);
-RcppExport SEXP _mcmcsae_CsparseS_matrix_prod(SEXP ASEXP, SEXP ySEXP) {
+// CsparseS_dense_prod
+Eigen::MatrixXd CsparseS_dense_prod(const Eigen::MappedSparseMatrix<double>& A, const Eigen::Map<Eigen::MatrixXd>& y);
+RcppExport SEXP _mcmcsae_CsparseS_dense_prod(SEXP ASEXP, SEXP ySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::traits::input_parameter< const Eigen::MappedSparseMatrix<double>& >::type A(ASEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type y(ySEXP);
-    rcpp_result_gen = Rcpp::wrap(CsparseS_matrix_prod(A, y));
+    rcpp_result_gen = Rcpp::wrap(CsparseS_dense_prod(A, y));
     return rcpp_result_gen;
 END_RCPP
 }
-// Cmatrix_sparseS_prod
-Eigen::MatrixXd Cmatrix_sparseS_prod(const Eigen::Map<Eigen::MatrixXd>& M, const Eigen::MappedSparseMatrix<double>& Q);
-RcppExport SEXP _mcmcsae_Cmatrix_sparseS_prod(SEXP MSEXP, SEXP QSEXP) {
+// Cdense_sparseS_prod
+Eigen::MatrixXd Cdense_sparseS_prod(const Eigen::Map<Eigen::MatrixXd>& M, const Eigen::MappedSparseMatrix<double>& Q);
+RcppExport SEXP _mcmcsae_Cdense_sparseS_prod(SEXP MSEXP, SEXP QSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type M(MSEXP);
     Rcpp::traits::input_parameter< const Eigen::MappedSparseMatrix<double>& >::type Q(QSEXP);
-    rcpp_result_gen = Rcpp::wrap(Cmatrix_sparseS_prod(M, Q));
+    rcpp_result_gen = Rcpp::wrap(Cdense_sparseS_prod(M, Q));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -373,25 +378,58 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// Csparse_matrix_crossprod
-Eigen::MatrixXd Csparse_matrix_crossprod(const Eigen::MappedSparseMatrix<double>& A, const Eigen::Map<Eigen::MatrixXd>& y);
-RcppExport SEXP _mcmcsae_Csparse_matrix_crossprod(SEXP ASEXP, SEXP ySEXP) {
+// Cdense_dense_crossprod
+Eigen::MatrixXd Cdense_dense_crossprod(const Eigen::Map<Eigen::MatrixXd>& A, const Eigen::Map<Eigen::MatrixXd>& B);
+RcppExport SEXP _mcmcsae_Cdense_dense_crossprod(SEXP ASEXP, SEXP BSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< const Eigen::MappedSparseMatrix<double>& >::type A(ASEXP);
-    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type y(ySEXP);
-    rcpp_result_gen = Rcpp::wrap(Csparse_matrix_crossprod(A, y));
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type A(ASEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type B(BSEXP);
+    rcpp_result_gen = Rcpp::wrap(Cdense_dense_crossprod(A, B));
     return rcpp_result_gen;
 END_RCPP
 }
-// Cmatrix_sparse_tcrossprod
-Eigen::MatrixXd Cmatrix_sparse_tcrossprod(const Eigen::Map<Eigen::MatrixXd>& y, const Eigen::MappedSparseMatrix<double>& A);
-RcppExport SEXP _mcmcsae_Cmatrix_sparse_tcrossprod(SEXP ySEXP, SEXP ASEXP) {
+// Csparse_dense_crossprod
+Eigen::MatrixXd Csparse_dense_crossprod(const Eigen::MappedSparseMatrix<double>& A, const Eigen::Map<Eigen::MatrixXd>& B);
+RcppExport SEXP _mcmcsae_Csparse_dense_crossprod(SEXP ASEXP, SEXP BSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< const Eigen::MappedSparseMatrix<double>& >::type A(ASEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type B(BSEXP);
+    rcpp_result_gen = Rcpp::wrap(Csparse_dense_crossprod(A, B));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Cdense_sparse_crossprod
+Eigen::MatrixXd Cdense_sparse_crossprod(const Eigen::Map<Eigen::MatrixXd>& A, const Eigen::MappedSparseMatrix<double>& B);
+RcppExport SEXP _mcmcsae_Cdense_sparse_crossprod(SEXP ASEXP, SEXP BSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type A(ASEXP);
+    Rcpp::traits::input_parameter< const Eigen::MappedSparseMatrix<double>& >::type B(BSEXP);
+    rcpp_result_gen = Rcpp::wrap(Cdense_sparse_crossprod(A, B));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Cdense_diag_crossprod
+Eigen::MatrixXd Cdense_diag_crossprod(const Eigen::Map<Eigen::MatrixXd>& M, const Eigen::Map<Eigen::VectorXd>& d);
+RcppExport SEXP _mcmcsae_Cdense_diag_crossprod(SEXP MSEXP, SEXP dSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type M(MSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type d(dSEXP);
+    rcpp_result_gen = Rcpp::wrap(Cdense_diag_crossprod(M, d));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Cdense_sparse_tcrossprod
+Eigen::MatrixXd Cdense_sparse_tcrossprod(const Eigen::Map<Eigen::MatrixXd>& y, const Eigen::MappedSparseMatrix<double>& A);
+RcppExport SEXP _mcmcsae_Cdense_sparse_tcrossprod(SEXP ySEXP, SEXP ASEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type y(ySEXP);
     Rcpp::traits::input_parameter< const Eigen::MappedSparseMatrix<double>& >::type A(ASEXP);
-    rcpp_result_gen = Rcpp::wrap(Cmatrix_sparse_tcrossprod(y, A));
+    rcpp_result_gen = Rcpp::wrap(Cdense_sparse_tcrossprod(y, A));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -654,25 +692,25 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// Ctab_matrix_prod
-Eigen::MatrixXd Ctab_matrix_prod(const SEXP A, const Eigen::Map<Eigen::MatrixXd>& y);
-RcppExport SEXP _mcmcsae_Ctab_matrix_prod(SEXP ASEXP, SEXP ySEXP) {
+// Ctab_dense_prod
+Eigen::MatrixXd Ctab_dense_prod(const SEXP A, const Eigen::Map<Eigen::MatrixXd>& y);
+RcppExport SEXP _mcmcsae_Ctab_dense_prod(SEXP ASEXP, SEXP ySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::traits::input_parameter< const SEXP >::type A(ASEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type y(ySEXP);
-    rcpp_result_gen = Rcpp::wrap(Ctab_matrix_prod(A, y));
+    rcpp_result_gen = Rcpp::wrap(Ctab_dense_prod(A, y));
     return rcpp_result_gen;
 END_RCPP
 }
-// Cmatrix_tab_tcrossprod
-Eigen::MatrixXd Cmatrix_tab_tcrossprod(const Eigen::Map<Eigen::MatrixXd>& y, const SEXP A);
-RcppExport SEXP _mcmcsae_Cmatrix_tab_tcrossprod(SEXP ySEXP, SEXP ASEXP) {
+// Cdense_tab_tcrossprod
+Eigen::MatrixXd Cdense_tab_tcrossprod(const Eigen::Map<Eigen::MatrixXd>& y, const SEXP A);
+RcppExport SEXP _mcmcsae_Cdense_tab_tcrossprod(SEXP ySEXP, SEXP ASEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type y(ySEXP);
     Rcpp::traits::input_parameter< const SEXP >::type A(ASEXP);
-    rcpp_result_gen = Rcpp::wrap(Cmatrix_tab_tcrossprod(y, A));
+    rcpp_result_gen = Rcpp::wrap(Cdense_tab_tcrossprod(y, A));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -687,14 +725,14 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// Ctab_matrix_crossprod
-NumericMatrix Ctab_matrix_crossprod(const SEXP A, const NumericMatrix& y);
-RcppExport SEXP _mcmcsae_Ctab_matrix_crossprod(SEXP ASEXP, SEXP ySEXP) {
+// Ctab_dense_crossprod
+NumericMatrix Ctab_dense_crossprod(const SEXP A, const NumericMatrix& y);
+RcppExport SEXP _mcmcsae_Ctab_dense_crossprod(SEXP ASEXP, SEXP ySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::traits::input_parameter< const SEXP >::type A(ASEXP);
     Rcpp::traits::input_parameter< const NumericMatrix& >::type y(ySEXP);
-    rcpp_result_gen = Rcpp::wrap(Ctab_matrix_crossprod(A, y));
+    rcpp_result_gen = Rcpp::wrap(Ctab_dense_crossprod(A, y));
     return rcpp_result_gen;
 END_RCPP
 }

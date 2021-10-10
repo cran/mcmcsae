@@ -5,20 +5,20 @@
 \alias{model-information-criteria}
 \alias{compute_DIC}
 \alias{compute_WAIC}
-\alias{waic.draws}
-\alias{loo.draws}
+\alias{waic.mcdraws}
+\alias{loo.mcdraws}
 \title{Compute DIC, WAIC and leave-one-out cross-validation model measures}
 \usage{
 compute_DIC(x, use.pV = FALSE)
 
 compute_WAIC(x, diagnostic = FALSE, batch.size = NULL, show.progress = TRUE)
 
-\method{waic}{draws}(x, by.unit = FALSE, ...)
+\method{waic}{mcdraws}(x, by.unit = FALSE, ...)
 
-\method{loo}{draws}(x, r_eff = FALSE, n.cores = 1L, ...)
+\method{loo}{mcdraws}(x, by.unit = FALSE, r_eff = FALSE, n.cores = 1L, ...)
 }
 \arguments{
-\item{x}{an object of class \code{draws}.}
+\item{x}{an object of class \code{mcdraws}.}
 
 \item{use.pV}{whether half the posterior variance of the deviance should be used
 as an alternative estimate of the effective number of model parameters for DIC.}
@@ -34,7 +34,7 @@ contributions to the WAIC effective number of model parameters should be returne
 slower but uses much less memory.}
 
 \item{...}{Other arguments, passed to \code{\link[loo]{loo}}. Not currently
-used by \code{waic.draws}.}
+used by \code{waic.mcdraws}.}
 
 \item{r_eff}{whether to compute relative effective sample size estimates
 for the likelihood of each observation. This takes more time, but should
@@ -54,9 +54,9 @@ For \code{compute_DIC} a vector with the deviance information criterion and
 \description{
 Compute the Deviance Information Criterion (DIC) or
 Watanabe-Akaike Information Criterion (WAIC) from an
-object of class \code{draws} output by \code{\link{MCMCsim}}.
-Method \code{waic.draws} computes WAIC using package \pkg{loo}.
-Method \code{loo.draws} also depends on package \pkg{loo} to compute
+object of class \code{mcdraws} output by \code{\link{MCMCsim}}.
+Method \code{waic.mcdraws} computes WAIC using package \pkg{loo}.
+Method \code{loo.mcdraws} also depends on package \pkg{loo} to compute
 a Pareto-smoothed importance sampling (PSIS) approximation
 to leave-one-out cross-validation.
 }
@@ -90,13 +90,15 @@ D. Spiegelhalter, N. Best, B. Carlin and A. van der Linde (2002).
 
  A. Vehtari, A. Gelman and J. Gabry (2015).
    Pareto smoothed importance sampling.
-   arXiv preprint arXiv:1507.02646.
+   arXiv:1507.02646.
 
  A. Vehtari, A. Gelman and J. Gabry (2017).
-   Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC.
+   Practical Bayesian model evaluation using leave-one-out cross-validation
+   and WAIC.
    Statistics and Computing 27, 1413-1432.
 
- P.-C. Buerkner, J. Gabry and A. Vehtari (2019).
-   Bayesian leave-one-out cross-validation for non-factorizable normal models.
-   arXiv:1810.10559v3.
+ P.-C. Buerkner, J. Gabry and A. Vehtari (2020).
+   Efficient leave-one-out cross-validation for Bayesian non-factorized
+   normal and Student-t models.
+   arXiv:1810.10559.
 }

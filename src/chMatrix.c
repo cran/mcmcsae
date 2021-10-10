@@ -22,7 +22,6 @@ void R_init_mcmcsae(DllInfo *dll) {
   R_useDynamicSymbols(dll, FALSE);
 
   M_R_cholmod_start(&c);
-  c.error_handler = M_R_cholmod_error;
 }
 
 void R_unload_mcmcsae(DllInfo *dll) {
@@ -57,6 +56,8 @@ void chm_set_ordering(const int m) {
 SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP LDL, SEXP super, SEXP Imult, SEXP m) {
   CHM_FR L;
   CHM_SP A = AS_CHM_SP__(a);
+  double beta[2] = {0, 0};
+  beta[0] = asReal(Imult);
   R_CheckStack();
 
   int iSuper = asLogical(super),
@@ -64,8 +65,6 @@ SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP LDL, SEXP super, SEXP Imult, SEXP 
       iLDL   = asLogical(LDL);
   int im     = asInteger(m);
   if ((im < -1) || (im > 3)) error("Cholesky ordering method must be an integer between -1 and 3");
-
-  double dImult = asReal(Imult);
 
   // NA --> let CHOLMOD choose
   if (iSuper == NA_LOGICAL)	iSuper = -1;
@@ -80,7 +79,7 @@ SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP LDL, SEXP super, SEXP Imult, SEXP 
     chm_set_ordering(-1);
   }
   L = M_cholmod_analyze(A, &c);
-  if (!M_cholmod_factorize_p(A, &dImult, (int*)NULL, 0, L, &c))
+  if (!M_cholmod_factorize_p(A, beta, (int*)NULL, 0, L, &c))
     error("Cholesky factorization failed");
 
   return M_chm_factor_to_SEXP(L, 1 /* free */);
@@ -88,25 +87,21 @@ SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP LDL, SEXP super, SEXP Imult, SEXP 
 
 // there is no M_chm_dense_to_SEXP in Matrix_stubs so write it here
 // based on Matrix package's chm_dense_to_matrix in chm_common.c
-SEXP chm_dense_to_matrixSEXP(CHM_DN a, int dofree) {
+SEXP chm_dense_to_matrixSEXP(CHM_DN a) {
   if (a->xtype != CHOLMOD_REAL) error("not a real type cholmod object");
   SEXP ans = PROTECT(allocMatrix(REALSXP, a->nrow, a->ncol));
   Memcpy(REAL(ans), (double *) a->x, a->nrow * a->ncol);
-  if (dofree > 0) {
-    M_cholmod_free_dense(&a, &c);
-  } else if (dofree < 0) Free(a);
+  M_cholmod_free_dense(&a, &c);
   UNPROTECT(1);
   return ans;
 }
 
 // basically chm_dense_to_vector, see chm_common.c of Matrix package
-SEXP chm_dense_to_vectorSEXP(CHM_DN a, int dofree) {
+SEXP chm_dense_to_vectorSEXP(CHM_DN a) {
   if (a->xtype != CHOLMOD_REAL) error("not a real type cholmod object");
   SEXP ans = PROTECT(allocVector(REALSXP, a->nrow * a->ncol));
   Memcpy(REAL(ans), (double *) a->x, a->nrow * a->ncol);
-  if (dofree > 0) {
-    M_cholmod_free_dense(&a, &c);
-  } else if (dofree < 0) Free(a);
+  M_cholmod_free_dense(&a, &c);
   UNPROTECT(1);
   return ans;
 }
@@ -122,8 +117,7 @@ SEXP CHMf_solve(SEXP a, SEXP b, SEXP system) {
 
   if (!(sys--)) error("invalid system argument");
 
-  SEXP ans = chm_dense_to_vectorSEXP(
-    M_cholmod_solve(sys, L, B, &c), 1);
+  SEXP ans = chm_dense_to_vectorSEXP(M_cholmod_solve(sys, L, B, &c));
   return ans;
 }
 
@@ -138,8 +132,7 @@ SEXP CHMf_solve_matrix(SEXP a, SEXP b, SEXP system) {
 
   if (!(sys--)) error("invalid system argument");
 
-  SEXP ans = chm_dense_to_matrixSEXP(
-    M_cholmod_solve(sys, L, B, &c), 1);
+  SEXP ans = chm_dense_to_matrixSEXP(M_cholmod_solve(sys, L, B, &c));
   return ans;
 }
 
@@ -166,7 +159,7 @@ SEXP CHM_update_inplace(SEXP object, SEXP parent, SEXP mult) {
   return R_NilValue;
 }
 
-void CHM_options() { int a=0;
+void CHM_options() {
   Rprintf("/* parameters for symbolic/numeric factorization and update/downdate */ \n");
   Rprintf("dbound = %lf \n", c.dbound);
   Rprintf("grow0 = %lf \n", c.grow0);

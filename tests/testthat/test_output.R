@@ -18,7 +18,7 @@ test_that("output of create_sampler and MCMCsim is as expected", {
   expect_is(get_means(sim), "list")
   expect_is(get_sds(sim), "list")
   summ <- summary(sim)
-  expect_is(summ, "draws_summary")
+  expect_is(summ, "mcdraws_summary")
   expect_true(all(summ$beta[, "Mean"] - coef(lm(y ~ x, data=df)) < 0.1))
   DIC <- compute_DIC(sim)
   expect_true(DIC["p_DIC"] > 2 && DIC["p_DIC"] < 4)

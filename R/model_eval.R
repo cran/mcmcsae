@@ -1,4 +1,4 @@
-#' Extract draws of fitted values or residuals from a draws object
+#' Extract draws of fitted values or residuals from an mcdraws object
 #'
 #' For a model created with \code{\link{create_sampler}} and estimated using \code{\link{MCMCsim}},
 #' these functions return the posterior draws of fitted values or residuals.
@@ -21,7 +21,7 @@
 #' bayesplot::mcmc_intervals(as.matrix(subset(residuals(sim), vars=1:20)))
 #' }
 #'
-#' @param object a draws object.
+#' @param object an object of class \code{mcdraws}.
 #' @param mean.only if \code{TRUE} only the vector of posterior means is returned. In that case
 #'  the subsequent arguments are ignored. Default is \code{FALSE}.
 #' @param units the data units (by default all) for which fitted values or residuals should be
@@ -41,31 +41,31 @@
 NULL
 
 #' @export
-## @method fitted draws
+## @method fitted mcdraws
 #' @rdname residuals-fitted-values
-fitted.draws <- function(object, mean.only=FALSE, units=NULL, chains=seq_len(nchains(object)),
-                         draws=seq_len(ndraws(object)), matrix=FALSE, type=c("link", "response"), ...) {
+fitted.mcdraws <- function(object, mean.only=FALSE, units=NULL, chains=seq_len(nchains(object)),
+                           draws=seq_len(ndraws(object)), matrix=FALSE, type=c("link", "response"), ...) {
   type <- match.arg(type)
   fitted_res(object, mean.only, units, chains, draws, matrix, type, resid=FALSE)
 }
 
 #' @export
-## @method residuals draws
+## @method residuals mcdraws
 #' @rdname residuals-fitted-values
-residuals.draws <- function(object, mean.only=FALSE, units=NULL, chains=seq_len(nchains(object)),
-                            draws=seq_len(ndraws(object)), matrix=FALSE, ...) {
+residuals.mcdraws <- function(object, mean.only=FALSE, units=NULL, chains=seq_len(nchains(object)),
+                              draws=seq_len(ndraws(object)), matrix=FALSE, ...) {
   fitted_res(object, mean.only, units, chains, draws, matrix, type="response", resid=TRUE)
 }
 
-# get fitted values or residuals, internal function
-fitted_res <- function(object, mean.only=FALSE, units=NULL, chains=seq_len(nchains(object)),
-                       draws=seq_len(ndraws(object)), matrix=FALSE, type, resid, ...) {
-  smplr <- object[["_model"]]
-  if (mean.only && (!is.null(object[["e_"]]) || !is.null(object[["_means"]][["e_"]]))) {
+# get fitted values or resduals, internal function
+fitted_res <- function(obj, mean.only=FALSE, units=NULL, chains=seq_len(nchains(obj)),
+                       draws=seq_len(ndraws(obj)), matrix=FALSE, type, resid, ...) {
+  smplr <- obj[["_model"]]
+  if (mean.only && (!is.null(obj[["e_"]]) || !is.null(obj[["_means"]][["e_"]]))) {
     if ((resid && smplr$e.is.res) || (!resid && !smplr$e.is.res))
-      return(get_means(object, "e_")[[1L]])
+      return(get_means(obj, "e_")[[1L]])
     else
-      return(smplr$y - get_means(object, "e_")[[1L]])
+      return(smplr$y - get_means(obj, "e_")[[1L]])
   }
   if (is.null(units)) {
     units <- seq_len(smplr$n)
@@ -73,23 +73,23 @@ fitted_res <- function(object, mean.only=FALSE, units=NULL, chains=seq_len(nchai
   } else {
     all.units <- FALSE
   }
-  if (is.null(object[["e_"]])) {
+  if (is.null(obj[["e_"]])) {
     mc <- smplr$mod[[1L]]
     if (all.units) Xi <- mc$X else Xi <- mc$X[units, , drop=FALSE]
     if (matrix) {
-      out <- tcrossprod(as.matrix.dc(get_from(object[[mc$name]], chains=chains, draws=draws), colnames=FALSE), Xi)
+      out <- tcrossprod(as.matrix.dc(get_from(obj[[mc$name]], chains=chains, draws=draws), colnames=FALSE), Xi)
     } else {
       out <- list()
       for (ch in seq_along(chains))
-        out[[ch]] <- tcrossprod(object[[mc$name]][[chains[ch]]][draws, , drop=FALSE], Xi)
+        out[[ch]] <- tcrossprod(obj[[mc$name]][[chains[ch]]][draws, , drop=FALSE], Xi)
     }
     for (mc in smplr$mod[-1L]) {
       if (all.units) Xi <- mc$X else Xi <- mc$X[units, , drop=FALSE]
       if (matrix)
-        out <- out + tcrossprod(as.matrix.dc(get_from(object[[mc$name]], chains=chains, draws=draws), colnames=FALSE), Xi)
+        out <- out + tcrossprod(as.matrix.dc(get_from(obj[[mc$name]], chains=chains, draws=draws), colnames=FALSE), Xi)
       else
         for (ch in seq_along(chains))
-          out[[ch]] <- out[[ch]] + tcrossprod(object[[mc$name]][[chains[ch]]][draws, , drop=FALSE], Xi)
+          out[[ch]] <- out[[ch]] + tcrossprod(obj[[mc$name]][[chains[ch]]][draws, , drop=FALSE], Xi)
     }
     if (smplr$use.offset) {
       if (matrix)
@@ -98,7 +98,7 @@ fitted_res <- function(object, mean.only=FALSE, units=NULL, chains=seq_len(nchai
         out <- lapply(out, function(x) {x + rep_each(smplr$offset[units], nrow(x))})
     }
   } else {
-    out <- get_from(object[["e_"]], chains=chains, draws=draws, vars=units)
+    out <- get_from(obj[["e_"]], chains=chains, draws=draws, vars=units)
     if (smplr$e.is.res) {
       # change to linear predictor as code below assumes that
       out <- lapply(out, function(x) rep_each(smplr$y[units], nrow(x)) - x)
@@ -127,7 +127,7 @@ fitted_res <- function(object, mean.only=FALSE, units=NULL, chains=seq_len(nchai
   out
 }
 
-#' Extract weights from a draws object
+#' Extract weights from an mcdraws object
 #'
 #' @examples
 #' \donttest{
@@ -162,20 +162,20 @@ fitted_res <- function(object, mean.only=FALSE, units=NULL, chains=seq_len(nchai
 #' }
 #'
 #' @export
-## @method weights draws
-#' @param object an object of class \code{draws}.
+## @method weights mcdraws
+#' @param object an object of class \code{mcdraws}.
 #' @param ... currently not used.
 #' @return A vector with (simulation means of) weights.
-weights.draws <- function(object, ...) get_means(object, "weights_")[[1L]]
+weights.mcdraws <- function(object, ...) get_means(object, "weights_")[[1L]]
 
 
 #' Compute DIC, WAIC and leave-one-out cross-validation model measures
 #'
 #' Compute the Deviance Information Criterion (DIC) or
 #' Watanabe-Akaike Information Criterion (WAIC) from an
-#' object of class \code{draws} output by \code{\link{MCMCsim}}.
-#' Method \code{waic.draws} computes WAIC using package \pkg{loo}.
-#' Method \code{loo.draws} also depends on package \pkg{loo} to compute
+#' object of class \code{mcdraws} output by \code{\link{MCMCsim}}.
+#' Method \code{waic.mcdraws} computes WAIC using package \pkg{loo}.
+#' Method \code{loo.mcdraws} also depends on package \pkg{loo} to compute
 #' a Pareto-smoothed importance sampling (PSIS) approximation
 #' to leave-one-out cross-validation.
 #'
@@ -192,7 +192,7 @@ weights.draws <- function(object, ...) get_means(object, "weights_")[[1L]]
 #' }
 #' }
 #'
-#' @param x an object of class \code{draws}.
+#' @param x an object of class \code{mcdraws}.
 #' @param use.pV whether half the posterior variance of the deviance should be used
 #'  as an alternative estimate of the effective number of model parameters for DIC.
 #' @param diagnostic whether vectors of log-pointwise-predictive-densities and pointwise
@@ -206,7 +206,7 @@ weights.draws <- function(object, ...) get_means(object, "weights_")[[1L]]
 #'  result in a better PSIS approximation. See \code{\link[loo]{loo}}.
 #' @param n.cores how many cores to use.
 #' @param ... Other arguments, passed to \code{\link[loo]{loo}}. Not currently
-#'  used by \code{waic.draws}.
+#'  used by \code{waic.mcdraws}.
 #' @return For \code{compute_DIC} a vector with the deviance information criterion and
 #'  effective number of model parameters. For \code{compute_WAIC} a vector with the
 #'  WAIC model selection criterion and WAIC effective number of model parameters.
@@ -231,22 +231,24 @@ weights.draws <- function(object, ...) get_means(object, "weights_")[[1L]]
 #'
 #'  A. Vehtari, A. Gelman and J. Gabry (2015).
 #'    Pareto smoothed importance sampling.
-#'    arXiv preprint arXiv:1507.02646.
+#'    arXiv:1507.02646.
 #'
 #'  A. Vehtari, A. Gelman and J. Gabry (2017).
-#'    Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC.
+#'    Practical Bayesian model evaluation using leave-one-out cross-validation
+#'    and WAIC.
 #'    Statistics and Computing 27, 1413-1432.
 #'
-#'  P.-C. Buerkner, J. Gabry and A. Vehtari (2019).
-#'    Bayesian leave-one-out cross-validation for non-factorizable normal models.
-#'    arXiv:1810.10559v3.
+#'  P.-C. Buerkner, J. Gabry and A. Vehtari (2020).
+#'    Efficient leave-one-out cross-validation for Bayesian non-factorized
+#'    normal and Student-t models.
+#'    arXiv:1810.10559.
 #' @name model-information-criteria
 NULL
 
 #' @export
 #' @rdname model-information-criteria
 compute_DIC <- function(x, use.pV=FALSE) {
-  if (!inherits(x, "draws")) stop("not an object of class 'draws'")
+  if (!inherits(x, "mcdraws")) stop("not an object of class 'mcdraws'")
   if (x[["_info"]]$from.prior) stop("cannot compute DIC for draws from prior")
   post.means <- get_means(x)
   if (is.null(post.means[["e_"]]))
@@ -284,7 +286,7 @@ get_lppd_function <- function(x) {
 #' @export
 #' @rdname model-information-criteria
 compute_WAIC <- function(x, diagnostic=FALSE, batch.size=NULL, show.progress=TRUE) {
-  if (!inherits(x, "draws")) stop("not an object of class 'draws'")
+  if (!inherits(x, "mcdraws")) stop("not an object of class 'mcdraws'")
   if (x[["_info"]]$from.prior) stop("cannot compute WAIC for draws from prior")
   n <- x[["_model"]]$n
   if (is.null(batch.size)) {
@@ -330,39 +332,47 @@ compute_WAIC <- function(x, diagnostic=FALSE, batch.size=NULL, show.progress=TRU
     c(WAIC1=WAIC1, p_WAIC1=pWAIC1, WAIC2=WAIC2, p_WAIC2=pWAIC2)
 }
 
-#' @method waic draws
+#' @method waic mcdraws
 #' @export
 #' @rdname model-information-criteria
 #' @importFrom loo waic
 # based on waic.stanreg from package rstanarm
-waic.draws <- function(x, by.unit=FALSE, ...) {
+waic.mcdraws <- function(x, by.unit=FALSE, ...) {
   if ((x[["_model"]]$Q0.type == "symm") && by.unit) {
-    warning("For non-diagonal precision matrix, use 'batch.size' equal to the number of
-      observations for correct leave-one-out predictive densities", immediate.=TRUE)
+    warning("For non-diagonal precision matrix, use 'by.unit=FALSE'
+      for correct leave-one-out predictive densities", immediate.=TRUE)
   }
   llh_i <- get_lppd_function(x)
   if (by.unit) {
     data <- data.frame(i=seq_len(x[["_model"]]$n))
     f <- function(data_i, draws) llh_i(draws, data_i$i)
-    loo::waic.function(f, data=data, draws=x)
+    loo::waic(f, data=data, draws=x)
   } else {
-    loo::waic.matrix(as.matrix(llh_i(x)))
+    loo::waic(as.matrix(llh_i(x)))
   }
 }
 
-#' @method loo draws
+#' @method loo mcdraws
 #' @export
 #' @rdname model-information-criteria
 #' @importFrom loo loo
-# TODO
-#  - for large data and number of draws, use loo.function
-#    and batch processing as in compute_WAIC
-loo.draws <- function(x, r_eff=FALSE, n.cores=1L, ...) {
+# TODO batch processing as in compute_WAIC
+loo.mcdraws <- function(x, by.unit=FALSE, r_eff=FALSE, n.cores=1L, ...) {
   llh_i <- get_lppd_function(x)
-  llh <- llh_i(x)
-  if (r_eff)
-    r_eff <- loo::relative_eff(exp(llh), chain_id=rep_each(seq_len(nchains(x)), ndraws(x)), cores=n.cores)
-  else
-    r_eff <- NULL
-  loo::loo(llh, r_eff=r_eff, cores=n.cores, ...)
+  if (by.unit) {
+    data <- data.frame(i=seq_len(x[["_model"]]$n))
+    f <- function(data_i, draws) llh_i(draws, data_i$i)
+    if (r_eff)
+      r_eff <- loo::relative_eff(f, chain_id=rep_each(seq_len(nchains(x)), ndraws(x)), data=data, draws=x, cores=n.cores)
+    else
+      r_eff <- NULL
+    loo::loo(f, data=data, draws=x, r_eff=r_eff, cores=n.cores)
+  } else {
+    llh <- llh_i(x)
+    if (r_eff)
+      r_eff <- loo::relative_eff(exp(llh), chain_id=rep_each(seq_len(nchains(x)), ndraws(x)), cores=n.cores)
+    else
+      r_eff <- NULL
+    loo::loo(llh, r_eff=r_eff, cores=n.cores, ...)
+  }
 }

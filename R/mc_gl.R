@@ -38,7 +38,9 @@ glreg <- function(formula=NULL, remove.redundant=FALSE, Q0=NULL,
     if (intercept_only(formula)) {
       X <- matrix(rep.int(1, e$l), ncol=1L, dimnames=list(NULL, "(Intercept)"))
     } else {
-      X <- model_Matrix(formula, data=e$e$data, remove.redundant=remove.redundant, sparse=FALSE)
+      #X <- compute_X(formula, data=e$e$data, remove.redundant=remove.redundant, sparse=FALSE)
+      X <- model_matrix(formula, e$e$data, sparse=FALSE)
+      if (remove.redundant) X <- remove_redundancy(X)
       if (is.null(e$factor)) stop("cannot derive group-level design matrix")
       factor.info <- get_factor_info(e$factor, e$e$data)
       if ("spline" %in% factor.info$types) stop("unsupported combination: splines and group-level covariates")
@@ -47,7 +49,9 @@ glreg <- function(formula=NULL, remove.redundant=FALSE, Q0=NULL,
       rm(fac)
     }
   } else {  # formula + group-level data provided
-    X <- model_Matrix(formula, data=data, remove.redundant=remove.redundant, sparse=FALSE)
+    #X <- compute_X(formula, data=data, remove.redundant=remove.redundant, sparse=FALSE)
+    X <- model_matrix(formula, data, sparse=FALSE)
+    if (remove.redundant) X <- remove_redundancy(X)
     # TODO if formula is used, match levels of factor to glp$data
   }
   if (nrow(X) != e$l) stop("wrong number of rows of group-level design matrix")

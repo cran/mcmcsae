@@ -13,33 +13,6 @@
 # - composite matrix as list of tabMatrices
 # - contrasts: "contr.sparse" for removing level with most observations
 
-#' Compute possibly sparse model matrix, optionally removing redundant columns
-#'
-#' @noRd
-#' @param formula model formula; only the rhs of it is currently used.
-#' @param data unit-level data frame containing all variables used in \code{formula}.
-#'  These variables should not contain missing values. An error is raised in case they do.
-#' @param contrasts.arg specification of contrasts for factor variables. Passed to \code{\link{model_matrix}}.
-#' @param remove.redundant if \code{TRUE} redundant columns in the design matrix are removed.
-#' @param redundancy.tol tolerance for detecting linear dependencies among the columns of the design matrix.
-#'  If \code{NULL}, a default value is used.
-#' @param sparse if \code{TRUE} a sparse is returned. This can be efficient for large datasets
-#'  and a model containing categorical variables with many categories. If \code{sparse=NULL},
-#'  the default, a simple heuristic determines whether a sparse or dense model matrix is returned.
-#' @return Predictor matrix X, either an ordinary matrix or a sparse \code{dgCMatrix}.
-model_Matrix <- function(formula, data=environment(formula), contrasts.arg=NULL, remove.redundant=TRUE, redundancy.tol=NULL, sparse=NULL) {
-  X <- model_matrix(formula, data, contrasts.arg, sparse=sparse)
-  if (remove.redundant) {
-    # first remove trivial redundancy: zero columns
-    zerocols <- which(zero_col(X))  # all-0 columns
-    if (length(zerocols)) {
-      X <- X[, -zerocols, drop=FALSE]
-    }
-    # remove remaining redundancy
-    X <- remove_redundancy(X, tol=redundancy.tol)
-  }
-  X
-}
 
 #' Compute possibly sparse model matrix
 #'
@@ -59,16 +32,25 @@ model_Matrix <- function(formula, data=environment(formula), contrasts.arg=NULL,
 #'  By default it is the empty string, reproducing the labels of \code{model.matrix}.
 #' @param by a vector by which to aggregate the result.
 #' @param tabM if \code{TRUE} return a list of tabMatrix objects.
+#' @param enclos enclosure to look for objects not found in \code{data}.
 #' @return Design matrix X, either an ordinary matrix or a sparse \code{dgCMatrix}.
-model_matrix <- function(formula, data=environment(formula), contrasts.arg=NULL,
+model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
                          drop.unused.levels=FALSE, sparse=NULL, drop0=TRUE, catsep="",
-                         by=NULL, tabM=FALSE) {
-  if (missing(data)) {
+                         by=NULL, tabM=FALSE, enclos=.GlobalEnv) {
+  if (is.null(data)) {
     trms <- terms(formula)
+    envir <- environment(formula)  # where to search for variables
     if (!NROW(attr(trms, "factors"))) stop("cannot determine the sample size")
-    n <- NROW(eval_in(rownames(attr(trms, "factors"))[1L], data))
+    n <- NROW(eval_in(rownames(attr(trms, "factors"))[1L], envir, enclos))
+  } else if (is.integer(data) && length(data) == 1L) {
+    # data is interpreted as sample size
+    trms <- terms(formula)
+    envir <- environment(formula)
+    n <- data
+    data <- NULL
   } else {
     trms <- terms(formula, data=data)
+    envir <- data
     n <- nrow(data)
   }
   if (!is.null(by)) {
@@ -99,7 +81,7 @@ model_matrix <- function(formula, data=environment(formula), contrasts.arg=NULL,
   vnames <- rownames(tmat)
   # 1. analyse
   # which variables are quantitative
-  qvar <- !catvars(trms, data)
+  qvar <- !catvars(trms, envir, enclos=enclos)
   qterm <- apply(tmat, 2L, function(x) any(qvar[x == 1L]))
   qvar <- vnames[which(qvar)]
   q <- if (has_intercept) 1L else 0L  # nr of columns
@@ -115,18 +97,18 @@ model_matrix <- function(formula, data=environment(formula), contrasts.arg=NULL,
     nc <- 1L  # number of cells (or columns in design matrix)
     # loop over quantitative variables, including possibly matrices
     for (v in intersect(vnames[tmat[, k] > 0L], qvar)) {
-      qv <- eval_in(v, data)
-      if (NROW(qv) != n) stop("variable lengths differ")
+      qv <- eval_in(v, envir, enclos)
+      if (NROW(qv) != n) stop("variable '", v, "' has different length ", NROW(qv))
       if (anyNA(qv)) stop("missing(s) in variable ", v)
-      if (is.matrix(qv)) nc <- nc * ncol(qv)
+      if (is.matrix(qv) || inherits(qv, "data.frame")) nc <- nc * ncol(qv)
     }
     qd <- qd + nc
     rmlevs <- NULL
     # loop over the factor vars and compute number of levels accounting for removed cols
     for (f in setdiff(vnames[tmat[, k] > 0L], qvar)) {
-      fac <- eval_in(f, data)
+      fac <- eval_in(f, envir, enclos)
+      if (length(fac) != n) stop("variable '", v, "' has different length ", length(fac))
       if (!is.factor(fac) || drop.unused.levels) fac <- factor(fac)
-      if (length(fac) != n) stop("variable lengths differ")
       if (anyNA(fac)) stop("missing(s) in variable ", f)
       levs <- attr(fac, "levels")
       ncat <- length(levs)
@@ -156,16 +138,13 @@ model_matrix <- function(formula, data=environment(formula), contrasts.arg=NULL,
       }
       nc <- nc * ncat
     }
-    if (!is.null(rmlevs)) {
+    if (!is.null(rmlevs))
       contr.list <- c(contr.list, setNames(list(rmlevs), tnames[k]))
-    }
     q <- q + nc
     # TODO also count nonzeros, i.e. the zeros in quantitative variables!
   }
   if (catsep == ":") stop("':' is not allowed as category separator in column labels")
-  if (is.null(sparse)) {
-    sparse <- qd < 0.5 * q  # determine whether sparse
-  }
+  if (is.null(sparse)) sparse <- qd < 0.5 * q
   # 2. construct
   if (!is.null(by)) {
     n <- ncol(Maggr)
@@ -176,7 +155,6 @@ model_matrix <- function(formula, data=environment(formula), contrasts.arg=NULL,
     x <- numeric(length(i))
     p <- rep.int(0L, q + 1L)
   } else {
-    # allocate memory for dense model matrix
     out <- matrix(NA_real_, n, q)
   }
   lab <- character(q)
@@ -200,13 +178,14 @@ model_matrix <- function(formula, data=environment(formula), contrasts.arg=NULL,
   for (k in seq_along(tnames)) {
     countvars <- intersect(vnames[tmat[, k] > 0L], qvar)
     if (length(countvars)) {
-      xk <- eval_in(countvars[1L], data)
+      xk <- eval_in(countvars[1L], envir, enclos)
+      if (inherits(xk, "data.frame")) xk <- as.matrix(xk)
       if (is.matrix(xk))
         labk <- paste(countvars[1L], if (is.null(colnames(xk))) seq_len(ncol(xk)) else colnames(xk), sep=catsep)
       else
         labk <- countvars[1L]
       for (v in countvars[-1L]) {
-        temp <- eval_in(v, data)
+        temp <- eval_in(v, envir, enclos)
         if (is.matrix(temp)) {
           xk <- t(KhatriRao(t(xk), t(temp)))
           labk <- outer(labk, paste(v, colnames(xk), sep=catsep), paste, sep=":")
@@ -223,9 +202,9 @@ model_matrix <- function(formula, data=environment(formula), contrasts.arg=NULL,
     if (length(facvars)) {
       if (length(countvars) && !is.matrix(xk)) {
         # TODO allow matrix; --> generalize x-slot in tabMatrix to matrix (and even dgCMatrix)
-        fk <- fac2tabM(facvars, data, x=xk, contrasts=contr.list[[tnames[k]]], catsep=catsep)
+        fk <- fac2tabM(facvars, envir, enclos, x=xk, contrasts=contr.list[[tnames[k]]], catsep=catsep)
       } else {
-        fk <- fac2tabM(facvars, data, contrasts=contr.list[[tnames[k]]], catsep=catsep)
+        fk <- fac2tabM(facvars, envir, enclos, contrasts=contr.list[[tnames[k]]], catsep=catsep)
       }
       if (is.matrix(xk)) {
         lab[col:(col + ncol(fk)*ncol(xk) - 1L)] <- outer(colnames(fk), labk, paste, sep=":")
@@ -302,10 +281,10 @@ model_matrix <- function(formula, data=environment(formula), contrasts.arg=NULL,
 
 # return a named logical vector indicating for each variable in
 #   the model terms object whether it is categorical
-catvars <- function(trms, data) {
+catvars <- function(trms, data, enclos=.GlobalEnv) {
   vnames <- rownames(terms_matrix(trms))
   vapply(vnames, function(x) {
-      temp <- eval_in(x, data)
+      temp <- eval_in(x, data, enclos)
       is.factor(temp) || is.character(temp)
     }, FALSE
   )

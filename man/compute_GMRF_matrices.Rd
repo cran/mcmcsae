@@ -12,6 +12,8 @@ compute_GMRF_matrices(
   R = TRUE,
   cols2remove = NULL,
   remove.redundant.R.cols = TRUE,
+  enclos = .GlobalEnv,
+  n.parent = 1L,
   ...
 )
 }
@@ -32,6 +34,11 @@ rows and columns of Q and rows of R) that are removed. This can be useful in the
 case of empty domains.}
 
 \item{remove.redundant.R.cols}{whether to test for and remove redundant restrictions from restriction matrix R}
+
+\item{enclos}{enclosure to look for objects not found in \code{data}.}
+
+\item{n.parent}{for internal use; in case of custom factor, the number of frames up
+the calling stack in which to evaluate any custom matrices}
 
 \item{...}{further arguments passed to \code{economizeMatrix}.}
 }
