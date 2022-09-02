@@ -160,7 +160,7 @@ gen <- function(formula = ~ 1, factor=NULL,
   if (name == "") stop("missing model component name")
 
   # check supplied var component (and if NULL leave them to be filled in later)
-  if (!is.null(var)) var <- match.arg(var, c("unstructured", "diagonal", "scalar", "fixed"))
+  if (!is.null(var)) var <- match.arg(var, c("unstructured", "diagonal", "scalar"))
   if (!is.null(factor) && !inherits(factor, "formula")) stop("element 'factor' of a model component must be a formula")
   if (is.list(Leroux)) {
     if (!all(names(Leroux) %in% c("a", "b", "a.star", "b.star"))) stop("invalid Leroux model component parameter list")
@@ -653,7 +653,7 @@ gen <- function(formula = ~ 1, factor=NULL,
   if (usePX) {
     if (PX$vector) {
       if (PX$sparse) {  # sparse M_ind, Dv
-        M_ind <- as(as(kronecker(rep.int(1, l), CdiagU(q0)), "CsparseMatrix"), "dgCMatrix")
+        M_ind <- as(as(kronecker(rep.int(1, l), CdiagU(q0)), "CsparseMatrix"), "generalMatrix")
         mat_sum_xi <- make_mat_sum(M0=PX$Q0, M1=crossprod_sym(M_ind, XX))
         chol_xi <- build_chol(mat_sum_xi(crossprod_sym(M_ind, XX)))
         draw <- add(draw, quote(Dv <- M_ind))

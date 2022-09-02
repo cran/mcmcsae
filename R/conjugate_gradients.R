@@ -159,7 +159,7 @@ setup_CG_sampler <- function(mbs, X, sampler, max.it=NULL, stop.criterion=NULL, 
       # TODO handle DA in mc_gen
       if (is.null(mc$DA)) {
         mc$DA <- mc$QA
-        if (class(mc$DA) != "ddiMatrix" || mc$DA@diag != "U") stop("cannot derive DA")
+        if (class(mc$DA)[1L] != "ddiMatrix" || mc$DA@diag != "U") stop("cannot derive DA")
       }
       # TODO
       # - duplicate code, see setup_priorGMRFsampler in mc_gen

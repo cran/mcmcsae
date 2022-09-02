@@ -14,7 +14,19 @@
 
 <title>Linear regression, prediction, and survey weighting</title>
 
-<script src="data:application/javascript;base64,Ly8gUGFuZG9jIDIuOSBhZGRzIGF0dHJpYnV0ZXMgb24gYm90aCBoZWFkZXIgYW5kIGRpdi4gV2UgcmVtb3ZlIHRoZSBmb3JtZXIgKHRvCi8vIGJlIGNvbXBhdGlibGUgd2l0aCB0aGUgYmVoYXZpb3Igb2YgUGFuZG9jIDwgMi44KS4KZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcignRE9NQ29udGVudExvYWRlZCcsIGZ1bmN0aW9uKGUpIHsKICB2YXIgaHMgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCJkaXYuc2VjdGlvbltjbGFzcyo9J2xldmVsJ10gPiA6Zmlyc3QtY2hpbGQiKTsKICB2YXIgaSwgaCwgYTsKICBmb3IgKGkgPSAwOyBpIDwgaHMubGVuZ3RoOyBpKyspIHsKICAgIGggPSBoc1tpXTsKICAgIGlmICghL15oWzEtNl0kL2kudGVzdChoLnRhZ05hbWUpKSBjb250aW51ZTsgIC8vIGl0IHNob3VsZCBiZSBhIGhlYWRlciBoMS1oNgogICAgYSA9IGguYXR0cmlidXRlczsKICAgIHdoaWxlIChhLmxlbmd0aCA+IDApIGgucmVtb3ZlQXR0cmlidXRlKGFbMF0ubmFtZSk7CiAgfQp9KTsK"></script>
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
 
 <style type="text/css">
   code{white-space: pre-wrap;}
@@ -24,6 +36,7 @@
   div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
   ul.task-list{list-style: none;}
     </style>
+
 
 
 <style type="text/css">
@@ -107,13 +120,20 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
   for (var i = 0; i < sheets.length; i++) {
     if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
     try { var rules = sheets[i].cssRules; } catch (e) { continue; }
-    for (var j = 0; j < rules.length; j++) {
+    var j = 0;
+    while (j < rules.length) {
       var rule = rules[j];
       // check if there is a div.sourceCode rule
-      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") continue;
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
       var style = rule.style.cssText;
       // check if color or background-color is set
-      if (rule.style.color === '' && rule.style.backgroundColor === '') continue;
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
       // replace div.sourceCode by a pre.sourceCode rule
       sheets[i].deleteRule(j);
       sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
@@ -125,7 +145,187 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 
 
 
-<link rel="stylesheet" href="data:text/css,body%20%7B%0Abackground%2Dcolor%3A%20%23fff%3B%0Amargin%3A%201em%20auto%3B%0Amax%2Dwidth%3A%20700px%3B%0Aoverflow%3A%20visible%3B%0Apadding%2Dleft%3A%202em%3B%0Apadding%2Dright%3A%202em%3B%0Afont%2Dfamily%3A%20%22Open%20Sans%22%2C%20%22Helvetica%20Neue%22%2C%20Helvetica%2C%20Arial%2C%20sans%2Dserif%3B%0Afont%2Dsize%3A%2014px%3B%0Aline%2Dheight%3A%201%2E35%3B%0A%7D%0A%23TOC%20%7B%0Aclear%3A%20both%3B%0Amargin%3A%200%200%2010px%2010px%3B%0Apadding%3A%204px%3B%0Awidth%3A%20400px%3B%0Aborder%3A%201px%20solid%20%23CCCCCC%3B%0Aborder%2Dradius%3A%205px%3B%0Abackground%2Dcolor%3A%20%23f6f6f6%3B%0Afont%2Dsize%3A%2013px%3B%0Aline%2Dheight%3A%201%2E3%3B%0A%7D%0A%23TOC%20%2Etoctitle%20%7B%0Afont%2Dweight%3A%20bold%3B%0Afont%2Dsize%3A%2015px%3B%0Amargin%2Dleft%3A%205px%3B%0A%7D%0A%23TOC%20ul%20%7B%0Apadding%2Dleft%3A%2040px%3B%0Amargin%2Dleft%3A%20%2D1%2E5em%3B%0Amargin%2Dtop%3A%205px%3B%0Amargin%2Dbottom%3A%205px%3B%0A%7D%0A%23TOC%20ul%20ul%20%7B%0Amargin%2Dleft%3A%20%2D2em%3B%0A%7D%0A%23TOC%20li%20%7B%0Aline%2Dheight%3A%2016px%3B%0A%7D%0Atable%20%7B%0Amargin%3A%201em%20auto%3B%0Aborder%2Dwidth%3A%201px%3B%0Aborder%2Dcolor%3A%20%23DDDDDD%3B%0Aborder%2Dstyle%3A%20outset%3B%0Aborder%2Dcollapse%3A%20collapse%3B%0A%7D%0Atable%20th%20%7B%0Aborder%2Dwidth%3A%202px%3B%0Apadding%3A%205px%3B%0Aborder%2Dstyle%3A%20inset%3B%0A%7D%0Atable%20td%20%7B%0Aborder%2Dwidth%3A%201px%3B%0Aborder%2Dstyle%3A%20inset%3B%0Aline%2Dheight%3A%2018px%3B%0Apadding%3A%205px%205px%3B%0A%7D%0Atable%2C%20table%20th%2C%20table%20td%20%7B%0Aborder%2Dleft%2Dstyle%3A%20none%3B%0Aborder%2Dright%2Dstyle%3A%20none%3B%0A%7D%0Atable%20thead%2C%20table%20tr%2Eeven%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0A%7D%0Ap%20%7B%0Amargin%3A%200%2E5em%200%3B%0A%7D%0Ablockquote%20%7B%0Abackground%2Dcolor%3A%20%23f6f6f6%3B%0Apadding%3A%200%2E25em%200%2E75em%3B%0A%7D%0Ahr%20%7B%0Aborder%2Dstyle%3A%20solid%3B%0Aborder%3A%20none%3B%0Aborder%2Dtop%3A%201px%20solid%20%23777%3B%0Amargin%3A%2028px%200%3B%0A%7D%0Adl%20%7B%0Amargin%2Dleft%3A%200%3B%0A%7D%0Adl%20dd%20%7B%0Amargin%2Dbottom%3A%2013px%3B%0Amargin%2Dleft%3A%2013px%3B%0A%7D%0Adl%20dt%20%7B%0Afont%2Dweight%3A%20bold%3B%0A%7D%0Aul%20%7B%0Amargin%2Dtop%3A%200%3B%0A%7D%0Aul%20li%20%7B%0Alist%2Dstyle%3A%20circle%20outside%3B%0A%7D%0Aul%20ul%20%7B%0Amargin%2Dbottom%3A%200%3B%0A%7D%0Apre%2C%20code%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0Aborder%2Dradius%3A%203px%3B%0Acolor%3A%20%23333%3B%0Awhite%2Dspace%3A%20pre%2Dwrap%3B%20%0A%7D%0Apre%20%7B%0Aborder%2Dradius%3A%203px%3B%0Amargin%3A%205px%200px%2010px%200px%3B%0Apadding%3A%2010px%3B%0A%7D%0Apre%3Anot%28%5Bclass%5D%29%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0A%7D%0Acode%20%7B%0Afont%2Dfamily%3A%20Consolas%2C%20Monaco%2C%20%27Courier%20New%27%2C%20monospace%3B%0Afont%2Dsize%3A%2085%25%3B%0A%7D%0Ap%20%3E%20code%2C%20li%20%3E%20code%20%7B%0Apadding%3A%202px%200px%3B%0A%7D%0Adiv%2Efigure%20%7B%0Atext%2Dalign%3A%20center%3B%0A%7D%0Aimg%20%7B%0Abackground%2Dcolor%3A%20%23FFFFFF%3B%0Apadding%3A%202px%3B%0Aborder%3A%201px%20solid%20%23DDDDDD%3B%0Aborder%2Dradius%3A%203px%3B%0Aborder%3A%201px%20solid%20%23CCCCCC%3B%0Amargin%3A%200%205px%3B%0A%7D%0Ah1%20%7B%0Amargin%2Dtop%3A%200%3B%0Afont%2Dsize%3A%2035px%3B%0Aline%2Dheight%3A%2040px%3B%0A%7D%0Ah2%20%7B%0Aborder%2Dbottom%3A%204px%20solid%20%23f7f7f7%3B%0Apadding%2Dtop%3A%2010px%3B%0Apadding%2Dbottom%3A%202px%3B%0Afont%2Dsize%3A%20145%25%3B%0A%7D%0Ah3%20%7B%0Aborder%2Dbottom%3A%202px%20solid%20%23f7f7f7%3B%0Apadding%2Dtop%3A%2010px%3B%0Afont%2Dsize%3A%20120%25%3B%0A%7D%0Ah4%20%7B%0Aborder%2Dbottom%3A%201px%20solid%20%23f7f7f7%3B%0Amargin%2Dleft%3A%208px%3B%0Afont%2Dsize%3A%20105%25%3B%0A%7D%0Ah5%2C%20h6%20%7B%0Aborder%2Dbottom%3A%201px%20solid%20%23ccc%3B%0Afont%2Dsize%3A%20105%25%3B%0A%7D%0Aa%20%7B%0Acolor%3A%20%230033dd%3B%0Atext%2Ddecoration%3A%20none%3B%0A%7D%0Aa%3Ahover%20%7B%0Acolor%3A%20%236666ff%3B%20%7D%0Aa%3Avisited%20%7B%0Acolor%3A%20%23800080%3B%20%7D%0Aa%3Avisited%3Ahover%20%7B%0Acolor%3A%20%23BB00BB%3B%20%7D%0Aa%5Bhref%5E%3D%22http%3A%22%5D%20%7B%0Atext%2Ddecoration%3A%20underline%3B%20%7D%0Aa%5Bhref%5E%3D%22https%3A%22%5D%20%7B%0Atext%2Ddecoration%3A%20underline%3B%20%7D%0A%0Acode%20%3E%20span%2Ekw%20%7B%20color%3A%20%23555%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%0Acode%20%3E%20span%2Edt%20%7B%20color%3A%20%23902000%3B%20%7D%20%0Acode%20%3E%20span%2Edv%20%7B%20color%3A%20%2340a070%3B%20%7D%20%0Acode%20%3E%20span%2Ebn%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Efl%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Ech%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Est%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Eco%20%7B%20color%3A%20%23888888%3B%20font%2Dstyle%3A%20italic%3B%20%7D%20%0Acode%20%3E%20span%2Eot%20%7B%20color%3A%20%23007020%3B%20%7D%20%0Acode%20%3E%20span%2Eal%20%7B%20color%3A%20%23ff0000%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%0Acode%20%3E%20span%2Efu%20%7B%20color%3A%20%23900%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%0Acode%20%3E%20span%2Eer%20%7B%20color%3A%20%23a61717%3B%20background%2Dcolor%3A%20%23e3d2d2%3B%20%7D%20%0A" type="text/css" />
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
 
 
 
@@ -137,11 +337,16 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 
 
 
-<h1 class="title toc-ignore">Linear regression, prediction, and survey weighting</h1>
+<h1 class="title toc-ignore">Linear regression, prediction, and survey
+weighting</h1>
 
 
 
-<p>We use the <code>api</code> dataset from package survey to illustrate estimation of a population mean from a sample using a linear regression model. First let’s estimate the population mean of the academic performance indicator 2000 from a simple random sample, <code>apisrs</code>. Using package survey’s GREG estimator <span class="citation">[@Sarndal1992]</span>, we find</p>
+<p>We use the <code>api</code> dataset from package survey to illustrate
+estimation of a population mean from a sample using a linear regression
+model. First let’s estimate the population mean of the academic
+performance indicator 2000 from a simple random sample,
+<code>apisrs</code>. Using package survey’s GREG estimator <span class="citation">[@Sarndal1992]</span>, we find</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(survey)</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">data</span>(api)</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># define the regression model</span></span>
@@ -159,12 +364,26 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">svymean</span>(<span class="sc">~</span> api00, cal)  <span class="co"># GREG estimate</span></span></code></pre></div>
 <pre><code>##         mean     SE
 ## api00 663.86 4.1942</code></pre>
-<p>The true population mean in this case can be obtained from the <code>apipop</code> dataset:</p>
+<p>The true population mean in this case can be obtained from the
+<code>apipop</code> dataset:</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mean</span>(apipop<span class="sc">$</span>api00)</span></code></pre></div>
 <pre><code>## [1] 664.7126</code></pre>
-<p>Note that the GREG estimate is more accurate than the simple equally weighted estimate, which is also reflected by the smaller estimated standard error of the former.</p>
-<p>We can run the same linear model using package mcmcsae. In the next code chunk, function <a href="../html/create_sampler.html"><code>create_sampler</code></a> sets up a sampler function that is used as input to function <a href="../html/MCMCsim.html"><code>MCMCsim</code></a>, which runs a simulation to obtain draws from the posterior distribution of the model parameters. By default three chains with independently generated starting values are run over 1250 iterations with the first 250 discarded as burnin. As the starting values for the MCMC simulation are randomly generated, we set a random seed for reproducibility.</p>
-<p>The results of the simulation are subsequently summarized, and the DIC model criterion is computed. The simulation summary shows several statistics for the model parameters, including the posterior mean, standard error, quantiles, as well as the Rhat convergence diagnostic.</p>
+<p>Note that the GREG estimate is more accurate than the simple equally
+weighted estimate, which is also reflected by the smaller estimated
+standard error of the former.</p>
+<p>We can run the same linear model using package mcmcsae. In the next
+code chunk, function <a href="../html/create_sampler.html"><code>create_sampler</code></a> sets
+up a sampler function that is used as input to function <a href="../html/MCMCsim.html"><code>MCMCsim</code></a>, which runs a
+simulation to obtain draws from the posterior distribution of the model
+parameters. By default three chains with independently generated
+starting values are run over 1250 iterations with the first 250
+discarded as burnin. As the starting values for the MCMC simulation are
+randomly generated, we set a random seed for reproducibility.</p>
+<p>The results of the simulation are subsequently summarized, and the
+DIC model criterion is computed. The simulation summary shows several
+statistics for the model parameters, including the posterior mean,
+standard error, quantiles, as well as the Rhat convergence
+diagnostic.</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(mcmcsae)</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">21</span>)</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>sampler <span class="ot">&lt;-</span> <span class="fu">create_sampler</span>(model, <span class="at">data=</span>apisrs)</span>
@@ -191,13 +410,28 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">compute_DIC</span>(sim)</span></code></pre></div>
 <pre><code>##         DIC       p_DIC 
 ## 2217.807439    9.104826</code></pre>
-<p>The output of function <a href="../html/MCMCsim.html"><code>MCMCsim</code></a> is an object of class <code>mcdraws</code>. The package provides methods for the generic functions <code>summary</code>, <code>plot</code>, <code>predict</code>, <code>residuals</code> and <code>fitted</code> for this class.</p>
+<p>The output of function <a href="../html/MCMCsim.html"><code>MCMCsim</code></a> is an object of
+class <code>mcdraws</code>. The package provides methods for the generic
+functions <code>summary</code>, <code>plot</code>, <code>predict</code>,
+<code>residuals</code> and <code>fitted</code> for this class.</p>
 <div id="prediction" class="section level2">
 <h2>Prediction</h2>
-<p>To compute a model-based estimate of the population mean, we need to predict the values of the target variable for the unobserved units. Let <span class="math inline">\(U\)</span> denote the set of population units, <span class="math inline">\(s \subset U\)</span> the set of sample (observed) units, and let <span class="math inline">\(y_i\)</span> denote the value of the variable of interest taken by the <span class="math inline">\(i\)</span>th unit. The population mean of the variable of interest is <span class="math display">\[
-\bar{Y} = \frac{1}{N}\sum_{i=1}^N y_i = \frac{1}{N}\left(\sum_{i\in s} y_i + \sum_{i\in U\setminus s} y_i \right)\,.
+<p>To compute a model-based estimate of the population mean, we need to
+predict the values of the target variable for the unobserved units. Let
+<span class="math inline">\(U\)</span> denote the set of population
+units, <span class="math inline">\(s \subset U\)</span> the set of
+sample (observed) units, and let <span class="math inline">\(y_i\)</span> denote the value of the variable of
+interest taken by the <span class="math inline">\(i\)</span>th unit. The
+population mean of the variable of interest is <span class="math display">\[
+\bar{Y} = \frac{1}{N}\sum_{i=1}^N y_i = \frac{1}{N}\left(\sum_{i\in s}
+y_i + \sum_{i\in U\setminus s} y_i \right)\,.
 \]</span></p>
-<p>Posterior draws for <span class="math inline">\(\bar{Y}\)</span> can be obtained by generating draws for the non-sampled population units, summing them and adding the sample sum. This is done in the next code chunk, where method <a href="../html/predict.mcdraws.html"><code>predict</code></a> is used to generate draws from the posterior predictive distribution for the new, unobserved, units.</p>
+<p>Posterior draws for <span class="math inline">\(\bar{Y}\)</span> can
+be obtained by generating draws for the non-sampled population units,
+summing them and adding the sample sum. This is done in the next code
+chunk, where method <a href="../html/predict.mcdraws.html"><code>predict</code></a> is used to
+generate draws from the posterior predictive distribution for the new,
+unobserved, units.</p>
 <div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>m <span class="ot">&lt;-</span> <span class="fu">match</span>(apisrs<span class="sc">$</span>cds, apipop<span class="sc">$</span>cds)  <span class="co"># population units in the sample</span></span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="co"># use only a sample of 250 draws from each chain</span></span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>predictions <span class="ot">&lt;-</span> <span class="fu">predict</span>(sim, <span class="at">newdata=</span>apipop[<span class="sc">-</span>m, ], <span class="at">iters=</span><span class="fu">sample</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">1000</span>, <span class="dv">250</span>), <span class="at">show.progress=</span><span class="cn">FALSE</span>)</span>
@@ -211,17 +445,23 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(<span class="fu">transform_dc</span>(predictions, <span class="at">fun =</span> <span class="cf">function</span>(x) (samplesum <span class="sc">+</span> <span class="fu">sum</span>(x))<span class="sc">/</span>N))</span></code></pre></div>
 <pre><code>##      Mean   SD t-value  MCSE q0.05 q0.5 q0.95 n_eff R_hat
 ## [1,]  664 4.21     158 0.155   657  665   671   732     1</code></pre>
-<p>The result for the population mean can also be obtained directly (which is more efficient memory wise) by supplying the appropriate aggregation function to the prediction method:</p>
+<p>The result for the population mean can also be obtained directly
+(which is more efficient memory wise) by supplying the appropriate
+aggregation function to the prediction method:</p>
 <div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(<span class="fu">predict</span>(sim, <span class="at">newdata=</span>apipop[<span class="sc">-</span>m, ], <span class="at">fun=</span><span class="cf">function</span>(x, p) (samplesum <span class="sc">+</span> <span class="fu">sum</span>(x))<span class="sc">/</span>N,</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>                <span class="at">show.progress=</span><span class="cn">FALSE</span>)</span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
 <pre><code>##      Mean  SD t-value   MCSE q0.05 q0.5 q0.95 n_eff R_hat
 ## [1,]  664 4.2     158 0.0778   657  664   671  2913     1</code></pre>
-<p>For any linear model one can obtain the same result more efficiently by precomputing covariate population totals. Posterior draws for <span class="math inline">\(\bar{Y}\)</span> are then computed as</p>
+<p>For any linear model one can obtain the same result more efficiently
+by precomputing covariate population totals. Posterior draws for <span class="math inline">\(\bar{Y}\)</span> are then computed as</p>
 <p><span class="math display">\[
-\bar{Y}_r = \frac{1}{N} \left( n\bar{y} + \beta_r&#39;(X - n\bar{x}) + e_r\right)\,,
+\bar{Y}_r = \frac{1}{N} \left( n\bar{y} + \beta_r&#39;(X - n\bar{x}) +
+e_r\right)\,,
 \]</span></p>
-<p>where <span class="math inline">\(e_r \sim {\cal N}(0, (N-n)\sigma_r^2)\)</span>, representing the sum of <span class="math inline">\(N-n\)</span> independent normal draws. The code to do this is</p>
+<p>where <span class="math inline">\(e_r \sim {\cal N}(0,
+(N-n)\sigma_r^2)\)</span>, representing the sum of <span class="math inline">\(N-n\)</span> independent normal draws. The code to
+do this is</p>
 <div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fu">nrow</span>(apisrs)</span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>XsamT <span class="ot">&lt;-</span> <span class="fu">colSums</span>(<span class="fu">model.matrix</span>(model, apisrs))</span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>XpopR <span class="ot">&lt;-</span> <span class="fu">matrix</span>(XpopT <span class="sc">-</span> XsamT, <span class="at">nrow=</span><span class="dv">1</span>)</span>
@@ -246,11 +486,20 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <pre><code>## linpred_ :
 ##          Mean   SD t-value  MCSE q0.05 q0.5 q0.95 n_eff R_hat
 ## linpred_  664 4.22     157 0.077   657  664   671  3000     1</code></pre>
-<p>Note the small difference between the weighted sample sum of the target variable and the posterior mean of the linear predictor. This is due to Monte Carlo error; the weighted sum is exact for the simple linear regression case.</p>
+<p>Note the small difference between the weighted sample sum of the
+target variable and the posterior mean of the linear predictor. This is
+due to Monte Carlo error; the weighted sum is exact for the simple
+linear regression case.</p>
 </div>
 <div id="outliers" class="section level2">
 <h2>Outliers</h2>
-<p>One possible way to deal with outliers is to use a Student-t sampling distribution, which has fatter tails than the normal distribution. In the next example, the formula.V argument is used to add local variance parameters with inverse chi-squared distributions. The marginal sampling distribution then becomes Student-t. Here the degrees of freedom parameter is modeled, i.e. assigned a prior distribution and inferred from the data.</p>
+<p>One possible way to deal with outliers is to use a Student-t sampling
+distribution, which has fatter tails than the normal distribution. In
+the next example, the formula.V argument is used to add local variance
+parameters with inverse chi-squared distributions. The marginal sampling
+distribution then becomes Student-t. Here the degrees of freedom
+parameter is modeled, i.e. assigned a prior distribution and inferred
+from the data.</p>
 <div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>sampler <span class="ot">&lt;-</span> <span class="fu">create_sampler</span>(model, <span class="at">formula.V=</span><span class="sc">~</span><span class="fu">vfac</span>(<span class="at">prior=</span><span class="fu">pr_invchisq</span>(<span class="at">df=</span><span class="st">&quot;modeled&quot;</span>)),</span>
 <span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>                          <span class="at">linpred=</span><span class="fu">list</span>(<span class="at">reg1=</span><span class="fu">matrix</span>(XpopR<span class="sc">/</span>N, <span class="at">nrow=</span><span class="dv">1</span>)),</span>
 <span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>                          <span class="at">data=</span>apisrs, <span class="at">compute.weights=</span><span class="cn">TRUE</span>)</span>

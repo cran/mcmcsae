@@ -37,6 +37,7 @@ a set of linear constraints to be imposed on the coefficient vector.
 B. Allevius (2018).
    On the precision matrix of an irregularly sampled AR(1) process.
    arXiv:1801.03791.
+
  H. Rue and L. Held (2005).
    Gaussian Markov Random Fields.
    Chapman & Hall/CRC.

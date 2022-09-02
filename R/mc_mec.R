@@ -111,6 +111,7 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL, Q0=NULL, b0=NULL,
       if (!all(sapply(vs, function(x) identical(x[[1L]], as.name("|"))))) stop("invalid 'formula' argument")
       V.in.formula <- TRUE
       formula.X <- as.formula(paste0("~ 0 + ", paste(sapply(vs, function(x) deparse(x[[2L]])), collapse=" + ")), env=environment(formula))
+      if (grepl("|", as.character(formula.X)[2L], fixed=TRUE)) stop("invalid 'formula'")  # maybe '()' forgotten?
       formula.V <- as.formula(paste0("~ 0 + ", paste(sapply(vs, function(x) deparse(x[[3L]])), collapse=" + ")), env=environment(formula))
       X <- model_matrix(formula.X, e$data, sparse=sparse)
       V <- model_matrix(formula.V, e$data, sparse=sparse)
@@ -203,7 +204,6 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL, Q0=NULL, b0=NULL,
     if (any(Vnew < 0)) stop("negative measurement error variance(s) in 'newdata'")
     i.me.new <- which(apply(Vnew, 1L, function(x) all(x > 0)))  # TODO add tolerance + allow list of matrix
     if (length(i.me.new) == nrow(newdata)) i.me.new <- seq_len(nrow(newdata))
-    rm(newdata)
     if (nrow(Vnew) < 0.5 * nrow(Xnew)) {
       rm(i.me.new)
       pred <- function(p) (Xnew + sqrt(Vnew) * Crnorm(length(Vnew))) %m*v% p[[name]]

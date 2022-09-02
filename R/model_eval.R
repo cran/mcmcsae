@@ -204,7 +204,10 @@ weights.mcdraws <- function(object, ...) get_means(object, "weights_")[[1L]]
 #' @param r_eff whether to compute relative effective sample size estimates
 #'  for the likelihood of each observation. This takes more time, but should
 #'  result in a better PSIS approximation. See \code{\link[loo]{loo}}.
-#' @param n.cores how many cores to use.
+#' @param n.cores the number of cpu cores to use. Default is one, i.e. no parallel computation.
+#' @param cl an existing cluster can be passed for parallel computation. If \code{cl} is provided,
+#'  \code{n.cores} will be set to the number of workers in that cluster. If \code{NULL} and
+#'  \code{n.cores > 1}, a new cluster is created.
 #' @param ... Other arguments, passed to \code{\link[loo]{loo}}. Not currently
 #'  used by \code{waic.mcdraws}.
 #' @return For \code{compute_DIC} a vector with the deviance information criterion and
@@ -285,13 +288,15 @@ get_lppd_function <- function(x) {
 
 #' @export
 #' @rdname model-information-criteria
-compute_WAIC <- function(x, diagnostic=FALSE, batch.size=NULL, show.progress=TRUE) {
+compute_WAIC <- function(x, diagnostic=FALSE, batch.size=NULL, show.progress=TRUE, cl=NULL, n.cores=1L) {
   if (!inherits(x, "mcdraws")) stop("not an object of class 'mcdraws'")
   if (x[["_info"]]$from.prior) stop("cannot compute WAIC for draws from prior")
   n <- x[["_model"]]$n
+  n.chains <- nchains(x)
+  n.draws <- n.chains * ndraws(x)
   if (is.null(batch.size)) {
     # determine batch size to avoid too much memory use; now by default truncated to ~ 80MB chunks
-    batch.size <- min(n, 10000000L %/% (nchains(x) * ndraws(x)))
+    batch.size <- min(n, 10000000L %/% n.draws)
   }
   if ((x[["_model"]]$Q0.type == "symm") && (batch.size != n)) {
     warning("For non-diagonal precision matrix, use 'batch.size' equal to the number of
@@ -299,31 +304,76 @@ compute_WAIC <- function(x, diagnostic=FALSE, batch.size=NULL, show.progress=TRU
   }
   batch <- seq_len(batch.size)
   n.batch <- n %/% batch.size + (n %% batch.size > 0L)
-  llh_i <- get_lppd_function(x)
-  lppd_sum <- pWAIC1 <- pWAIC2 <- 0
-  if (diagnostic) lppd <- pwaic <- rep.int(NA_real_, n)
-  show.progress <- show.progress && n.batch > 2L
-  if (show.progress) pb <- txtProgressBar(min=1L, max=n.batch, style=3L)
-  for (i in seq_len(n.batch)) {
-    if ((i == n.batch) && (n %% batch.size))
-      ind <- (n - (n %% batch.size) + 1L):n
-    else
-      ind <- batch + (i - 1L) * batch.size
-    logprob_i <- llh_i(x, ind)
-    nr <- dim(logprob_i)[1L]; nc <- dim(logprob_i)[2L]
-    lppd_i <- colLogSumExps(logprob_i) - log(nr)
-    pwaic_i <- colVars(logprob_i)
-    if (diagnostic) {
-      lppd[ind] <- lppd_i
-      pwaic[ind] <- pwaic_i
+  if (is.null(cl))
+    n.cores <- max(as.integer(n.cores)[1L], 1L)
+  else
+    n.cores <- length(cl)
+  if (n.cores > 1L) {
+    if (n.cores > parallel::detectCores()) stop("too many cores")
+    if (is.null(cl)) {
+      cl <- setup_cluster(n.cores)
+      on.exit(stop_cluster(cl))
     }
-    lppd_sum <- lppd_sum + sum(lppd_i)
-    pWAIC1 <- pWAIC1 + sum(.colMeans(logprob_i, nr, nc))
-    pWAIC2 <- pWAIC2 + sum(pwaic_i)
-    if (show.progress) setTxtProgressBar(pb, i)
+    waic_obj <- function(obj) {
+      nS <- ndraws(obj) * n.chains
+      llh_i <- get_lppd_function(obj)
+      lppd <- waic.var <- waic.mean <- rep.int(NA_real_, n)
+      for (b in seq_len(n.batch)) {
+        if ((b == n.batch) && (n %% batch.size))
+          ind <- (n - (n %% batch.size) + 1L):n
+        else
+          ind <- batch + (b - 1L) * batch.size
+        logprob_i <- llh_i(obj, ind)
+        lppd[ind] <- colLogSumExps(logprob_i)
+        waic.var[ind] <- colVars(logprob_i)
+        waic.mean[ind] <- .colMeans(logprob_i, nS, length(ind))
+      }
+      list(lppd=lppd, var=waic.var, mean=waic.mean, nS=nS)
+    }
+    message(n.draws, " draws distributed over ", n.cores, " cores")
+    sim_list <- split_iters(x, parts=n.cores)
+    out <- parallel::parLapply(cl, X=sim_list, fun=waic_obj)
+    lppd <- exp(out[[1L]]$lppd)
+    pwaic <- out[[1L]]$var  # running posterior variance
+    nA <- out[[1L]]$nS
+    avg <- out[[1L]]$mean  # running posterior mean
+    for (o in out[-1L]) {
+      lppd <- lppd + exp(o$lppd)
+      nAB <- nA + o$nS
+      pwaic <- ((nA - 1L) * pwaic + (o$nS - 1L) * o$var + (nA * o$nS / nAB) * (avg - o$mean)^2) / (nAB - 1L)
+      avg <- (nA * avg + o$nS * o$mean) / nAB
+      nA <- nAB
+    }
+    lppd <- log(lppd) - log(nA)
+    lppd_sum <- sum(lppd)
+    pWAIC1 <- 2 * (lppd_sum - sum(avg))
+    pWAIC2 <- sum(pwaic)
+  } else {
+    llh_i <- get_lppd_function(x)
+    lppd_sum <- pWAIC1 <- pWAIC2 <- 0
+    if (diagnostic) lppd <- pwaic <- rep.int(NA_real_, n)
+    show.progress <- show.progress && n.batch > 2L
+    if (show.progress) pb <- txtProgressBar(min=1L, max=n.batch, style=3L)
+    for (b in seq_len(n.batch)) {
+      if ((b == n.batch) && (n %% batch.size))
+        ind <- (n - (n %% batch.size) + 1L):n
+      else
+        ind <- batch + (b - 1L) * batch.size
+      logprob_i <- llh_i(x, ind)
+      lppd_i <- colLogSumExps(logprob_i) - log(n.draws)
+      pwaic_i <- colVars(logprob_i)
+      if (diagnostic) {
+        lppd[ind] <- lppd_i
+        pwaic[ind] <- pwaic_i
+      }
+      lppd_sum <- lppd_sum + sum(lppd_i)
+      pWAIC1 <- pWAIC1 + sum(.colMeans(logprob_i, n.draws, length(ind)))
+      pWAIC2 <- pWAIC2 + sum(pwaic_i)
+      if (show.progress) setTxtProgressBar(pb, b)
+    }
+    if (show.progress) close(pb)
+    pWAIC1 <- 2 * (lppd_sum - pWAIC1)
   }
-  if (show.progress) close(pb)
-  pWAIC1 <- 2 * (lppd_sum - pWAIC1)
   WAIC1 <- -2 * lppd_sum + 2 * pWAIC1
   WAIC2 <- -2 * lppd_sum + 2 * pWAIC2
   if (diagnostic)

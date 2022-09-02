@@ -50,7 +50,7 @@ test_that("kronecker product closure template works, fixed M1", {
   kron <- build_kron(M1, M2, q2=2, M1.fixed=TRUE)
   M2b <- c(3, 2.1)
   expect_equal(kron(M1, M2b)@x, as.numeric(outer(M2b, rep.int(1, 3))))
-  M1 <- as(as(kronecker(Q_RW1(4), Q_iid(3)), "dgCMatrix"), "symmetricMatrix")
+  M1 <- as(as(kronecker(Q_RW1(4), Q_iid(3)), "CsparseMatrix"), "symmetricMatrix")
   M2 <- 12.1
   kron <- build_kron(M1, M2, q2=1, M1.fixed=TRUE)
   M2b <- 5.8

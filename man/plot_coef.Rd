@@ -50,7 +50,7 @@ objects of class \code{dc_summary} and \code{sae}.}
 
 \item{cex.var}{the fontsize of the variable names, default=0.8.}
 
-\item{mar}{a numerical vector of the form c(bottom, left, top, right) which gives the number of lines of margin to be specified on the four sides of the plot. The default is c(0,1,5,0).}
+\item{mar}{a numerical vector of the form c(bottom, left, top, right) which gives the number of lines of margin to be specified on the four sides of the plot.}
 }
 \description{
 This function plots estimates with error bars. Multiple sets of

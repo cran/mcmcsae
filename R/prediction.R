@@ -231,7 +231,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
   if (subtract.offset) log.ry <- log(model$ry)
 
   if (is.null(cl))
-    n.cores <- min(as.integer(n.cores)[1L], n.chain)
+    n.cores <- max(as.integer(n.cores)[1L], 1L)
   else
     n.cores <- length(cl)
   if (n.cores > 1L) {
@@ -251,7 +251,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
       if (!is.null(seed)) parallel::clusterSetRNGStream(cl, seed)
     }
     parallel::clusterExport(cl, reserved.export.names, environment())
-    message(length(iters), " draws distributed over ", n.cores, " cores")
+    message(length(iters) * n.chain, " draws distributed over ", n.cores, " cores")
     sim_list <- split_iters(object, iters, parts=n.cores)
     predict_obj <- function(obj) {
       chains <- seq_len(nchains(obj))
@@ -284,9 +284,9 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
           if (ppcheck) ppp <- ppp + (out[[ch]][i, ] >= if (arg1) fy else fun.(y, p))
         }
       }
+      if (ppcheck) attr(out, "ppp") <- ppp
       out
     }
-    message("running predict")
     out <- combine_iters_dc(parallel::parLapply(cl, X=sim_list, fun=predict_obj))
   } else {
     if (!is.null(seed)) set.seed(seed)
@@ -340,8 +340,8 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
       close(outfile)
       return(filename)
     }
+    if (ppcheck) attr(out, "ppp") <- ppp/(n.chain * length(iters))
   }
-  if (ppcheck) attr(out, "ppp") <- ppp/(n.chain * length(iters))
   if (!is.null(labels)) attr(out, "labels") <- labels
   class(out) <- "dc"
   out

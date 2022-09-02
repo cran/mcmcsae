@@ -141,7 +141,7 @@
 #'    Journal of Statistical Software 67(1), 1-48.
 #'
 #'  S.W. Linderman, M.J. Johnson and R.P. Adams (2015).
-#'    Dependent multinomial models made easy: Stick-breaking with the Polya-gamma augmentation.
+#'    Dependent multinomial models made easy: Stick-breaking with the Polya-Gamma augmentation.
 #'    Advances in Neural Information Processing Systems, 3456–3464.
 #'
 #'  N. Polson, J.G. Scott and J. Windle (2013).
@@ -250,9 +250,6 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
     }
     if (!isTRUE(sigma.fixed)) sigma.fixed <- FALSE
     f_mean <- identity  # mean function acting on linear predictor
-    
-    
-    
   } else {  # binomial, multinomial, negative-binomial or Poisson likelihood
     if (!is.null(Q0) || !is.null(formula.V)) stop("'Q0' and 'formula.V' arguments cannot be used with (negative) binomial or multinomial likelihood")
     if (identical(sigma.fixed, FALSE) || !is.null(sigma.mod)) warning("arguments 'sigma.fixed' and 'sigma.mod' ignored for (negative) binomial or multinomial likelihood")
@@ -324,7 +321,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
         f_mean <- function(eta) ry * exp(eta)  # mean function acting on linear predictor
       }
     }
-    if (!prior.only && !family$link == "probit") {
+    if (!prior.only && family$link != "probit") {
       if (.opts$PG.approx) {
         mPG <- as.integer(.opts$PG.approx.m)
         if (!length(mPG) %in% c(1L, n)) stop("invalid value for option 'PG.approx.m'")
@@ -345,7 +342,8 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
     Q0 <- CdiagU(n)
   } else if (is.character(Q0)) {
     Q0 <- Cdiag(data[[Q0]])
-  } else if (is.vector(Q0)) {
+  } else if (!is_a_matrix(Q0)) {
+    Q0 <- as.vector(Q0)
     if (length(Q0) == 1L)
       Q0 <- Cdiag(rep.int(Q0, n))
     else
@@ -431,7 +429,6 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
     if (isTRUE(control$CG)) control$CG <- list()  # TODO allow different control$CG for each block
     if (is.list(control$CG) && !length(block))
       warning("conjugate gradient algorithm currently only used inside blocks; see argument 'block'", immediate.=TRUE)
-
     if (single.block) {  # computation of working response simplifies
       control$recompute.e <- FALSE  # already computed in the coefficient sampling function
       y <- as.numeric(y)  # some C++ matrix algebra functions expect double
@@ -597,7 +594,6 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
         out <- out + if (is.function(linpred[[k]])) linpred[[k]](p) else linpred[[k]] %m*v% p[[k]]
     out
   }
-  # generate from predictive distribution; lp is output of lin_predict
   switch(family$family,
     gaussian =
       rpredictive <- function(p, lp, cholQ=NULL, var=NULL, V=NULL, ny, ry) {
@@ -961,8 +957,14 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
       start <- add(start, quote(if (is.null(p[["sigma_"]])) p$sigma_ <- sqrt(sigma.mod$rprior())))
     } else {
       #start <- add(start, quote(if (is.null(p[["sigma_"]])) p$sigma_ <- runif(1L, 0.1 * scale_y, scale_y) * mean(sqrt(diag(Q0)))))
-      start <- add(start, quote(if (is.null(p[["sigma_"]])) p$sigma_ <- runif(1L, 0.1 * scale_sigma, scale_sigma)))
-      start <- add(start, quote(if (length(p[["sigma_"]]) != 1L) stop("wrong length for 'sigma_' start value")))
+      #start <- add(start, quote(if (is.null(p[["sigma_"]])) p$sigma_ <- runif(1L, 0.1 * scale_sigma, scale_sigma)))
+      #start <- add(start, quote(if (length(p[["sigma_"]]) != 1L) stop("wrong length for 'sigma_' start value")))
+      start <- add(start, quote(
+        if (is.null(p[["sigma_"]]))
+          p$sigma_ <- runif(1L, 0.1 * scale_sigma, scale_sigma)
+        else if (length(p[["sigma_"]]) != 1L)
+          stop("wrong length for 'sigma_' start value")
+      ))
     }
   }  # END if (!sigma.fixed)
 

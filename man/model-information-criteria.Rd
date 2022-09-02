@@ -11,7 +11,14 @@
 \usage{
 compute_DIC(x, use.pV = FALSE)
 
-compute_WAIC(x, diagnostic = FALSE, batch.size = NULL, show.progress = TRUE)
+compute_WAIC(
+  x,
+  diagnostic = FALSE,
+  batch.size = NULL,
+  show.progress = TRUE,
+  cl = NULL,
+  n.cores = 1L
+)
 
 \method{waic}{mcdraws}(x, by.unit = FALSE, ...)
 
@@ -30,6 +37,12 @@ contributions to the WAIC effective number of model parameters should be returne
 
 \item{show.progress}{whether to show a progress bar.}
 
+\item{cl}{an existing cluster can be passed for parallel computation. If \code{cl} is provided,
+\code{n.cores} will be set to the number of workers in that cluster. If \code{NULL} and
+\code{n.cores > 1}, a new cluster is created.}
+
+\item{n.cores}{the number of cpu cores to use. Default is one, i.e. no parallel computation.}
+
 \item{by.unit}{if \code{TRUE} the computation is carried out unit-by-unit, which is
 slower but uses much less memory.}
 
@@ -39,8 +52,6 @@ used by \code{waic.mcdraws}.}
 \item{r_eff}{whether to compute relative effective sample size estimates
 for the likelihood of each observation. This takes more time, but should
 result in a better PSIS approximation. See \code{\link[loo]{loo}}.}
-
-\item{n.cores}{how many cores to use.}
 }
 \value{
 For \code{compute_DIC} a vector with the deviance information criterion and

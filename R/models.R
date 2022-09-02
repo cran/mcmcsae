@@ -61,6 +61,7 @@ computeDesignMatrix <- function(formula=NULL, data=NULL, sampler=NULL, labels=TR
       }
     }
   } else {
+    if (!inherits(formula, "formula")) stop("'formula' must be a formula")
     formula <- standardize_formula(formula, data=data)
     out <- to_mclist(formula)
     for (m in seq_along(out)) {
@@ -70,12 +71,19 @@ computeDesignMatrix <- function(formula=NULL, data=NULL, sampler=NULL, labels=TR
       else
         mc$formula <- as.formula(eval(mc$formula))
       environment(mc$formula) <- environment(formula)
-      if (!is.null(mc$factor))
-        mc$factor <- as.formula(mc$factor, env=environment(formula))
-      if (is.null(mc$remove.redundant)) mc$remove.redundant <- FALSE
-      if (is.null(mc$drop.empty.levels)) mc$drop.empty.levels <- FALSE
-      out[[m]] <- compute_X(mc$formula, mc$factor, mc$remove.redundant,
-          mc$drop.empty.levels, mc$sparse, data)
+      if ("|" %in% all.names(mc$formula)) {
+        # assume this is a mec component; we use as design matrix the covariate matrix subject to error
+        vs <- as.list(attr(terms(mc$formula), "variables")[-1L])
+        formula.X <- as.formula(paste0("~ 0 + ", paste(sapply(vs, function(x) deparse(x[[2L]])), collapse=" + ")), env=environment(formula))
+        out[[m]] <- model_matrix(formula.X, data, sparse=mc$sparse)
+      } else {
+        if (!is.null(mc$factor))
+          mc$factor <- as.formula(mc$factor, env=environment(formula))
+        if (is.null(mc$remove.redundant)) mc$remove.redundant <- FALSE
+        if (is.null(mc$drop.empty.levels)) mc$drop.empty.levels <- FALSE
+        out[[m]] <- compute_X(mc$formula, mc$factor, mc$remove.redundant,
+            mc$drop.empty.levels, mc$sparse, data)
+      }        
       if (!labels) colnames(out[[m]]) <- NULL
     }
   }
@@ -458,6 +466,7 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
 #'  B. Allevius (2018).
 #'    On the precision matrix of an irregularly sampled AR(1) process.
 #'    arXiv:1801.03791.
+#'
 #'  H. Rue and L. Held (2005).
 #'    Gaussian Markov Random Fields.
 #'    Chapman & Hall/CRC.
@@ -488,7 +497,7 @@ Q_AR1 <- function(n, phi, w=NULL) {
 D_AR1 <- function(n, phi, w=NULL) {
   if (n < 2L) stop("AR1 model needs a sequence of at least 2 periods")
   if (is.null(w)) {
-    as(bandSparse(n, n, 0:1, list(c(rep.int(1, n-1L), sqrt(1 - phi^2)), rep.int(-phi, n-1L))), "dgCMatrix")
+    as(as(bandSparse(n, n, 0:1, list(c(rep.int(1, n-1L), sqrt(1 - phi^2)), rep.int(-phi, n-1L))), "generalMatrix"), "CsparseMatrix")
   } else {
     # w_i to be interpreted as 1/(t_{i+1} - t_{i})
     w <- as.numeric(w)
@@ -497,7 +506,7 @@ D_AR1 <- function(n, phi, w=NULL) {
     iw <- 1/w
     d0 <- c(sqrt((1 - phi2)/(1 - phi2^iw)), sqrt(1 - phi2))
     d1 <- - sqrt((1 - phi2)/(1 - phi2^iw)) * phi^iw
-    as(bandSparse(n, n, 0:1, list(d0, d1)), "dgCMatrix")
+    as(as(bandSparse(n, n, 0:1, list(d0, d1)), "generalMatrix"), "CsparseMatrix")
   }
 }
 

@@ -732,7 +732,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       if (is.null(p[[name.tr]])) {
         if (is.null(p[[name]])) {
           if (!requireNamespace("lintools", quietly=TRUE)) stop("please install package lintools and try again")
-          temp <- -as(Ut, "dgTMatrix")
+          temp <- -as(as(Ut, "TsparseMatrix"), "generalMatrix")
           # sparse version
           A <- data.frame(
             row = temp@i,  # constraint index

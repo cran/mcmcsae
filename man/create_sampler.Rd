@@ -185,7 +185,7 @@ J.H. Albert and S. Chib (1993).
    Journal of Statistical Software 67(1), 1-48.
 
  S.W. Linderman, M.J. Johnson and R.P. Adams (2015).
-   Dependent multinomial models made easy: Stick-breaking with the Polya-gamma augmentation.
+   Dependent multinomial models made easy: Stick-breaking with the Polya-Gamma augmentation.
    Advances in Neural Information Processing Systems, 3456–3464.
 
  N. Polson, J.G. Scott and J. Windle (2013).

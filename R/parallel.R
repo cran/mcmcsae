@@ -187,9 +187,9 @@ combine_iters_dc <- function(obj) {
   }
   if (!is.null(attr(obj[[1L]], "ppp"))) {
     if (length(attr(obj[[1L]], "ppp")) == 1L)
-      attr(out, "ppp") <- mean(sapply(obj, attr, "ppp"))
+      attr(out, "ppp") <- sum(sapply(obj, attr, "ppp")) / (length(chains) * n.draw)
     else
-      attr(out, "ppp") <- rowMeans(sapply(obj, attr, "ppp"))
+      attr(out, "ppp") <- rowSums(sapply(obj, attr, "ppp")) / (length(chains) * n.draw)
   }
   if (!is.null(attr(obj[[1L]], "labels"))) attr(out, "labels") <- attr(obj[[1L]], "labels")
   class(out) <- "dc"

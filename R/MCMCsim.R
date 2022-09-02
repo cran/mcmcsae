@@ -606,7 +606,7 @@ to_mcmc <- function(x) {
 #' @export
 #' @rdname MCMC-object-conversion
 to_draws_array <- function(x) {
-  if (class(x) != "dc") stop("not an object of class 'dc'")
+  if (!inherits(x, "dc")) stop("not an object of class 'dc'")
   posterior::as_draws_array(as.array.dc(x))
 }
 

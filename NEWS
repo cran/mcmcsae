@@ -1,4 +1,10 @@
 
+version 0.7.1
+- compute_WAIC can now run using multiple cores
+- predict method with option ppcheck=TRUE now also works in parallel
+- prepare for coercion deprecations in upcoming version of Matrix package
+
+
 version 0.7.0
 - renamed class 'draws' to 'mcdraws' to avoid name clash with R package
   posterior
@@ -26,6 +32,7 @@ version 0.6.0
 - print.dc_summary now correctly handles max.lines argument
 - adapted to new version of Matrix package
 - more input checks and small code improvements
+
 
 version 0.5.0
 - initial CRAN release

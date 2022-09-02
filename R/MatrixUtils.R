@@ -74,8 +74,8 @@ zeroMatrix <- function(nr, nc)
 # matrix algebra: efficient matrix-vector products and some new Matrix methods
 
 # RcppEigen 'knows' dgC, but not dsC --> represent dsC as dgC
-.dgC.class.attr <- attr(as(matrix(0), "dgCMatrix"), "class")
-.dsC.class.attr <- attr(as(matrix(0), "dsCMatrix"), "class")
+.dgC.class.attr <- class(as(matrix(c(0,0)), "CsparseMatrix"))
+.dsC.class.attr <- class(as(as(matrix(0), "CsparseMatrix"), "symmetricMatrix"))
 
 #' Fast matrix-vector multiplications
 #' 
@@ -566,7 +566,7 @@ economizeMatrix <- function(M, sparse=NULL, symmetric=FALSE, strip.names=TRUE,
   }
   if (is.null(sparse)) sparse <- better_sparse(M)
   if (sparse) {
-    if (is.matrix(M)) M <- as(M, "dgCMatrix")
+    if (is.matrix(M)) M <- as(as(as(M, "CsparseMatrix"), "generalMatrix"), "dMatrix")
   } else {
     if (!is.matrix(M)) M <- as.matrix(M)
     # make sure the matrix has mode 'double', otherwise some C++ matrix routines might not work
@@ -577,7 +577,7 @@ economizeMatrix <- function(M, sparse=NULL, symmetric=FALSE, strip.names=TRUE,
   if (isDiagonal(M)) return(economizeDiagMatrix(M, strip.names, vec.diag))
   if (allow.tabMatrix && !symmetric) {
     if (class(M)[1L] != "tabMatrix") {
-      M <- as(as(M, "CsparseMatrix"), "dgCMatrix")
+      M <- as(as(as(M, "CsparseMatrix"), "generalMatrix"), "dMatrix")
       if (dgC_is_tabMatrix(M)) M <- as(M, "tabMatrix")
     }
     if (class(M)[1L] == "tabMatrix") {
@@ -586,7 +586,7 @@ economizeMatrix <- function(M, sparse=NULL, symmetric=FALSE, strip.names=TRUE,
     }
   }
   if (!(class(M)[1L] %in% c("dgCMatrix", "dsCMatrix")))
-    M <- as(as(M, "CsparseMatrix"), "dgCMatrix")
+    M <- as(as(as(M, "CsparseMatrix"), "generalMatrix"), "dMatrix")
   if (drop.zeros) M <- drop0(M)
   if (symmetric && class(M)[1L] == "dgCMatrix")
     M <- as(M, "symmetricMatrix")
@@ -655,8 +655,8 @@ cross <- function(Q1, Q2) {
     else
       return(Cdiag(as.numeric(base::tcrossprod(ddi_diag(Q1), ddi_diag(Q2)))))
   }
-  if (all(c(c1, c2) %in% c("ddiMatrix", "dsCMatrix"))) return(as(as(kronecker(Q2, Q1), "dgCMatrix"), "symmetricMatrix"))
-  return(as(kronecker(Q2, Q1), "CsparseMatrix"))  # at least one matrix is dgC (non-symmetric incidence matrix, say)
+  if (all(c(c1, c2) %in% c("ddiMatrix", "dsCMatrix"))) return(as(as(kronecker(Q2, Q1), "CsparseMatrix"), "symmetricMatrix"))
+  return(as(kronecker(Q2, Q1), "CsparseMatrix"))  # at least one matrix is dgC
 }
 
 #' Utility function to construct a sparse aggregation matrix from a factor
