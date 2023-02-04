@@ -37,18 +37,8 @@ test_that("Cholesky for matrix works", {
   expect_equal(ch$solve(y0, system="Lt"), solve(chol(M), y0))
   expect_equal(ch$solve(y0, system="L"), solve(t(chol(M)), y0))
   expect_equal(ch$solve(y1, system="Lt"), solve(chol(M), y1))
-  # with permutation
-  M <- crossprod(matrix(rnorm(n^2), n))
-  diag(M) <- diag(M) + runif(n, 0.1, 1)
-  ch <- build_chol(M, perm=TRUE)
-  M <- crossprod(matrix(rnorm(n^2), n))
-  diag(M) <- diag(M) + runif(n, 0.1, 1)
-  ch$update(M)
-  expect_equal(ch$solve(y0), solve(M, y0))
-  expect_equal(ch$solve(y1), solve(M, y1))
-  expect_equal(crossprod(ch$cholM[, order(attr(ch$cholM, "pivot"))]), M)
   x <- rnorm(n)
-  expect_equal(ch$Ltimes(x), ch$cholM[, order(attr(ch$cholM, "pivot"))] %m*v% x)
+  expect_equal(ch$Ltimes(x), ch$cholM %m*v% x)
 })
 
 test_that("Cholesky for dsCMatrix works", {

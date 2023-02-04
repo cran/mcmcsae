@@ -9,7 +9,7 @@ x <- rnorm(n)
 eta <- 1 + 2*x
 y <- rpois(n, lambda = exp(eta))
 
-test_that("Negative binomial approximation to Poisson regression works", {
+test_that("negative binomial approximation to Poisson regression works", {
   r <- 100  # should be large for negligible overdispersion, but too large values result in slow MCMC mixing
   o <- rep(-log(r), n)
   sampler <- create_sampler(y ~ 1 + x + offset(o), ry=r, r.mod=pr_fixed(1), family="negbinomial")

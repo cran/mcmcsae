@@ -17,10 +17,13 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
   if (!(type %in% c("numeric", "matrix", "ddiMatrix", "dsCMatrix"))) stop("build_chol: unsupported matrix class '", type, "'")
   size <- if (type == "numeric") length(M) else dim(M)[1L]
 
-  if (is.null(perm)) {
-    # TODO find better decision rule for use of permutation in cholesky factorization
-    perm <- size > 100L
-    # perm can still change below depending on type
+  if (type == "dsCMatrix") {
+    if (is.null(perm)) {
+      # TODO find better decision rule for use of permutation in cholesky factorization
+      perm <- size > 100L
+    }
+  } else {
+    perm <- FALSE
   }
 
   # define update, solve and Ltimes methods with arguments
@@ -34,7 +37,6 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
   # Ltimes left-multiplies a vector/matrix by L (in case of permutations P'L which need not be lower triangular!) or its transpose
   switch(type,
     numeric=, ddiMatrix = {  # diagonal represented as vector case (including trivial scalar case)
-      perm <- FALSE
       if (type == "ddiMatrix" && M@diag == "U") {  # trivial case, identity matrix, no updates
         if (Imult != 0) stop("unit ddiMatrix assumed fixed")
         cholM <- M
@@ -145,91 +147,52 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
       }
     },
     matrix = {  # LDL, super ignored
-      # NB chol stores upper triangular matrix, i.e. Lt
+      # NB Ccholesky currently returns upper triangular matrix, i.e. Lt
       if (Imult == 0)
-        cholM <- chol.default(M, pivot=perm)
+        cholM <- Ccholesky(M)
       else
-        cholM <- chol.default(add_diagC(M, rep.int(Imult, size)), pivot=perm)
-      if (perm) {  # this assumes that permutation never changes...CHECK!!
-        P <- attr(cholM, "pivot")
-        iP <- invPerm(P)
-      }
+        cholM <- Ccholesky(add_diagC(M, rep.int(Imult, size)))
       update <- function(parent, mult=0) {
         if (mult == 0)
-          cholM <<- chol.default(parent, pivot=perm)
+          cholM <<- Ccholesky(parent)
         else
-          cholM <<- chol.default(add_diagC(parent, rep.int(mult, size)), pivot=perm)
-        if (perm) {  # permutation may change; alternatively compute P and iP in solve function as needed
-          P <<- attr(cholM, "pivot")
-          iP <<- invPerm(P)
+          cholM <<- Ccholesky(add_diagC(parent, rep.int(mult, size)))
+      }
+      Ltimes <- function(x, transpose=TRUE) {
+        if (is.vector(x)) {
+          if (transpose) cholM %m*v% x else crossprod_mv(cholM, x)
+        } else {
+          if (transpose) cholM %m*m% x else crossprod_mm(cholM, x)
         }
       }
-      if (perm) {
-        # TODO check whether the permutation is handled correctly in the transpose=FALSE case
-        Ltimes <- function(x, transpose=TRUE) {
-          if (is.vector(x)) {
-            if (transpose) cholM %m*v% x[P] else crossprod_mv(cholM, x)[iP]
-          } else {
-            if (transpose) cholM %m*m% x[P, , drop=FALSE] else crossprod_mm(cholM, x)[iP, , drop=FALSE]
-          }
-        }
-        solve <- function(rhs, system="A", systemP=FALSE) {
-          switch(class(rhs)[1L],
-            numeric =
-              switch(system,
-                A = Cbacksolve(cholM, Cforwardsolve(cholM, rhs[P]))[iP],
-                Lt = if (systemP) Cbacksolve(cholM, rhs)[iP] else Cbacksolve(cholM, rhs),
-                L = if (systemP) Cforwardsolve(cholM, rhs[P]) else Cforwardsolve(cholM, rhs),
-                stop("unsupported solve system")
-              ),
-            matrix =
-              switch(system,
-                A = CbacksolveM(cholM, CforwardsolveM(cholM, rhs[P, , drop=FALSE]))[iP, , drop=FALSE],
-                Lt = if (systemP) CbacksolveM(cholM, rhs)[iP, , drop=FALSE] else CbacksolveM(cholM, rhs),
-                L = if (systemP) CforwardsolveM(cholM, rhs[P, , drop=FALSE]) else CforwardsolveM(cholM, rhs),
-                stop("unsupported solve system")
-              ),
-            stop("'", class(rhs)[1L], "' not supported as right hand side in solve")
-          )
-        }
-      } else {
-        Ltimes <- function(x, transpose=TRUE) {
-          if (is.vector(x)) {
-            if (transpose) cholM %m*v% x else crossprod_mv(cholM, x)
-          } else {
-            if (transpose) cholM %m*m% x else crossprod_mm(cholM, x)
-          }
-        }
-        solve <- function(rhs, system="A", systemP=FALSE) {
-          switch(class(rhs)[1L],
-            numeric =
-              switch(system,
-                A = Cbacksolve(cholM, Cforwardsolve(cholM, rhs)),
-                Lt = Cbacksolve(cholM, rhs),
-                L = Cforwardsolve(cholM, rhs),
-                #LDLt = backsolve(cholM, forwardsolve(cholM, rhs, upper.tri=TRUE, transpose=TRUE)),
-                stop("unsupported solve system")
-              ),
-            matrix =
-              switch(system,
-                A = CbacksolveM(cholM, CforwardsolveM(cholM, rhs)),
-                Lt = CbacksolveM(cholM, rhs),
-                L = CforwardsolveM(cholM, rhs),
-                stop("unsupported solve system")
-              ),
-            # disallow dgCMatrix rhs with dense M; in this case it is better to force rhs to be dense as well, as the result is typically dense
-            #dgCMatrix = {  # this works, but may be slow; TODO instead of dgC, return the result as a dense matrix
-            #  nc <- dim(rhs)[2L]
-            #  out <- rhs
-            #  for (i in seq_len(nc)) out[, i] <- solve(rhs[, i], system)
-            #  out
-            #}
-            stop("'", class(rhs)[1L], "' not supported as right hand side in solve")
-          )
-        }
+      solve <- function(rhs, system="A", systemP=FALSE) {
+        switch(class(rhs)[1L],
+          numeric =
+            switch(system,
+              A = Cbacksolve(cholM, Cforwardsolve(cholM, rhs)),
+              Lt = Cbacksolve(cholM, rhs),
+              L = Cforwardsolve(cholM, rhs),
+              stop("unsupported solve system")
+            ),
+          matrix =
+            switch(system,
+              A = CbacksolveM(cholM, CforwardsolveM(cholM, rhs)),
+              Lt = CbacksolveM(cholM, rhs),
+              L = CforwardsolveM(cholM, rhs),
+              stop("unsupported solve system")
+            ),
+          # disallow dgCMatrix rhs with dense M; in this case it is better to force rhs to be dense as well, as the result is typically dense
+          #dgCMatrix = {  # this works, but may be slow; TODO instead of dgC, return the result as a dense matrix
+          #  nc <- dim(rhs)[2L]
+          #  out <- rhs
+          #  for (i in seq_len(nc)) out[, i] <- solve(rhs[, i], system)
+          #  out
+          #}
+          stop("'", class(rhs)[1L], "' not supported as right hand side in solve")
+        )
       }
     }
-  )  # END switch(type, ...
+  )  # END switch(type, ...)
 
   rm(M, type, LDL, super, Imult)
   environment()

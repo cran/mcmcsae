@@ -23,9 +23,23 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// Crtmvn_Gibbs
-NumericVector Crtmvn_Gibbs(const NumericVector& v, const SEXP Ut, const NumericVector& ustar, const double eps);
-RcppExport SEXP _mcmcsae_Crtmvn_Gibbs(SEXP vSEXP, SEXP UtSEXP, SEXP ustarSEXP, SEXP epsSEXP) {
+// Crtmvn_Gibbs_dense
+Eigen::VectorXd Crtmvn_Gibbs_dense(const Eigen::Map<Eigen::VectorXd>& v, const Eigen::Map<Eigen::MatrixXd> Ut, const Eigen::Map<Eigen::VectorXd>& ustar, const double eps);
+RcppExport SEXP _mcmcsae_Crtmvn_Gibbs_dense(SEXP vSEXP, SEXP UtSEXP, SEXP ustarSEXP, SEXP epsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type v(vSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd> >::type Ut(UtSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type ustar(ustarSEXP);
+    Rcpp::traits::input_parameter< const double >::type eps(epsSEXP);
+    rcpp_result_gen = Rcpp::wrap(Crtmvn_Gibbs_dense(v, Ut, ustar, eps));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Crtmvn_Gibbs_sparse
+NumericVector Crtmvn_Gibbs_sparse(const NumericVector& v, const SEXP Ut, const NumericVector& ustar, const double eps);
+RcppExport SEXP _mcmcsae_Crtmvn_Gibbs_sparse(SEXP vSEXP, SEXP UtSEXP, SEXP ustarSEXP, SEXP epsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -33,7 +47,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const SEXP >::type Ut(UtSEXP);
     Rcpp::traits::input_parameter< const NumericVector& >::type ustar(ustarSEXP);
     Rcpp::traits::input_parameter< const double >::type eps(epsSEXP);
-    rcpp_result_gen = Rcpp::wrap(Crtmvn_Gibbs(v, Ut, ustar, eps));
+    rcpp_result_gen = Rcpp::wrap(Crtmvn_Gibbs_sparse(v, Ut, ustar, eps));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -46,6 +60,29 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const NumericVector& >::type mu(muSEXP);
     Rcpp::traits::input_parameter< const NumericVector& >::type y(ySEXP);
     rcpp_result_gen = Rcpp::wrap(CrTNprobit(mu, y));
+    return rcpp_result_gen;
+END_RCPP
+}
+// TMVN_HMC_C
+Eigen::VectorXd TMVN_HMC_C(const SEXP S, const int S_cols, const Eigen::Map<Eigen::VectorXd>& v0, const Eigen::Map<Eigen::VectorXd>& x0, const Eigen::Map<Eigen::VectorXd>& s_adj, const Eigen::Map<Eigen::VectorXd>& refl_fac, const bool zero_mu, const Eigen::Map<Eigen::VectorXd>& mu, const bool simplified, const SEXP VS, const bool diagnostic, Eigen::Map<Eigen::VectorXi>& bounces, double t_sim, int max_refl);
+RcppExport SEXP _mcmcsae_TMVN_HMC_C(SEXP SSEXP, SEXP S_colsSEXP, SEXP v0SEXP, SEXP x0SEXP, SEXP s_adjSEXP, SEXP refl_facSEXP, SEXP zero_muSEXP, SEXP muSEXP, SEXP simplifiedSEXP, SEXP VSSEXP, SEXP diagnosticSEXP, SEXP bouncesSEXP, SEXP t_simSEXP, SEXP max_reflSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< const SEXP >::type S(SSEXP);
+    Rcpp::traits::input_parameter< const int >::type S_cols(S_colsSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type v0(v0SEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type x0(x0SEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type s_adj(s_adjSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type refl_fac(refl_facSEXP);
+    Rcpp::traits::input_parameter< const bool >::type zero_mu(zero_muSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< const bool >::type simplified(simplifiedSEXP);
+    Rcpp::traits::input_parameter< const SEXP >::type VS(VSSEXP);
+    Rcpp::traits::input_parameter< const bool >::type diagnostic(diagnosticSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXi>& >::type bounces(bouncesSEXP);
+    Rcpp::traits::input_parameter< double >::type t_sim(t_simSEXP);
+    Rcpp::traits::input_parameter< int >::type max_refl(max_reflSEXP);
+    rcpp_result_gen = Rcpp::wrap(TMVN_HMC_C(S, S_cols, v0, x0, s_adj, refl_fac, zero_mu, mu, simplified, VS, diagnostic, bounces, t_sim, max_refl));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -117,15 +154,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// cCHM_options
-void cCHM_options();
-RcppExport SEXP _mcmcsae_cCHM_options() {
-BEGIN_RCPP
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    cCHM_options();
-    return R_NilValue;
-END_RCPP
-}
 // CrPGapprox
 NumericVector CrPGapprox(const int n, const NumericVector& b, const NumericVector& z, const IntegerVector& m);
 RcppExport SEXP _mcmcsae_CrPGapprox(SEXP nSEXP, SEXP bSEXP, SEXP zSEXP, SEXP mSEXP) {
@@ -180,6 +208,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// addto
+void addto(Eigen::Map<Eigen::VectorXd>& x, const double a, const Eigen::Map<Eigen::VectorXd>& y);
+RcppExport SEXP _mcmcsae_addto(SEXP xSEXP, SEXP aSEXP, SEXP ySEXP) {
+BEGIN_RCPP
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type x(xSEXP);
+    Rcpp::traits::input_parameter< const double >::type a(aSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type y(ySEXP);
+    addto(x, a, y);
+    return R_NilValue;
+END_RCPP
+}
 // inverseSPD
 Eigen::MatrixXd inverseSPD(const Eigen::Map<Eigen::MatrixXd>& M);
 RcppExport SEXP _mcmcsae_inverseSPD(SEXP MSEXP) {
@@ -187,6 +226,16 @@ BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type M(MSEXP);
     rcpp_result_gen = Rcpp::wrap(inverseSPD(M));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Ccholesky
+Eigen::MatrixXd Ccholesky(const Eigen::Map<Eigen::MatrixXd> M);
+RcppExport SEXP _mcmcsae_Ccholesky(SEXP MSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd> >::type M(MSEXP);
+    rcpp_result_gen = Rcpp::wrap(Ccholesky(M));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -622,17 +671,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// get_col_dgC
-Eigen::VectorXd get_col_dgC(const Eigen::MappedSparseMatrix<double>& A, const int j);
-RcppExport SEXP _mcmcsae_get_col_dgC(SEXP ASEXP, SEXP jSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< const Eigen::MappedSparseMatrix<double>& >::type A(ASEXP);
-    Rcpp::traits::input_parameter< const int >::type j(jSEXP);
-    rcpp_result_gen = Rcpp::wrap(get_col_dgC(A, j));
-    return rcpp_result_gen;
-END_RCPP
-}
 // log1pexpC
 NumericVector log1pexpC(const NumericVector& x);
 RcppExport SEXP _mcmcsae_log1pexpC(SEXP xSEXP) {
@@ -667,15 +705,15 @@ BEGIN_RCPP
 END_RCPP
 }
 // Ctab
-SEXP Ctab(IntegerVector Dim, bool reduced, IntegerVector perm, bool num, NumericVector x);
+SEXP Ctab(const IntegerVector& Dim, const bool reduced, const IntegerVector& perm, const bool num, const NumericVector& x);
 RcppExport SEXP _mcmcsae_Ctab(SEXP DimSEXP, SEXP reducedSEXP, SEXP permSEXP, SEXP numSEXP, SEXP xSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< IntegerVector >::type Dim(DimSEXP);
-    Rcpp::traits::input_parameter< bool >::type reduced(reducedSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type perm(permSEXP);
-    Rcpp::traits::input_parameter< bool >::type num(numSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type Dim(DimSEXP);
+    Rcpp::traits::input_parameter< const bool >::type reduced(reducedSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type perm(permSEXP);
+    Rcpp::traits::input_parameter< const bool >::type num(numSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type x(xSEXP);
     rcpp_result_gen = Rcpp::wrap(Ctab(Dim, reduced, perm, num, x));
     return rcpp_result_gen;
 END_RCPP

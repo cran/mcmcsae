@@ -350,31 +350,6 @@ crossprod_sym2 <- function(M1, M2=M1) {
 ddi_diag <- function(M) if (M@diag == "N") M@x else rep.int(1, M@Dim[1L])
 
 
-#' Extract a column from a matrix object
-#' 
-#' @noRd
-#' @param M a matrix object. Currently supported are matrix, dgCMatrix and ddiMatrix
-#' @param j the column index.
-#' @return The \code{h}th column of \code{M} as a (dense) numeric vector.
-get_col <- function(M, j) {
-  switch(class(M)[1L],
-    matrix = M[, j, drop=TRUE],
-    dgCMatrix = get_col_dgC(M, j),
-    ddiMatrix = {
-      out <- rep.int(0, M@Dim[1L])
-      out[j] <- if (M@diag == "U") 1 else M@x[j]
-      out
-    },
-    tabMatrix = {
-      if (M@num)
-        as.numeric(M@perm == j - 1L) * M@x
-      else
-        as.numeric(M@perm == j - 1L)
-    },
-    stop("unsupported class '", class(M)[1L], "'")
-  )
-}
-
 commutator <- function(M1, M2) M1 %*% M2 - M2 %*% M1
 
 
@@ -440,6 +415,11 @@ setMethod("%*%", signature("ddiMatrix", "tabMatrix"), function(x, y) {
 #' @rdname Matrix-methods
 setMethod("%*%", signature("CsparseMatrix", "tabMatrix"), function(x, y)
   x %*% Ctab2dgC(y)
+)
+
+#' @rdname Matrix-methods
+setMethod("%*%", signature("tabMatrix", "CsparseMatrix"), function(x, y)
+  Ctab2dgC(x) %*% y
 )
 
 #' @rdname Matrix-methods
@@ -549,7 +529,7 @@ economizeDiagMatrix <- function(M, strip.names=TRUE, vec.diag=FALSE) {
 #' @param vec.diag if \code{TRUE} a diagonal matrix is represented by a vector. In addition, if all elements
 #'  of the vector are equal then it is reduced to a scalar.
 #' @param vec.as.diag if \code{TRUE}, the default, vector input is expanded to a diagonal matrix with
-#'  this vector at its diagonal. Otherwise, vector \code{M} is interpreted as a single-column matrix.  
+#'  this vector at its diagonal. Otherwise, vector \code{M} is interpreted as a single-column matrix.
 #' @return the matrix in an efficient (memory and performance-wise) format.
 economizeMatrix <- function(M, sparse=NULL, symmetric=FALSE, strip.names=TRUE,
                             allow.tabMatrix=TRUE, drop.zeros=FALSE, vec.diag=FALSE, vec.as.diag=TRUE) {
@@ -613,6 +593,13 @@ better_sparse <- function(x) sparsity(x) > 0.5 && prod(dim(x)) > 500L
 large_and_sparse <- function(x) !is.matrix(x) && prod(dim(x)) > 1e6L
 
 setMethod("solve", signature("ddiMatrix", "numeric"), function(a, b)
+  switch(a@diag,
+    U = b,
+    N = b / a@x
+  )
+)
+
+setMethod("solve", signature("ddiMatrix", "matrix"), function(a, b)
   switch(a@diag,
     U = b,
     N = b / a@x

@@ -1,15 +1,22 @@
 
 // RcppEigen.h also pulls in Rcpp.h
 #include <RcppEigen.h>
-
 using namespace Rcpp;
 
 
-// For code that never uses random number generation,
-// use option rng=false for a tiny speed-up
+//’ In-place addition of a multiple of another vector
+//’ 
+//’ @param x a vector to be added to.
+//’ @param a a scalar value.
+//’ @param y a vector of the same length as x.
+//’ @return No return value, but x is updated in-place to x + a*y.
+// [[Rcpp::export(rng=false)]]
+void addto(Eigen::Map<Eigen::VectorXd> & x, const double a, const Eigen::Map<Eigen::VectorXd> & y) {
+  if (x.size() != y.size()) stop("incompatible dimensions");
+  x += a * y;
+}
 
-
-//’ Inverse of a symmetric positive definite (ordinary dense) matrix
+//’ Inverse of a symmetric positive definite dense matrix
 //’ 
 //’ @param M a symmetric positive definite matrix.
 //’ @return The inverse of \code{M}.
@@ -20,7 +27,16 @@ Eigen::MatrixXd inverseSPD(const Eigen::Map<Eigen::MatrixXd> & M) {
   return M.selfadjointView<Eigen::Upper>().ldlt().solve(Eigen::MatrixXd::Identity(d,d));
 }
 
-//’ Dense triangular solves, in particular solve of Lt system, with vector right hand side
+//’ Cholesky factor of a symmetric positive definite dense matrix
+//’ 
+//’ @param M a symmetric positive definite matrix.
+//’ @return The upper triangular Cholesky factor of \code{M}.
+// [[Rcpp::export(rng=false)]]
+Eigen::MatrixXd Ccholesky(const Eigen::Map<Eigen::MatrixXd> M) {
+  return M.llt().matrixU();
+}
+
+//’ Dense triangular solve, in particular of Lt system, with vector right hand side
 //’
 //’ @param M an upper triangular matrix, typically the Lt factor of a LLt decomposition.
 //’ @param y a numeric vector.
@@ -31,7 +47,7 @@ Eigen::VectorXd Cbacksolve(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::M
   return M.triangularView<Eigen::Upper>().solve(y);
 }
 
-//’ Dense triangular solves, in particular solve of L system, with vector right hand side.
+//’ Dense triangular solve, in particular of L system, with vector right hand side.
 //’
 //’ @param M an upper triangular matrix, typically the Lt factor of a LLt decomposition.
 //’ @param y a numeric vector.
@@ -42,7 +58,7 @@ Eigen::VectorXd Cforwardsolve(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen
   return M.triangularView<Eigen::Upper>().transpose().solve(y);
 }
 
-//’ Dense triangular solves, in particular solve of Lt system, with matrix right hand side
+//’ Dense triangular solve, in particular of Lt system, with matrix right hand side
 //’
 //’ @param M an upper triangular matrix, typically the Lt factor of a LLt decomposition.
 //’ @param y a numeric matrix.
@@ -53,7 +69,7 @@ Eigen::MatrixXd CbacksolveM(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::
   return M.triangularView<Eigen::Upper>().solve(y);
 }
 
-//’ Dense triangular solves, in particular solve of L system, with matrix right hand side
+//’ Dense triangular solve, in particular of L system, with matrix right hand side
 //’
 //’ @param M an upper triangular matrix, typically the Lt factor of a LLt decomposition.
 //’ @param y a numeric matrix.
@@ -520,16 +536,6 @@ Rcpp::List prec2se_cor(const Eigen::Map<Eigen::MatrixXd> & Q) {
   }
   return Rcpp::List::create(Rcpp::Named("se") = se,
                             Rcpp::Named("cor") = cor);
-}
-
-//’ Extract a column from a sparse matrix
-//’
-//’ @param A a sparse matrix (\code{dgCMatrix}).
-//’ @param j the (1-based) column index.
-//’ @return A (dense) vector with the \code{j}th column of \code{A}.
-// [[Rcpp::export(rng=false)]]
-Eigen::VectorXd get_col_dgC(const Eigen::MappedSparseMatrix<double> & A, const int j) {
-  return A.col(j - 1);
 }
 
 //’ Compute log(1 + exp(x)) in a numerically robust way

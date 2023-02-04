@@ -1,4 +1,22 @@
 
+version 0.7.2
+- prediction for new data now handles out-of-sample random effects (at least
+  for iid random effect terms), so that it becomes easier to account for
+  cluster effects from cluster samples, say
+- several other small improvements to predict method
+- small fix in preparation for upcoming Matrix 1.5-4 (thanks to Mikael Jagan)
+- model_matrix: allow single-level factor/character variables if no contrasts
+  are applied
+- bug fix: inequality constraints did not work in combination with blocked
+  Gibbs sampler
+- some parts of truncated multivariate normal samplers have been converted
+  to C++ (using Rcpp and RcppEigen) for better performance
+- argument sampler of computeDesignMatrix has been removed
+- to_draws_array can now also convert an mcdraws object (or a subset of
+  components from it) to a draws_array object for further analysis using
+  R package posterior
+
+
 version 0.7.1
 - compute_WAIC can now run using multiple cores
 - predict method with option ppcheck=TRUE now also works in parallel

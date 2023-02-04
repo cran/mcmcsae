@@ -178,7 +178,10 @@ combine_iters_dc <- function(obj) {
   n.draw <- sum(sapply(obj, function(x) nrow(x[[1L]])))
   n.var <- ncol(obj[[1L]][[1L]])
   out <- list()
-  for (ch in chains) out[[ch]] <- matrix(NA_real_, nrow=n.draw, ncol=n.var)
+  if (is.integer(obj[[1L]][[1L]][1L, 1L]))
+    for (ch in chains) out[[ch]] <- matrix(NA_integer_, nrow=n.draw, ncol=n.var)
+  else
+    for (ch in chains) out[[ch]] <- matrix(NA_real_, nrow=n.draw, ncol=n.var)
   r <- 1L
   for (obj.i in obj) {
     ind <- r:(r - 1L + nrow(obj.i[[1L]]))

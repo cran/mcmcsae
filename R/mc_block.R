@@ -160,6 +160,13 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   draw <- add(draw, bquote(tau <- .(if (e$sigma.fixed) 1 else quote(1 / p[["sigma_"]]^2))))
   # update the block-diagonal joint precision matrix
   draw <- add(draw, quote(attr(QT, "x") <- get_Qvector(p, tau)))
+  if (!is.null(S)) {  # need to reconstruct coef_ as input to TMVN sampler
+    # TODO store coef_ component and only replace the subcomponents with PX
+    #      and check whether this works in case of gen component with gl=TRUE
+    draw <- add(draw, quote(
+      for (mc in mcs) p[["coef_"]][vec_list[[mc$name]]] <- p[[mc$name]]
+    ))
+  }
   # update mec component columns of X
   # TODO more efficient update of only those elements that can change (for dgC or matrix X)
   for (mc in mcs)

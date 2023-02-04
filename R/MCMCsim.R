@@ -10,7 +10,7 @@
 #' means/standard errors for some large vector parameters, say. Another
 #' way to use less memory is to save the simulation results of large vector
 #' parameters to file.
-#' For parameters specified in \code{plot.trace} traceplots or pair plots of
+#' For parameters specified in \code{plot.trace} trace plots or pair plots of
 #' multiple parameters are displayed during the simulation.
 #'
 #' A sampler object is an environment containing data and functions to use
@@ -98,12 +98,12 @@
 #' @param stop.on.convergence if \code{TRUE} stop the simulation if the R-hat diagnostics for all parameters in \code{trace.convergence} are less than \code{convergence.bound}.
 #' @param convergence.bound threshold used with \code{stop.on.convergence}.
 #' @param plot.trace character vector of parameter names for which to plot draws
-#'  during the simulation. For one or two parameters traceplots will be shown,
+#'  during the simulation. For one or two parameters trace plots will be shown,
 #'  and if more parameters are specified the results will be displayed in a pairs
 #'  plot. For vector parameters a specific component can be selected using brackets,
 #'  e.g. \code{"beta[2]"}.
-#' @param add.to.plot if \code{TRUE} traceplot is added to every \code{n.progress} iterations,
-#'  otherwise a new plot (with new scales etc) is made after each \code{n.progress} iterations.
+#' @param add.to.plot if \code{TRUE} the plot is updated every \code{n.progress} iterations,
+#'  otherwise a new plot (with new scales) is created after every \code{n.progress} iterations.
 #' @param plot.type default is "l" (lines).
 #' @param n.cores the number of cpu cores to use. Default is one, i.e. no parallel computation.
 #'  If an existing cluster \code{cl} is provided, \code{n.cores} will be set to the number
@@ -148,11 +148,11 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
   if (n.cores > 1L) {
     if (n.cores > parallel::detectCores()) stop("too many cores")
     if (is.null(cl)) {
-      cl <- setup_cluster(n.cores, seed, export)
+      cl <- setup_cluster(n.cores, seed)
     } else {
       if (!is.null(seed)) parallel::clusterSetRNGStream(cl, seed)
-      if (!is.null(export)) parallel::clusterExport(cl, export)
     }
+    if (!is.null(export)) parallel::clusterExport(cl, export, parent.frame())
     chains.per.worker <- rep(n.chain %/% n.cores, n.cores) + rep(1:0, c(n.chain %% n.cores, n.cores - n.chain %% n.cores))
     distr.list <- vector("list", n.cores)
     for (i in seq_len(n.cores)) distr.list[[i]]$n.chain <- chains.per.worker[i]
@@ -305,9 +305,9 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
     out[["_means"]][[v]] <- list()
     if (store.sds) out[["_sds"]][[v]] <- list()
     for (ch in chains) {
-      out[["_means"]][[v]][[ch]] <- double(length(test_draw[[v]]))
+      out[["_means"]][[v]][[ch]] <- 0 * test_draw[[v]]
       if (store.sds) {
-        out[["_sds"]][[v]][[ch]] <- double(length(test_draw[[v]]))
+        out[["_sds"]][[v]][[ch]] <- 0 * test_draw[[v]]
       }
     }
   }
@@ -419,9 +419,9 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
       for (ch in chains) {
         for (v in store) out[[v]][[ch]][index, ] <- p[[ch]][[v]]
         for (v in store.mean) {
-          out[["_means"]][[v]][[ch]] <- out[["_means"]][[v]][[ch]] + p[[ch]][[v]]
+          addto(out[["_means"]][[v]][[ch]], 1, p[[ch]][[v]])
           if (store.sds)
-            out[["_sds"]][[v]][[ch]] <- out[["_sds"]][[v]][[ch]] + (p[[ch]][[v]])^2
+            addto(out[["_sds"]][[v]][[ch]], 1, (p[[ch]][[v]])^2)
         }
       }  # END for (ch in chains)
       if (write.to.file)
@@ -538,6 +538,9 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
 #' The array format is supported by some packages for analysis or visualisation of MCMC
 #' simulation results, e.g. \pkg{bayesplot}.
 #' Use \code{as.matrix} to convert to a matrix, concatenating the chains.
+#' Finally, use \code{to_draws_array} to convert either a draws component or
+#' (a subset of components of) an mcdraws object to a \code{draws_array} object
+#' as defined in package \pkg{posterior}.
 #'
 #' @examples
 #' \donttest{
@@ -552,6 +555,8 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
 #' if (require("posterior", quietly=TRUE)) {
 #'   mcbeta <- to_draws_array(sim$beta)
 #'   mcbeta
+#'   draws <- to_draws_array(sim)
+#'   str(draws)
 #' }
 #' str(as.array(sim$beta))
 #' str(as.matrix(sim$beta))
@@ -583,9 +588,12 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
 #' }
 #'
 #' @param x a component of an mcdraws object corresponding to a scalar or vector model parameter.
+#' @param components optional character vector of names of draws components in an mcdraws object.
+#'  This can be used to select a subset of components to convert to
+#'   \code{\link[posterior]{draws_array}} format.
 #' @param colnames whether column names should be set.
 #' @param ... currently ignored.
-#' @return The draws component coerced to an \code{\link[coda]{mcmc.list}} object,
+#' @return The draws component(s) coerced to an \code{\link[coda]{mcmc.list}} object,
 #'  a \code{\link[posterior]{draws_array}} object, an array, or a matrix.
 #' @name MCMC-object-conversion
 NULL
@@ -605,9 +613,24 @@ to_mcmc <- function(x) {
 
 #' @export
 #' @rdname MCMC-object-conversion
-to_draws_array <- function(x) {
-  if (!inherits(x, "dc")) stop("not an object of class 'dc'")
-  posterior::as_draws_array(as.array.dc(x))
+to_draws_array <- function(x, components=NULL) {
+  if (inherits(x, "mcdraws")) {
+    f <- function(x, name) {
+      out <- x[[name]]
+      if (nvars(out) > 1L) labels(out) <- paste(name, labels(out), sep="_")
+      to_draws_array(out)
+    }
+    if (is.null(components)) components <- par_names(x)
+    out <- f(x, components[1L])
+    for (i in seq_along(components[-1L])) {
+      out <- posterior::bind_draws(out, f(x, components[i + 1L]), along="variable")
+    }
+    out
+  } else if (inherits(x, "dc")) {
+    posterior::as_draws_array(as.array.dc(x))
+  } else {
+    stop("not an object of class 'mcdraws' or 'dc'")
+  }
 }
 
 #' @method as.array dc

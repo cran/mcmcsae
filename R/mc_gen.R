@@ -204,7 +204,7 @@ gen <- function(formula = ~ 1, factor=NULL,
     if (has.factor) {
       if (drop.empty.levels) {
         factor.cols.removed <- which(zero_col(XA))
-        if (length(factor.cols.removed)) XA <- XA[, -factor.cols.removed]
+        if (length(factor.cols.removed)) XA <- XA[, -factor.cols.removed, drop=FALSE]
       }
       X <- combine_X0_XA(X0, XA)
     } else {
@@ -311,7 +311,7 @@ gen <- function(formula = ~ 1, factor=NULL,
     }
     if (length(PX$mu0) != PX$dim) stop("wrong length for 'PX$mu0'")
     PX$Qmu0 <- PX$Q0 %m*v% PX$mu0
-    name_xi <- paste0(name, "_xi_")  # trailing '_' so that it is not stored by MCMCsim even if store.all=TRUE
+    name_xi <- paste0(name, "_xi_")  # trailing '_' --> not stored by MCMCsim even if store.all=TRUE
   }
 
   if (Leroux_type != "none") {
@@ -448,7 +448,6 @@ gen <- function(formula = ~ 1, factor=NULL,
   }
 
   # for both memory and speed efficiency define unit_Q case (random intercept and random slope with scalar var components, no constraints)
-  #unit_Q <- is.null(priorA) && isUnitDiag(QA) && (var == "scalar" && is.null(Q0)) && !constr
   unit_Q <- is.null(priorA) && isUnitDiag(QA) && (var == "scalar" && is.null(Q0)) && is.null(R)
 
   name_sigma <- paste0(name, "_sigma")
@@ -473,15 +472,14 @@ gen <- function(formula = ~ 1, factor=NULL,
 
   linpred <- function(p) X %m*v% p[[name]]
 
-  make_predict <- function(newdata) {
-    nnew <- nrow(newdata)
+  make_predict <- function(newdata, verbose=TRUE) {
     has.factor <- inherits(factor, "formula") && !intercept_only(factor)
     if (e$family$family == "multinomial") {
       edat <- new.env(parent = .GlobalEnv)
       X0 <- NULL
       if (has.factor) XA <- NULL
       for (k in seq_len(e$Km1)) {
-        edat$cat_ <- factor(rep.int(e$cats[k], nnew), levels=e$cats[-length(e$cats)])
+        edat$cat_ <- factor(rep.int(e$cats[k], nrow(newdata)), levels=e$cats[-length(e$cats)])
         X0 <- rbind(X0, model_matrix(formula, data=newdata, sparse=sparse, enclos=edat))
         if (has.factor) XA <- rbind(XA, compute_XA(factor, newdata, enclos=edat))
       }
@@ -494,13 +492,51 @@ gen <- function(formula = ~ 1, factor=NULL,
       Xnew <- combine_X0_XA(X0, XA)
     else
       Xnew <- X0
-    # for prediction do not (automatically) remove redundant columns!
-    if (remove.redundant || drop.empty.levels)
-      Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
-    # check that X has the right number of columns
-    if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
-    # TODO check the category names as well; allow oos categories; insert missing categories in newdata
-    economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE)
+    rm(has.factor, X0, XA)
+
+    if (unit_Q) {
+      # in this case we allow oos random effects and mixed cases by matching training and test levels
+      m <- match(colnames(Xnew), e$coef.names[[name]])
+      qnew <- ncol(Xnew)
+      Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE)
+      if (all(is.na(m))) {
+        # all random effects in Xnew are new
+        if (verbose) message("model component '", name, "': all effects in 'newdata' are out-of-sample effects")
+        linpred <- function(p) Xnew %m*v% Crnorm(qnew, sd = p[[name_sigma]])
+      } else if (anyNA(m)) {
+        # both existing and new levels in newdata
+        q_unmatched <- sum(is.na(m))
+        if (verbose) message("model component '", name, "': ", q_unmatched, " out of ", qnew, " effects in 'newdata' are out-of-sample effects")
+        I_matched <- which(!is.na(m))
+        I_unmatched <- setdiff(seq_len(qnew), I_matched)
+        I_coef <- m[!is.na(m)]
+        # TODO next function in C++ (no need to initialize)
+        linpred <- function(p) {
+          v <- vector("double", qnew)
+          v[I_matched] <- p[[name]][I_coef]  # TODO distinguish case where I_coef = 1:q
+          v[I_unmatched] <- Crnorm(q_unmatched, sd=p[[name_sigma]])
+          Xnew %m*v% v
+        }
+      } else {
+        # all rows of Xnew correspond to existing levels
+        if (identical(m, seq_len(q))) {
+          linpred <- function(p) Xnew %m*v% p[[name]]
+        } else {
+          I_coef <- m
+          linpred <- function(p) Xnew %m*v% p[[name]][I_coef]
+        }
+      }
+      rm(m)
+      linpred
+    } else {
+      # generic case: here we expect the same levels in training and test sets
+      # for prediction do not (automatically) remove redundant columns!
+      if (remove.redundant || drop.empty.levels)
+        Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
+      if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
+      Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE)
+      function(p) Xnew %m*v% p[[name]]
+    }
   }
 
   if (gl) {  # group-level covariates

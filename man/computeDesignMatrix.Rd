@@ -5,14 +5,12 @@
 \title{Compute a list of design matrices for all terms in a model formula,
 or based on a sampler environment}
 \usage{
-computeDesignMatrix(formula = NULL, data = NULL, sampler = NULL, labels = TRUE)
+computeDesignMatrix(formula = NULL, data = NULL, labels = TRUE)
 }
 \arguments{
 \item{formula}{model formula.}
 
 \item{data}{data frame to be used in deriving the design matrices.}
-
-\item{sampler}{a sampler environment (as created by e.g. by \code{\link{create_sampler}}).}
 
 \item{labels}{if \code{TRUE}, column names are assigned.}
 }
@@ -37,10 +35,5 @@ str(computeDesignMatrix(~ x, dat)[[1]])
 model <- ~ reg(~x, name="beta") + gen(~x, factor=~f, name="v")
 X <- computeDesignMatrix(model, dat)
 str(X)
-sampler <- create_sampler(model, dat, prior.only=TRUE)
-str(computeDesignMatrix(sampler=sampler))
-str(computeDesignMatrix(sampler=sampler, labels=FALSE))
-newdata <- data.frame(x=rnorm(10), f=dat$f[1:10])
-str(computeDesignMatrix(sampler=sampler, data=newdata))
 
 }

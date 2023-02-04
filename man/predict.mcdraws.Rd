@@ -20,6 +20,7 @@
   filename,
   write.single.prec = FALSE,
   show.progress = TRUE,
+  verbose = TRUE,
   n.cores = 1L,
   cl = NULL,
   seed = NULL,
@@ -58,7 +59,7 @@ which generates the data as a categorical vector, with integer coded levels.}
 \item{fun.}{function applied to the vector of posterior predictions to compute one or multiple summaries
 or test statistics. The function can have one or two arguments. The first argument is always the vector
 of posterior predictions. The optional second argument represents a list of model parameters, needed only
-when a test statistic depends on them.}
+when a test statistic depends on them. The function must return an integer or numeric vector.}
 
 \item{labels}{optional names for the output object. Must be a vector of the same length as the result of \code{fun.}.}
 
@@ -76,6 +77,8 @@ Default \code{NULL} means that all draws from \code{object} are used.}
 \item{write.single.prec}{Whether to write to file in single precision. Default is \code{FALSE}.}
 
 \item{show.progress}{whether to show a progress bar.}
+
+\item{verbose}{whether to show informative messages.}
 
 \item{n.cores}{the number of cpu cores to use. Default is one, i.e. no parallel computation.
 If an existing cluster \code{cl} is provided, \code{n.cores} will be set to the number

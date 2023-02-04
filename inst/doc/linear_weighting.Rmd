@@ -1,6 +1,7 @@
 ---
 title: Linear regression, prediction, and survey weighting
 output: rmarkdown::html_vignette
+bibliography: mcmcsae.bib
 vignette: >
   %\VignetteIndexEntry{Linear regression, prediction, and survey weighting}
   %\VignetteEngine{knitr::rmarkdown}

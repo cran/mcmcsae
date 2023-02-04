@@ -102,7 +102,7 @@ should be supplied.}
 This allows inference on e.g. (sub)population totals or means. The list must be of the form
 \code{list(name_1=X_1, ...)} where the names refer to the model component names and predictions are
 computed by summing \code{X_i \%*\% p[[name_i]]}. Alternatively, \code{linpred="fitted"} can be used
-for simulations of the full in-sample linear predictor.}
+as a short-cut for simulations of the full in-sample linear predictor.}
 
 \item{compute.weights}{if \code{TRUE} weights are computed for each element of \code{linpred}. Note that for
 a large dataset in combination with vector-valued linear predictors the weights can take up a lot of memory.

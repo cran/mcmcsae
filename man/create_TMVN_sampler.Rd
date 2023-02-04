@@ -22,7 +22,8 @@ create_TMVN_sampler(
   method = NULL,
   reduce = (method == "Gibbs" && !is.null(R)),
   T.HMC = pi/2,
-  print.info = FALSE,
+  max.refl = .Machine$integer.max,
+  diagnostic = FALSE,
   sharpness = 100,
   useV = FALSE
 )
@@ -69,7 +70,10 @@ equality constraints.}
 length 2 is supplied it is interpreted as an interval from which the duration is drawn uniformly,
 independently in each HMC iteration.}
 
-\item{print.info}{whether information about violations of inequalities and bounces off inequality walls
+\item{max.refl}{maximum number of reflections in HMC TMVN dynamics. Default
+is unlimited.}
+
+\item{diagnostic}{whether information about violations of inequalities and bounces off inequality walls
 is printed to the screen. This sometimes provides useful diagnostic information.}
 
 \item{sharpness}{for method 'softTMVN', the sharpness of the soft inequalities; the larger the better
@@ -127,6 +131,10 @@ Z.I. Botev and P. L'Ecuyer (2016).
  Y. Cong, B. Chen and M. Zhou (2017).
    Fast simulation of hyperplane-truncated multivariate normal distributions.
    Bayesian Analysis 12(4), 1017-1037.
+
+ Y. Li and S.K. Ghosh (2015). Efficient sampling methods for truncated multivariate normal
+   and student-t distributions subject to linear inequality constraints.
+   Journal of Statistical Theory and Practice 9(4), 712-732.
 
  A. Pakman and L. Paninski (2014).
    Exact Hamiltonian Monte Carlo for truncated multivariate gaussians.

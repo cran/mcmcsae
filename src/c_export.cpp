@@ -7,7 +7,6 @@ extern "C" SEXP CHMf_solve(SEXP a, SEXP b, SEXP system);
 extern "C" SEXP CHMf_solve_matrix(SEXP a, SEXP b, SEXP system);
 extern "C" SEXP CHMf_spsolve(SEXP a, SEXP b, SEXP system);
 extern "C" SEXP CHM_update_inplace(SEXP object, SEXP parent, SEXP mult);
-extern "C" void CHM_options();
 
 
 // [[Rcpp::export]]
@@ -33,9 +32,4 @@ SEXP cCHMf_spsolve(SEXP a, SEXP b, SEXP system) {
 // [[Rcpp::export]]
 SEXP cCHM_update_inplace(SEXP object, SEXP parent, SEXP mult) {
   return CHM_update_inplace(object, parent, mult);
-}
-
-// [[Rcpp::export]]
-void cCHM_options() {
-  CHM_options();
 }

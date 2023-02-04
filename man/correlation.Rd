@@ -27,6 +27,11 @@ a set of linear constraints to be imposed on the coefficient vector.
     package \pkg{maptools}. Arguments \code{snap} and \code{queen} are passed to \code{\link[spdep]{poly2nb}}.
     If \code{derive.constraints=TRUE} the constraint matrix for an IGMRF model component
     is formed by computing the singular vectors of the precision matrix.}
+  \item{spline(f, knots, degree)}{P-splines, i.e. penalized B-splines structure over
+    the domain of a quantitative variable f. Arguments knots and degree are passed to
+    \code{\link[splines]{splineDesign}}. If \code{knots} is a single value it is interpreted as
+    the number of knots, otherwise as a vector of knot positions. By default 40 equally spaced
+    knots are used, and a degree of 3.}
   \item{custom(f, D=NULL, Q=NULL, R=NULL, derive.constraints=NULL)}{Either a custom precision or incidence
     matrix associated with factor f can be passed to argument \code{Q} or \code{D}. Optionally a
     constraint matrix can be supplied as \code{R}, or constraints can be derived from the null space

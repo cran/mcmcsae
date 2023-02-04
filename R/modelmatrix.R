@@ -112,7 +112,7 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
       if (anyNA(fac)) stop("missing(s) in variable ", f)
       levs <- attr(fac, "levels")
       ncat <- length(levs)
-      if (ncat <= 1L) stop("factor variable with fewer than two levels: ", f)
+      if (ncat <= 1L && !is.null(contrasts.arg)) stop("factor variable with fewer than two levels: ", f)
       # NB if tmat[f, k] == 2L a main effect is missing and we should not remove a level!
       # also, if there is no intercept, no level should be removed for the first main factor effect
       # see the documentation of terms.formula

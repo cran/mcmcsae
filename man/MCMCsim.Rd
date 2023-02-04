@@ -88,13 +88,13 @@ Each named parameter is written to a separate file, named \code{filename_paramet
 \item{convergence.bound}{threshold used with \code{stop.on.convergence}.}
 
 \item{plot.trace}{character vector of parameter names for which to plot draws
-during the simulation. For one or two parameters traceplots will be shown,
+during the simulation. For one or two parameters trace plots will be shown,
 and if more parameters are specified the results will be displayed in a pairs
 plot. For vector parameters a specific component can be selected using brackets,
 e.g. \code{"beta[2]"}.}
 
-\item{add.to.plot}{if \code{TRUE} traceplot is added to every \code{n.progress} iterations,
-otherwise a new plot (with new scales etc) is made after each \code{n.progress} iterations.}
+\item{add.to.plot}{if \code{TRUE} the plot is updated every \code{n.progress} iterations,
+otherwise a new plot (with new scales) is created after every \code{n.progress} iterations.}
 
 \item{plot.type}{default is "l" (lines).}
 
@@ -125,7 +125,7 @@ be stored. To save memory, it is also possible to only store Monte Carlo
 means/standard errors for some large vector parameters, say. Another
 way to use less memory is to save the simulation results of large vector
 parameters to file.
-For parameters specified in \code{plot.trace} traceplots or pair plots of
+For parameters specified in \code{plot.trace} trace plots or pair plots of
 multiple parameters are displayed during the simulation.
 }
 \details{

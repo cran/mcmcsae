@@ -8,7 +8,7 @@ using namespace Rcpp;
 //’ @param x a numeric vector representing the matrix diagonal.
 //’ @return The diagonal matrix of class \code{ddiMatrix} with diagonal \code{x}.
 // [[Rcpp::export(rng=false)]]
-SEXP Ctab(IntegerVector Dim, bool reduced, IntegerVector perm, bool num, NumericVector x) {
+SEXP Ctab(const IntegerVector & Dim, const bool reduced, const IntegerVector & perm, const bool num, const NumericVector & x) {
   S4 out("tabMatrix");
   out.slot("Dim") = clone(Dim);
   out.slot("reduced") = reduced;
@@ -38,19 +38,11 @@ NumericVector Ctab_numeric_prod(const SEXP A, const NumericVector & y, const boo
     if (num && !ignore_x) {
       const NumericVector x(as<S4>(A).slot("x"));
       for (int i = 0; i < n; i++) {
-        if (perm[i] < 0) {
-          out[i] = 0;
-        } else {  
-          out[i] = x[i] * y[perm[i]];
-        }
+        out[i] = (perm[i] >= 0) * x[i] * y[perm[i]];
       }
     } else {
       for (int i = 0; i < n; i++) {
-        if (perm[i] < 0) {
-          out[i] = 0;
-        } else {
-          out[i] = y[perm[i]];
-        }
+        out[i] = (perm[i] >= 0) * y[perm[i]];
       }
     }
   } else {
@@ -393,16 +385,28 @@ NumericMatrix Ctab2mat(const SEXP M) {
   NumericMatrix out(Dim[0], Dim[1]);
   if (num) {
     const NumericVector x(as<S4>(M).slot("x"));
-    for (int i = 0; i < Dim[0]; i++) {
-      if (perm[i] >= 0) {
+    if (reduced) {
+      for (int i = 0; i < Dim[0]; i++) {
+        if (perm[i] >= 0) {
+          out(i, perm[i]) = x[i];
+        }
+      }
+    } else {
+      for (int i = 0; i < Dim[0]; i++) {
         out(i, perm[i]) = x[i];
       }
     }
   } else {
-    for (int i = 0; i < Dim[0]; i++) {
-      if (perm[i] >= 0) {
-        out(i, perm[i]) = 1;
+    if (reduced) {
+      for (int i = 0; i < Dim[0]; i++) {
+        if (perm[i] >= 0) {
+          out(i, perm[i]) = 1;
+        }
       }
+    } else {
+      for (int i = 0; i < Dim[0]; i++) {
+        out(i, perm[i]) = 1;
+      } 
     }
   }
   return out;

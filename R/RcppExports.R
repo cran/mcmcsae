@@ -5,12 +5,20 @@ Crtuvn <- function(l, u) {
     .Call(`_mcmcsae_Crtuvn`, l, u)
 }
 
-Crtmvn_Gibbs <- function(v, Ut, ustar, eps) {
-    .Call(`_mcmcsae_Crtmvn_Gibbs`, v, Ut, ustar, eps)
+Crtmvn_Gibbs_dense <- function(v, Ut, ustar, eps) {
+    .Call(`_mcmcsae_Crtmvn_Gibbs_dense`, v, Ut, ustar, eps)
+}
+
+Crtmvn_Gibbs_sparse <- function(v, Ut, ustar, eps) {
+    .Call(`_mcmcsae_Crtmvn_Gibbs_sparse`, v, Ut, ustar, eps)
 }
 
 CrTNprobit <- function(mu, y) {
     .Call(`_mcmcsae_CrTNprobit`, mu, y)
+}
+
+TMVN_HMC_C <- function(S, S_cols, v0, x0, s_adj, refl_fac, zero_mu, mu, simplified, VS, diagnostic, bounces, t_sim, max_refl) {
+    .Call(`_mcmcsae_TMVN_HMC_C`, S, S_cols, v0, x0, s_adj, refl_fac, zero_mu, mu, simplified, VS, diagnostic, bounces, t_sim, max_refl)
 }
 
 cCHM_dsC_Cholesky <- function(a, perm, LDL, super, Imult, m) {
@@ -33,10 +41,6 @@ cCHM_update_inplace <- function(object, parent, mult) {
     .Call(`_mcmcsae_cCHM_update_inplace`, object, parent, mult)
 }
 
-cCHM_options <- function() {
-    invisible(.Call(`_mcmcsae_cCHM_options`))
-}
-
 CrPGapprox <- function(n, b, z, m) {
     .Call(`_mcmcsae_CrPGapprox`, n, b, z, m)
 }
@@ -53,8 +57,16 @@ CrCRT <- function(y, r, m = 20L) {
     .Call(`_mcmcsae_CrCRT`, y, r, m)
 }
 
+addto <- function(x, a, y) {
+    invisible(.Call(`_mcmcsae_addto`, x, a, y))
+}
+
 inverseSPD <- function(M) {
     .Call(`_mcmcsae_inverseSPD`, M)
+}
+
+Ccholesky <- function(M) {
+    .Call(`_mcmcsae_Ccholesky`, M)
 }
 
 Cbacksolve <- function(M, y) {
@@ -211,10 +223,6 @@ Csparse_crossprod_sym2 <- function(A, B) {
 
 prec2se_cor <- function(Q) {
     .Call(`_mcmcsae_prec2se_cor`, Q)
-}
-
-get_col_dgC <- function(A, j) {
-    .Call(`_mcmcsae_get_col_dgC`, A, j)
 }
 
 log1pexpC <- function(x) {

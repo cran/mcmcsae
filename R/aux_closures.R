@@ -1,7 +1,6 @@
 
 # Return a closure for summation of symmetric matrices of a fixed (zero-)structure.
 # supported matrices are matrix, dsCMatrix, ddiMatrix
-# (no support for packed dense symmetric, as it does not seem worth it: small memory gain, performance loss)
 # at most one of M0, M2 can be null
 # M0 is completely fixed
 # M1 and M2 can change in value, but not in zero-structure
@@ -38,7 +37,7 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
         update <- function(M1, M2, w1=1, w2=1) add_diagC(w2 * M2, w1 * ddi_diag(M1))
       },
       matdsC = {
-        IM <- cbind(M2@i + 1L, rep.int(1:M2@Dim[2L], diff(M2@p)))  # one-based index
+        IM <- cbind(M2@i + 1L, rep.int(seq_len(M2@Dim[2L]), diff(M2@p)))  # one-based index
         symm <- which(IM[, 1L] != IM[, 2L])  # rows that should be added in order to symmetrize the result
         rm(template)
         update <- function(M1, M2, w1=1, w2=1) {
@@ -49,7 +48,7 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
         }
       },
       dsCmat = {
-        IM <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))
+        IM <- cbind(M1@i + 1L, rep.int(seq_len(M1@Dim[2L]), diff(M1@p)))
         symm <- which(IM[, 1L] != IM[, 2L])
         rm(template)
         update <- function(M1, M2, w1=1, w2=1) {
@@ -106,7 +105,7 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
         update <- function(M1, M2, w1=1, w2=1) add_diagC(template, w1 * ddi_diag(M1))
       },
       matdsCNUL = {
-        IM <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))
+        IM <- cbind(M1@i + 1L, rep.int(seq_len(M1@Dim[2L]), diff(M1@p)))
         symm <- which(IM[, 1L] != IM[, 2L])
         template <- as.matrix(M0)
         update <- function(M1, M2, w1=1, w2=1) {
@@ -172,7 +171,7 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
         update <- function(M1, M2, w1=1, w2=1) add_diagC(template, w1 * ddi_diag(M1) + w2 * ddi_diag(M2))
       },
       matmatdsC = {
-        IM <- cbind(M2@i + 1L, rep.int(1:M2@Dim[2L], diff(M2@p)))
+        IM <- cbind(M2@i + 1L, rep.int(seq_len(M2@Dim[2L]), diff(M2@p)))
         symm <- which(IM[, 1L] != IM[, 2L])
         template <- as.matrix(M0)
         update <- function(M1, M2, w1=1, w2=1) {
@@ -183,7 +182,7 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
         }
       },
       matdsCmat = {
-        IM <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))
+        IM <- cbind(M1@i + 1L, rep.int(seq_len(M1@Dim[2L]), diff(M1@p)))
         symm <- which(IM[, 1L] != IM[, 2L])
         template <- as.matrix(M0)
         update <- function(M1, M2, w1=1, w2=1) {
@@ -194,7 +193,7 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
         }
       },
       matdsCddi = {
-        IM <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))
+        IM <- cbind(M1@i + 1L, rep.int(seq_len(M1@Dim[2L]), diff(M1@p)))
         symm <- which(IM[, 1L] != IM[, 2L])
         template <- as.matrix(M0)
         update <- function(M1, M2, w1=1, w2=1) {
@@ -205,7 +204,7 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
         }
       },
       matddidsC = {
-        IM <- cbind(M2@i + 1L, rep.int(1:M2@Dim[2L], diff(M2@p)))
+        IM <- cbind(M2@i + 1L, rep.int(seq_len(M2@Dim[2L]), diff(M2@p)))
         symm <- which(IM[, 1L] != IM[, 2L])
         template <- as.matrix(M0)
         update <- function(M1, M2, w1=1, w2=1) {
@@ -216,9 +215,9 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
         }
       },
       matdsCdsC = {
-        IM1 <- cbind(M1@i + 1L, rep.int(1:M1@Dim[2L], diff(M1@p)))
+        IM1 <- cbind(M1@i + 1L, rep.int(seq_len(M1@Dim[2L]), diff(M1@p)))
         symm1 <- which(IM1[, 1L] != IM1[, 2L])
-        IM2 <- cbind(M2@i + 1L, rep.int(1:M2@Dim[2L], diff(M2@p)))
+        IM2 <- cbind(M2@i + 1L, rep.int(seq_len(M2@Dim[2L]), diff(M2@p)))
         symm2 <- which(IM2[, 1L] != IM2[, 2L])
         template <- as.matrix(M0)
         update <- function(M1, M2, w1=1, w2=1) {

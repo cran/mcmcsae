@@ -9,6 +9,7 @@
 \alias{\%*\%,ddiMatrix,dgCMatrix-method}
 \alias{\%*\%,ddiMatrix,tabMatrix-method}
 \alias{\%*\%,CsparseMatrix,tabMatrix-method}
+\alias{\%*\%,tabMatrix,CsparseMatrix-method}
 \alias{tcrossprod,matrix,dgCMatrix-method}
 \alias{tcrossprod,matrix,tabMatrix-method}
 \alias{tcrossprod,matrix,ddiMatrix-method}
@@ -32,6 +33,8 @@
 \S4method{\%*\%}{ddiMatrix,tabMatrix}(x, y)
 
 \S4method{\%*\%}{CsparseMatrix,tabMatrix}(x, y)
+
+\S4method{\%*\%}{tabMatrix,CsparseMatrix}(x, y)
 
 \S4method{tcrossprod}{matrix,dgCMatrix}(x, y)
 

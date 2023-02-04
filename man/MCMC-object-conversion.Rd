@@ -10,7 +10,7 @@
 \usage{
 to_mcmc(x)
 
-to_draws_array(x)
+to_draws_array(x, components = NULL)
 
 \method{as.array}{dc}(x, ...)
 
@@ -19,12 +19,16 @@ to_draws_array(x)
 \arguments{
 \item{x}{a component of an mcdraws object corresponding to a scalar or vector model parameter.}
 
+\item{components}{optional character vector of names of draws components in an mcdraws object.
+This can be used to select a subset of components to convert to
+ \code{\link[posterior]{draws_array}} format.}
+
 \item{...}{currently ignored.}
 
 \item{colnames}{whether column names should be set.}
 }
 \value{
-The draws component coerced to an \code{\link[coda]{mcmc.list}} object,
+The draws component(s) coerced to an \code{\link[coda]{mcmc.list}} object,
  a \code{\link[posterior]{draws_array}} object, an array, or a matrix.
 }
 \description{
@@ -34,6 +38,9 @@ Use \code{as.array} to convert to an array of dimension \code{(draws, chains, pa
 The array format is supported by some packages for analysis or visualisation of MCMC
 simulation results, e.g. \pkg{bayesplot}.
 Use \code{as.matrix} to convert to a matrix, concatenating the chains.
+Finally, use \code{to_draws_array} to convert either a draws component or
+(a subset of components of) an mcdraws object to a \code{draws_array} object
+as defined in package \pkg{posterior}.
 }
 \examples{
 \donttest{
@@ -48,6 +55,8 @@ if (require("coda", quietly=TRUE)) {
 if (require("posterior", quietly=TRUE)) {
   mcbeta <- to_draws_array(sim$beta)
   mcbeta
+  draws <- to_draws_array(sim)
+  str(draws)
 }
 str(as.array(sim$beta))
 str(as.matrix(sim$beta))

@@ -112,7 +112,7 @@
 #'  This allows inference on e.g. (sub)population totals or means. The list must be of the form
 #'  \code{list(name_1=X_1, ...)} where the names refer to the model component names and predictions are
 #'  computed by summing \code{X_i \%*\% p[[name_i]]}. Alternatively, \code{linpred="fitted"} can be used
-#'  for simulations of the full in-sample linear predictor.
+#'  as a short-cut for simulations of the full in-sample linear predictor.
 #' @param compute.weights if \code{TRUE} weights are computed for each element of \code{linpred}. Note that for
 #'  a large dataset in combination with vector-valued linear predictors the weights can take up a lot of memory.
 #'  By default only means are stored in the simulation carried out using \code{\link{MCMCsim}}.
@@ -586,13 +586,16 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
   }
 
   lin_predict <- function(p, linpred) {
-    out <- if (use.offset) offset else 0
-    if (is.null(linpred))
-      for (mc in mod) out <- out + mc$linpred(p)
-    else
-      for (k in names(linpred))
-        out <- out + if (is.function(linpred[[k]])) linpred[[k]](p) else linpred[[k]] %m*v% p[[k]]
-    out
+    if (is.null(linpred)) {  # in-sample linear predictor
+      out <- mod[[1L]]$linpred(p)
+      for (mc in mod[-1L]) out <- out + mc$linpred(p)
+    } else {
+      # linpred can now be a function, see make_pred in gen (work in progress)
+      # TODO make sure it is always a function
+      out <- if (is.function(linpred[[1L]])) linpred[[1L]](p) else linpred[[1L]] %m*v% p[[names(linpred)[1L]]]
+      for (k in names(linpred)[-1L]) out <- out + if (is.function(linpred[[k]])) linpred[[k]](p) else linpred[[k]] %m*v% p[[k]]
+    }
+    if (use.offset) out + offset else out
   }
   switch(family$family,
     gaussian =

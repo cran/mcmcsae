@@ -194,7 +194,7 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL, Q0=NULL, b0=NULL,
 
   # function that creates an oos prediction function (closure) based on new data
   # this computes the contribution of this component to the linear predictor
-  make_predict <- function(newdata) {
+  make_predict <- function(newdata, verbose=TRUE) {
     if (!V.in.formula) stop("for out-of-sample prediction with mec components make sure to specify the",
                             "measurement error variances using the formula argument")
     Xnew <- model_matrix(formula.X, newdata, sparse=sparse)

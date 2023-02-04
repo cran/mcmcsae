@@ -43,7 +43,7 @@
 #' @param fun. function applied to the vector of posterior predictions to compute one or multiple summaries
 #'  or test statistics. The function can have one or two arguments. The first argument is always the vector
 #'  of posterior predictions. The optional second argument represents a list of model parameters, needed only
-#'  when a test statistic depends on them.
+#'  when a test statistic depends on them. The function must return an integer or numeric vector.
 #' @param labels optional names for the output object. Must be a vector of the same length as the result of \code{fun.}.
 #' @param ppcheck if \code{TRUE}, function \code{fun.} is also applied to the observed data and
 #'  an MCMC approximation is computed of the posterior predictive probability that the test statistic for
@@ -54,6 +54,7 @@
 #' @param filename name of the file to write predictions to in case \code{to.file=TRUE}.
 #' @param write.single.prec Whether to write to file in single precision. Default is \code{FALSE}.
 #' @param show.progress whether to show a progress bar.
+#' @param verbose whether to show informative messages.
 #' @param n.cores the number of cpu cores to use. Default is one, i.e. no parallel computation.
 #'  If an existing cluster \code{cl} is provided, \code{n.cores} will be set to the number
 #'  of workers in that cluster.
@@ -73,7 +74,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
                           var=NULL, ny=NULL, ry=NULL,
                           fun.=identity, labels=NULL, ppcheck=FALSE, iters=NULL,
                           to.file=FALSE, filename, write.single.prec=FALSE,
-                          show.progress=TRUE,
+                          show.progress=TRUE, verbose=TRUE,
                           n.cores=1L, cl=NULL, seed=NULL, export=NULL, ...) {
   type <- match.arg(type)
   if (ppcheck && type != "data") stop("posterior predictive checks only possible with type = 'data'")
@@ -175,8 +176,8 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
     if (!is.null(X.)) warning("argument 'X.' is ignored", immediate.=TRUE)
     use.linpred_ <- FALSE
     X. <- list()
-    if (nrow(newdata) > 5e4L) message("setting up model design matrices for 'newdata'")
-    for (mc in model$mod) X.[[mc$name]] <- mc$make_predict(newdata)
+    if (verbose && nrow(newdata) > 5e4L) message("setting up model design matrices for 'newdata'")
+    for (mc in model$mod) X.[[mc$name]] <- mc$make_predict(newdata, verbose=verbose)
     if (!is.null(X.) && !all(names(X.) %in% par.names)) stop("for prediction all coefficients must be stored in 'object' (use 'store.all=TRUE' in MCMCsim)")
     if (fam$family == "multinomial")
       n <- nrow(newdata) * model$Km1
@@ -200,11 +201,27 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
     }
   }
 
-  # determine dimension of test statistic
-  if (arg1)
-    d <- length(fun.(rep.int(0, n)))
-  else
-    d <- length(fun.(rep.int(0, n), get_draw(object, 1L, 1L)))
+  # determine dimension and mode (integer/double) of test statistic
+  if ((type == "data" && fam$family != "gaussian") || type == "data_cat") {
+    # x argument of fun. is integer
+    if (arg1) {
+      temp <- fun.(rep.int(1L, n))
+    } else {
+      temp <- fun.(rep.int(1L, n), get_draw(object, 1L, 1L))
+    }
+  } else {
+    # x argument of fun. is double
+    if (arg1) {
+      temp <- fun.(rep.int(0.1, n))  
+    } else {
+      temp <- fun.(rep.int(0.1, n), get_draw(object, 1L, 1L))
+    }
+  }
+  d <- length(temp)
+  out_type <- storage.mode(temp)
+  if (!(out_type %in% c("logical", "integer", "double"))) stop("'fun.' must return an integer or numeric vector")
+  rm(temp)
+
   if (!is.null(labels) && length(labels) != d) stop("incompatible 'labels' vector")
   if (fam$family == "multinomial") {
     if (is.null(labels) && isTRUE(all.equal(fun., identity)) && type != "data_cat")
@@ -236,27 +253,22 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
     n.cores <- length(cl)
   if (n.cores > 1L) {
     if (n.cores > parallel::detectCores()) stop("too many cores")
-    reserved.export.names <- c("X.", "cholQ", "var", "V", "ny", "ry", "d", "ppcheck")
     if (is.null(cl)) {
-      cl <- setup_cluster(n.cores, seed, export)
+      cl <- setup_cluster(n.cores, seed)
       on.exit(stop_cluster(cl))
     } else {
-      if (!is.null(export)) {
-        if (!is.character(export)) stop("'export' must be a character vector")
-        if (any(export %in% reserved.export.names))
-          stop("please use variable names other than ", paste(reserved.export.names, collapse=", "),
-               " in the definition of 'fun.'")
-        parallel::clusterExport(cl, export)
-      }
       if (!is.null(seed)) parallel::clusterSetRNGStream(cl, seed)
     }
-    parallel::clusterExport(cl, reserved.export.names, environment())
-    message(length(iters) * n.chain, " draws distributed over ", n.cores, " cores")
+    if (!is.null(export)) {
+      if (!is.character(export)) stop("'export' must be a character vector")
+      parallel::clusterExport(cl, export, parent.frame())
+    }
+    if (verbose) message(length(iters) * n.chain, " draws distributed over ", n.cores, " cores")
     sim_list <- split_iters(object, iters, parts=n.cores)
     predict_obj <- function(obj) {
       chains <- seq_len(nchains(obj))
       iters <- seq_len(ndraws(obj))
-      if ((type == "data" && fam$family != "gaussian") || type == "data_cat")
+      if (out_type %in% c("logical", "integer"))
         out <- rep.int(list(matrix(NA_integer_, length(iters), d)), length(chains))
       else
         out <- rep.int(list(matrix(NA_real_, length(iters), d)), length(chains))
@@ -265,7 +277,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
         if (arg1)
           fy <- fun.(model$y)
         else
-          y <- obj[["_model"]]$y
+          y <- model$y
       }
       for (i in iters) {
         for (ch in chains) {
@@ -298,7 +310,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
       write.size <- if (write.single.prec) 4L else NA_integer_
       ppcheck <- FALSE  # TODO allow ppcheck in the case that predictions are written to file
     } else {
-      if ((type == "data" && fam$family != "gaussian") || type == "data_cat")
+      if (out_type %in% c("logical", "integer"))
         out <- rep.int(list(matrix(NA_integer_, n.it, d)), n.chain)
       else
         out <- rep.int(list(matrix(NA_real_, n.it, d)), n.chain)

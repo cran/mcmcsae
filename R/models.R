@@ -34,58 +34,37 @@ check_mod_names <- function(x) {
 #' model <- ~ reg(~x, name="beta") + gen(~x, factor=~f, name="v")
 #' X <- computeDesignMatrix(model, dat)
 #' str(X)
-#' sampler <- create_sampler(model, dat, prior.only=TRUE)
-#' str(computeDesignMatrix(sampler=sampler))
-#' str(computeDesignMatrix(sampler=sampler, labels=FALSE))
-#' newdata <- data.frame(x=rnorm(10), f=dat$f[1:10])
-#' str(computeDesignMatrix(sampler=sampler, data=newdata))
 #'
 #' @export
 #' @param formula model formula.
 #' @param data data frame to be used in deriving the design matrices.
-#' @param sampler a sampler environment (as created by e.g. by \code{\link{create_sampler}}).
 #' @param labels if \code{TRUE}, column names are assigned.
 #' @return A list of design matrices.
-computeDesignMatrix <- function(formula=NULL, data=NULL, sampler=NULL, labels=TRUE) {
-  if (is.null(formula)) {
-    if (is.null(sampler)) stop("either 'formula' or 'sampler' must be provided")
-    if (!is.environment(sampler) || is.null(sampler$mod)) stop("not a sampler environment")
-    out <- list()
-    for (mc in sampler$mod) {
-      if (is.null(data))
-        out[[mc$name]] <- mc$X
-      else
-        out[[mc$name]] <- mc$make_predict(data)
-      if (labels) {
-        dimnames(out[[mc$name]])[[2L]] <- sampler$coef.names[[mc$name]]
-      }
-    }
-  } else {
-    if (!inherits(formula, "formula")) stop("'formula' must be a formula")
-    formula <- standardize_formula(formula, data=data)
-    out <- to_mclist(formula)
-    for (m in seq_along(out)) {
-      mc <- as.list(out[[m]])[-1L]
-      if (is.null(mc$formula))
-        mc$formula <- ~ 1
-      else
-        mc$formula <- as.formula(eval(mc$formula))
-      environment(mc$formula) <- environment(formula)
-      if ("|" %in% all.names(mc$formula)) {
-        # assume this is a mec component; we use as design matrix the covariate matrix subject to error
-        vs <- as.list(attr(terms(mc$formula), "variables")[-1L])
-        formula.X <- as.formula(paste0("~ 0 + ", paste(sapply(vs, function(x) deparse(x[[2L]])), collapse=" + ")), env=environment(formula))
-        out[[m]] <- model_matrix(formula.X, data, sparse=mc$sparse)
-      } else {
-        if (!is.null(mc$factor))
-          mc$factor <- as.formula(mc$factor, env=environment(formula))
-        if (is.null(mc$remove.redundant)) mc$remove.redundant <- FALSE
-        if (is.null(mc$drop.empty.levels)) mc$drop.empty.levels <- FALSE
-        out[[m]] <- compute_X(mc$formula, mc$factor, mc$remove.redundant,
-            mc$drop.empty.levels, mc$sparse, data)
-      }        
-      if (!labels) colnames(out[[m]]) <- NULL
-    }
+computeDesignMatrix <- function(formula=NULL, data=NULL, labels=TRUE) {
+  if (!inherits(formula, "formula")) stop("'formula' must be a formula")
+  formula <- standardize_formula(formula, data=data)
+  out <- to_mclist(formula)
+  for (m in seq_along(out)) {
+    mc <- as.list(out[[m]])[-1L]
+    if (is.null(mc$formula))
+      mc$formula <- ~ 1
+    else
+      mc$formula <- as.formula(eval(mc$formula))
+    environment(mc$formula) <- environment(formula)
+    if ("|" %in% all.names(mc$formula)) {
+      # assume this is a mec component; we use as design matrix the covariate matrix subject to error
+      vs <- as.list(attr(terms(mc$formula), "variables")[-1L])
+      formula.X <- as.formula(paste0("~ 0 + ", paste(sapply(vs, function(x) deparse(x[[2L]])), collapse=" + ")), env=environment(formula))
+      out[[m]] <- model_matrix(formula.X, data, sparse=mc$sparse)
+    } else {
+      if (!is.null(mc$factor))
+        mc$factor <- as.formula(mc$factor, env=environment(formula))
+      if (is.null(mc$remove.redundant)) mc$remove.redundant <- FALSE
+      if (is.null(mc$drop.empty.levels)) mc$drop.empty.levels <- FALSE
+      out[[m]] <- compute_X(mc$formula, mc$factor, mc$remove.redundant,
+          mc$drop.empty.levels, mc$sparse, data)
+    }        
+    if (!labels) colnames(out[[m]]) <- NULL
   }
   out
 }
@@ -456,6 +435,11 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
 #'     package \pkg{maptools}. Arguments \code{snap} and \code{queen} are passed to \code{\link[spdep]{poly2nb}}.
 #'     If \code{derive.constraints=TRUE} the constraint matrix for an IGMRF model component
 #'     is formed by computing the singular vectors of the precision matrix.}
+#'   \item{spline(f, knots, degree)}{P-splines, i.e. penalized B-splines structure over
+#'     the domain of a quantitative variable f. Arguments knots and degree are passed to
+#'     \code{\link[splines]{splineDesign}}. If \code{knots} is a single value it is interpreted as
+#'     the number of knots, otherwise as a vector of knot positions. By default 40 equally spaced
+#'     knots are used, and a degree of 3.}
 #'   \item{custom(f, D=NULL, Q=NULL, R=NULL, derive.constraints=NULL)}{Either a custom precision or incidence
 #'     matrix associated with factor f can be passed to argument \code{Q} or \code{D}. Optionally a
 #'     constraint matrix can be supplied as \code{R}, or constraints can be derived from the null space

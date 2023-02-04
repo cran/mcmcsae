@@ -150,7 +150,7 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
 
   linpred <- function(p) X %m*v% p[[name]]
 
-  make_predict <- function(newdata) {
+  make_predict <- function(newdata, verbose=TRUE) {
     nnew <- nrow(newdata)
     if (e$family$family == "multinomial") {
       edat <- new.env(parent = .GlobalEnv)
@@ -246,9 +246,8 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
     start <- function(p) MVNsampler$start(p)
   }  # END if (!in_block)
 
-  rm(R, r, S, s, lower, upper)
+  if (!in_block || is.null(S)) rm(R, r, S, s, lower, upper)
 
-  #rm(e)
   environment()
 }
 
