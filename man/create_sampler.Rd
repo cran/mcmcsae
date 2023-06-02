@@ -36,8 +36,9 @@ treated in the same way as a \code{reg(...)} term, but without the option to cha
 \item{data}{data frame with n rows in which the variables specified in model components (if any) can be found.}
 
 \item{family}{character string describing the data distribution. The default is 'gaussian'.
-Other options are 'binomial' for the binomial distribution and 'negbinomial' for the negative binomial distribution,
-and "poisson" for the Poisson distribution.
+Other options are 'binomial' for the binomial distribution, 'negbinomial' for the negative binomial distribution,
+and "poisson" for the Poisson distribution. See \link{mcmcsae-family} for the
+functional way of specifying \code{family} and associated settings.
 For the binomial distribution logistic and probit link functions are supported, the latter only
 for binary data. For the negative binomial and Poisson distributions a log link function is assumed.
 Note that posterior inference based on the Poisson distribution is implemented only approximately,
@@ -150,7 +151,7 @@ passed as a list with possible elements
   \item{add.outer.R}{whether to add the outer product of the constraint matrix for a better conditioned solve system
     for blocks. This is done by default when using blocked Gibbs sampling for blocks with constraints.}
   \item{recompute.e}{when \code{FALSE} residuals or linear predictors are only computed at the start of the simulation.
-    This may give a modest speedup but in some cases may be less accurate due to roundoff error accumulation.
+    This may give a modest speedup but in some cases may be less accurate due to round-off error accumulation.
     Default is \code{TRUE}.}
   \item{CG}{for a conjugate gradient iterative algorithm instead of Cholesky updates for sampling
     the model's coefficients. This must be a list with possible components \code{max.it},
@@ -186,7 +187,7 @@ J.H. Albert and S. Chib (1993).
 
  S.W. Linderman, M.J. Johnson and R.P. Adams (2015).
    Dependent multinomial models made easy: Stick-breaking with the Polya-Gamma augmentation.
-   Advances in Neural Information Processing Systems, 3456–3464.
+   Advances in Neural Information Processing Systems, 3456-3464.
 
  N. Polson, J.G. Scott and J. Windle (2013).
    Bayesian Inference for Logistic Models Using Polya-Gamma Latent Variables.
@@ -195,7 +196,7 @@ J.H. Albert and S. Chib (1993).
  H. Rue and L. Held (2005).
    Gaussian Markov Random Fields.
    Chapman & Hall/CRC.
-   
+
  M. Zhou and L. Carin (2015).
    Negative Binomial Process Count and Mixture Modeling.
    IEEE Transactions on Pattern Analysis and Machine Intelligence 37(2), 307-320.

@@ -77,7 +77,7 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
     },
     dsCMatrix = {
       cholM <- Cholesky_dsC(M, perm=perm, LDL=LDL, super=super, Imult=Imult, ordering=ordering)
-      perm <- !identical(cholM@perm, 0:(length(cholM@perm) - 1L))
+      perm <- is.unsorted(cholM@perm, strictly = TRUE)
       if (perm) {  # permutation matrix unaffected by updates
         P <- cholM@perm + 1L
         iP <- invPerm(cholM@perm, zero.p=TRUE)

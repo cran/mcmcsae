@@ -30,6 +30,8 @@ Get the number of chains, samples per chain or the number of variables in a simu
 ex <- mcmcsae_example(n=50)
 sampler <- create_sampler(ex$model, data=ex$dat)
 sim <- MCMCsim(sampler, burnin=100, n.iter=300, thin=2, n.chain=5, store.all=TRUE)
+# resolve possible conflict with posterior package:
+nchains <- mcmcsae::nchains; ndraws <- mcmcsae::ndraws
 nchains(sim); nchains(sim$beta)
 ndraws(sim); ndraws(sim$beta)
 nvars(sim$beta); nvars(sim$sigma_); nvars(sim$llh_); nvars(sim$v)

@@ -22,7 +22,7 @@
 #'  with the number of the variance model term attached.
 #' @param e for internal use only.
 #' @return An object with precomputed quantities and functions for sampling from
-#'  prior or conditional posterior distributions for this model component. Only intended
+#'  prior or conditional posterior distributions for this model component. Intended
 #'  for internal use by other package functions.
 #' @references
 #'  E. Cepeda and D. Gamerman (2000).

@@ -13,6 +13,14 @@ Crtmvn_Gibbs_sparse <- function(v, Ut, ustar, eps) {
     .Call(`_mcmcsae_Crtmvn_Gibbs_sparse`, v, Ut, ustar, eps)
 }
 
+Crtmvn_slice_Gibbs_dense <- function(v, Ut, ustar, eps) {
+    .Call(`_mcmcsae_Crtmvn_slice_Gibbs_dense`, v, Ut, ustar, eps)
+}
+
+Crtmvn_slice_Gibbs_sparse <- function(v, Ut, ustar, eps) {
+    .Call(`_mcmcsae_Crtmvn_slice_Gibbs_sparse`, v, Ut, ustar, eps)
+}
+
 CrTNprobit <- function(mu, y) {
     .Call(`_mcmcsae_CrTNprobit`, mu, y)
 }
@@ -57,8 +65,16 @@ CrCRT <- function(y, r, m = 20L) {
     .Call(`_mcmcsae_CrCRT`, y, r, m)
 }
 
-addto <- function(x, a, y) {
-    invisible(.Call(`_mcmcsae_addto`, x, a, y))
+copy_vector <- function(x) {
+    .Call(`_mcmcsae_copy_vector`, x)
+}
+
+add_vector <- function(x, y) {
+    invisible(.Call(`_mcmcsae_add_vector`, x, y))
+}
+
+mv_update <- function(y, plus, M, x) {
+    invisible(.Call(`_mcmcsae_mv_update`, y, plus, M, x))
 }
 
 inverseSPD <- function(M) {
@@ -235,6 +251,14 @@ Cdense_kron <- function(M1, M2) {
 
 Crepgen <- function(v, n, M2) {
     .Call(`_mcmcsae_Crepgen`, v, n, M2)
+}
+
+Cnnz_per_col_scps_template <- function(X, j1_ind, j2_ind) {
+    .Call(`_mcmcsae_Cnnz_per_col_scps_template`, X, j1_ind, j2_ind)
+}
+
+Ccreate_sparse_crossprod_sym_template <- function(X, j1_ind, j2_ind, nnz_per_col) {
+    .Call(`_mcmcsae_Ccreate_sparse_crossprod_sym_template`, X, j1_ind, j2_ind, nnz_per_col)
 }
 
 Ctab <- function(Dim, reduced, perm, num, x) {

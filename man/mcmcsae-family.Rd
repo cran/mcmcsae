@@ -24,7 +24,7 @@ f_multinomial(link = "logit", K = NULL)
 \code{"identity"} for (log-)Gaussian sampling distributions, \code{"logit"} (default) and \code{"probit"}
 for binomial distributions and \code{"log"} for negative binomial sampling distributions.}
 
-\item{K}{number of categories for multinomial model; this must be specified for prior predictive sampling}
+\item{K}{number of categories for multinomial model; this must be specified for prior predictive sampling.}
 }
 \value{
 A family object.

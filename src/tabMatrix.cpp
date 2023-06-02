@@ -5,10 +5,16 @@ using namespace Rcpp;
 
 //’ Create a tabMatrix
 //’
-//’ @param x a numeric vector representing the matrix diagonal.
-//’ @return The diagonal matrix of class \code{ddiMatrix} with diagonal \code{x}.
+//’ @param Dim integer vector of size two containing the number of rows and columns.
+//’ @param reduced whether zero columns are allowed.
+//’ @param perm integer vector of column indices corresponding to the unique (if any)
+//’  non-zero entry per row.
+//’ @param num whether the non-zeros can be different from 1.
+//’ @param x in case num is true, the numeric vector of nonzero values.
+//’ @return A matrix of class \code{tabMatrix}.
 // [[Rcpp::export(rng=false)]]
 SEXP Ctab(const IntegerVector & Dim, const bool reduced, const IntegerVector & perm, const bool num, const NumericVector & x) {
+  if (reduced && num) stop("'reduced' and 'num' should not both be true");
   S4 out("tabMatrix");
   out.slot("Dim") = clone(Dim);
   out.slot("reduced") = reduced;
@@ -35,26 +41,17 @@ NumericVector Ctab_numeric_prod(const SEXP A, const NumericVector & y, const boo
   const bool reduced(::Rf_asLogical(as<S4>(A).slot("reduced")));
   const bool num(::Rf_asLogical(as<S4>(A).slot("num")));
   if (reduced) {
-    if (num && !ignore_x) {
-      const NumericVector x(as<S4>(A).slot("x"));
-      for (int i = 0; i < n; i++) {
-        out[i] = (perm[i] >= 0) * x[i] * y[perm[i]];
-      }
-    } else {
-      for (int i = 0; i < n; i++) {
-        out[i] = (perm[i] >= 0) * y[perm[i]];
-      }
+    for (int i = 0; i < n; i++) {
+      out[i] = (perm[i] >= 0) * y[perm[i]];
+    }
+  } else if (num && !ignore_x) {
+    const NumericVector x(as<S4>(A).slot("x"));
+    for (int i = 0; i < n; i++) {
+      out[i] = x[i] * y[perm[i]];
     }
   } else {
-    if (num && !ignore_x) {
-      const NumericVector x(as<S4>(A).slot("x"));
-      for (int i = 0; i < n; i++) {
-        out[i] = x[i] * y[perm[i]];
-      }
-    } else {
-      for (int i = 0; i < n; i++) {
-        out[i] = y[perm[i]];
-      }
+    for (int i = 0; i < n; i++) {
+      out[i] = y[perm[i]];
     }
   }
   return out;
@@ -76,34 +73,21 @@ Eigen::MatrixXd Ctab_dense_prod(const SEXP A, const Eigen::Map<Eigen::MatrixXd> 
   const bool num(::Rf_asLogical(as<S4>(A).slot("num")));
   Eigen::MatrixXd out(n, y.cols());
   if (reduced) {
-    if (num) {
-      const NumericVector x(as<S4>(A).slot("x"));
-      for (int i = 0; i < n; i++) {
-        if (perm[i] < 0) {
-          out.row(i).setZero();
-        } else {
-          out.row(i) = x[i] * y.row(perm[i]);
-        }
-      }
-    } else {
-      for (int i = 0; i < n; i++) {
-        if (perm[i] < 0) {
-          out.row(i).setZero();
-        } else {
-          out.row(i) = y.row(perm[i]);
-        }
-      }
-    }
-  } else {
-    if (num) {
-      const NumericVector x(as<S4>(A).slot("x"));
-      for (int i = 0; i < n; i++) {
-        out.row(i) = x[i] * y.row(perm[i]);
-      }
-    } else {
-      for (int i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++) {
+      if (perm[i] < 0) {
+        out.row(i).setZero();
+      } else {
         out.row(i) = y.row(perm[i]);
       }
+    }
+  } else if (num) {
+    const NumericVector x(as<S4>(A).slot("x"));
+    for (int i = 0; i < n; i++) {
+      out.row(i) = x[i] * y.row(perm[i]);
+    }
+  } else {
+    for (int i = 0; i < n; i++) {
+      out.row(i) = y.row(perm[i]);
     }
   }
   return out;
@@ -125,34 +109,21 @@ Eigen::MatrixXd Cdense_tab_tcrossprod(const Eigen::Map<Eigen::MatrixXd> & y, con
   const bool num(::Rf_asLogical(as<S4>(A).slot("num")));
   Eigen::MatrixXd out(y.rows(), n);
   if (reduced) {
-    if (num) {
-      const NumericVector x(as<S4>(A).slot("x"));
-      for (int i = 0; i < n; i++) {
-        if (perm[i] < 0) {
-          out.col(i).setZero();
-        } else {
-          out.col(i) = x[i] * y.col(perm[i]);
-        }
-      }
-    } else {
-      for (int i = 0; i < n; i++) {
-        if (perm[i] < 0) {
-          out.col(i).setZero();
-        } else {
-          out.col(i) = y.col(perm[i]);
-        }
-      }
-    }
-  } else {
-    if (num) {
-      const NumericVector x(as<S4>(A).slot("x"));
-      for (int i = 0; i < n; i++) {
-        out.col(i) = x[i] * y.col(perm[i]);
-      }
-    } else {
-      for (int i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++) {
+      if (perm[i] < 0) {
+        out.col(i).setZero();
+      } else {
         out.col(i) = y.col(perm[i]);
       }
+    }
+  } else if (num) {
+    const NumericVector x(as<S4>(A).slot("x"));
+    for (int i = 0; i < n; i++) {
+      out.col(i) = x[i] * y.col(perm[i]);
+    }
+  } else {
+    for (int i = 0; i < n; i++) {
+      out.col(i) = y.col(perm[i]);
     }
   }
   return out;
@@ -174,30 +145,19 @@ NumericVector Ctab_numeric_crossprod(const SEXP A, const NumericVector & y) {
   const bool reduced(::Rf_asLogical(as<S4>(A).slot("reduced")));
   const bool num(::Rf_asLogical(as<S4>(A).slot("num")));
   if (reduced) {
-    if (num) {
-      const NumericVector x(as<S4>(A).slot("x"));
-      for (int i = 0; i < n; i++) {
-        if (perm[i] >= 0) {
-          out[perm[i]] += x[i]*y[i];
-        }
-      }
-    } else {
-      for (int i = 0; i < n; i++) {
-        if (perm[i] >= 0) {
-          out[perm[i]] += y[i];
-        }
-      }
-    }
-  } else {
-    if (num) {
-      const NumericVector x(as<S4>(A).slot("x"));
-      for (int i = 0; i < n; i++) {
-        out[perm[i]] += x[i]*y[i];
-      }
-    } else {
-      for (int i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++) {
+      if (perm[i] >= 0) {
         out[perm[i]] += y[i];
       }
+    }
+  } else if (num) {
+    const NumericVector x(as<S4>(A).slot("x"));
+    for (int i = 0; i < n; i++) {
+      out[perm[i]] += x[i]*y[i];
+    }
+  } else {
+    for (int i = 0; i < n; i++) {
+      out[perm[i]] += y[i];
     }
   }
   return out;
@@ -220,37 +180,24 @@ NumericMatrix Ctab_dense_crossprod(const SEXP A, const NumericMatrix & y) {
   const bool reduced(::Rf_asLogical(as<S4>(A).slot("reduced")));
   const bool num(::Rf_asLogical(as<S4>(A).slot("num")));
   if (reduced) {
-    if (num) {
-      const NumericVector x(as<S4>(A).slot("x"));
-      for (int i = 0; i < yrows; i++) {
-        if (perm[i] >= 0) {
-          for (int j = 0; j < ycols; j++) {
-            out(perm[i], j) += x[i] * y(i, j);
-          }
-        }
-      }
-    } else {
-      for (int i = 0; i < yrows; i++) {
-        if (perm[i] >= 0) {
-          for (int j = 0; j < ycols; j++) {
-            out(perm[i], j) += y(i, j);
-          }
-        }
-      }
-    }
-  } else {
-    if (num) {
-      const NumericVector x(as<S4>(A).slot("x"));
-      for (int i = 0; i < yrows; i++) {
-        for (int j = 0; j < ycols; j++) {
-          out(perm[i], j) += x[i] * y(i, j);
-        }
-      }
-    } else {
-      for (int i = 0; i < yrows; i++) {
+    for (int i = 0; i < yrows; i++) {
+      if (perm[i] >= 0) {
         for (int j = 0; j < ycols; j++) {
           out(perm[i], j) += y(i, j);
         }
+      }
+    }
+  } else if (num) {
+    const NumericVector x(as<S4>(A).slot("x"));
+    for (int j = 0; j < ycols; j++) {
+      for (int i = 0; i < yrows; i++) {
+        out(perm[i], j) += x[i] * y(i, j);
+      }
+    }
+  } else {
+    for (int j = 0; j < ycols; j++) {
+      for (int i = 0; i < yrows; i++) {
+        out(perm[i], j) += y(i, j);
       }
     }
   }
@@ -271,30 +218,19 @@ NumericVector Ctab_unary_crossprod(const SEXP A) {
   const bool reduced(::Rf_asLogical(as<S4>(A).slot("reduced")));
   const bool num(::Rf_asLogical(as<S4>(A).slot("num")));
   if (reduced) {
-    if (num) {
-      const NumericVector x(as<S4>(A).slot("x"));
-      for (int i = 0; i < n; i++) {
-        if (perm[i] >= 0) {
-          diag[perm[i]] += x[i]*x[i];
-        }
-      }
-    } else {
-      for (int i = 0; i < n; i++) {
-        if (perm[i] >= 0) {
-          diag[perm[i]] ++;
-        }
+    for (int i = 0; i < n; i++) {
+      if (perm[i] >= 0) {
+        diag[perm[i]]++;
       }
     }
+  } else if (num) {
+    const NumericVector x(as<S4>(A).slot("x"));
+    for (int i = 0; i < n; i++) {
+      diag[perm[i]] += x[i]*x[i];
+    }
   } else {
-    if (num) {
-      const NumericVector x(as<S4>(A).slot("x"));
-      for (int i = 0; i < n; i++) {
-        diag[perm[i]] += x[i]*x[i];
-      }
-    } else {
-      for (int i = 0; i < n; i++) {
-        diag[perm[i]] ++;
-      }
+    for (int i = 0; i < n; i++) {
+      diag[perm[i]]++;
     }
   }
   return diag;
@@ -309,6 +245,7 @@ SEXP Ctab2dgC(const SEXP M) {
   if (!Rf_isS4(M) || !Rf_inherits(M, "tabMatrix")) stop("M is not a tabMatrix");
   const IntegerVector Dim(as<S4>(M).slot("Dim"));
   const IntegerVector perm(as<S4>(M).slot("perm"));
+  const NumericVector x(as<S4>(M).slot("x"));
   const bool reduced(::Rf_asLogical(as<S4>(M).slot("reduced")));
   const bool num(::Rf_asLogical(as<S4>(M).slot("num")));
   S4 out("dgCMatrix");
@@ -317,6 +254,10 @@ SEXP Ctab2dgC(const SEXP M) {
   if (reduced) {
     for (int k=0; k < perm.size(); k++) {
       if (perm[k] >= 0) tab[perm[k]]++;
+    }
+  } else if (num) {
+    for (int k=0; k < perm.size(); k++) {
+      if (x[k] != 0) tab[perm[k]]++;
     }
   } else {
     for (int k=0; k < perm.size(); k++) {
@@ -333,18 +274,9 @@ SEXP Ctab2dgC(const SEXP M) {
   IntegerVector ind = clone(colpointers);
   IntegerVector rowpointers(csum);
   if (num) {
-    const NumericVector x(as<S4>(M).slot("x"));
     NumericVector xdgC = no_init(csum);
-    if (reduced) {
-      for (int k=0; k < perm.size(); k++) {
-        if (perm[k] >= 0) {
-          rowpointers[ind[perm[k]]] = k;
-          xdgC[ind[perm[k]]] = x[k];
-          ind[perm[k]]++;
-        }
-      }
-    } else {
-      for (int k=0; k < perm.size(); k++) {
+    for (int k=0; k < perm.size(); k++) {
+      if (x[k] != 0) {
         rowpointers[ind[perm[k]]] = k;
         xdgC[ind[perm[k]]] = x[k];
         ind[perm[k]]++;
@@ -385,28 +317,18 @@ NumericMatrix Ctab2mat(const SEXP M) {
   NumericMatrix out(Dim[0], Dim[1]);
   if (num) {
     const NumericVector x(as<S4>(M).slot("x"));
-    if (reduced) {
-      for (int i = 0; i < Dim[0]; i++) {
-        if (perm[i] >= 0) {
-          out(i, perm[i]) = x[i];
-        }
-      }
-    } else {
-      for (int i = 0; i < Dim[0]; i++) {
-        out(i, perm[i]) = x[i];
+    for (int i = 0; i < Dim[0]; i++) {
+      out(i, perm[i]) = x[i];
+    }
+  } else if (reduced) {
+    for (int i = 0; i < Dim[0]; i++) {
+      if (perm[i] >= 0) {
+        out(i, perm[i]) = 1;
       }
     }
   } else {
-    if (reduced) {
-      for (int i = 0; i < Dim[0]; i++) {
-        if (perm[i] >= 0) {
-          out(i, perm[i]) = 1;
-        }
-      }
-    } else {
-      for (int i = 0; i < Dim[0]; i++) {
-        out(i, perm[i]) = 1;
-      } 
+    for (int i = 0; i < Dim[0]; i++) {
+      out(i, perm[i]) = 1;
     }
   }
   return out;

@@ -21,7 +21,7 @@
 #'  draw function associated with this model component. Mainly intended for developers.
 #' @param e For internal use only.
 #' @return An object with precomputed quantities and functions for sampling from
-#'  prior or conditional posterior distributions for this model component. Only intended
+#'  prior or conditional posterior distributions for this model component. Intended
 #'  for internal use by other package functions.
 # TODO generalize inverse chi-squared (including beta-prime) and exponential priors to generalized hyperbolic
 vfac <- function(factor="local_",

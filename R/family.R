@@ -7,7 +7,7 @@
 #' @param link the name of a link function. Currently the only allowed link functions are:
 #'  \code{"identity"} for (log-)Gaussian sampling distributions, \code{"logit"} (default) and \code{"probit"}
 #'  for binomial distributions and \code{"log"} for negative binomial sampling distributions.
-#' @param K number of categories for multinomial model; this must be specified for prior predictive sampling
+#' @param K number of categories for multinomial model; this must be specified for prior predictive sampling.
 #' @return A family object.
 #' @name mcmcsae-family
 NULL

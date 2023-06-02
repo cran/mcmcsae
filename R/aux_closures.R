@@ -5,7 +5,8 @@
 # M0 is completely fixed
 # M1 and M2 can change in value, but not in zero-structure
 # function returned computes M0 + w1*M1 + w2*M2
-make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
+# sparse: should the matrix sum template and output be sparse? for now only works when !is.null(M0)
+make_mat_sum <- function(M0=NULL, M1, M2=NULL, sparse=NULL) {
   # TODO multiply M1 and M2 by a positive random number, to exclude the possibility of coincidental cancellations in the sum
   if (!is.null(M0)) {
     if (!(class(M0)[1L] %in% c("ddiMatrix", "dsCMatrix", "matrix"))) stop("unsupported matrix type")
@@ -13,14 +14,13 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
   }
   if (is.null(M2)) {
     if (is.null(M0)) stop("at least one of M0 and M2 must be non-NULL")
-    template <- economizeMatrix(M0 + M1, symmetric=TRUE)
+    template <- economizeMatrix(M0 + M1, sparse=sparse, symmetric=TRUE)
   } else {
     if (is.null(M0))
       template <- economizeMatrix(M1 + M2, symmetric=TRUE)
     else
-      template <- economizeMatrix(M0 + M1 + M2, symmetric=TRUE)
+      template <- economizeMatrix(M0 + M1 + M2, sparse=sparse, symmetric=TRUE)
   }
-  # template will be of the same class as the least sparse of M0, M1, M2
   if (is.null(M0)) {
     classes <- paste0(substr(class(M1)[1L], 1L, 3L), substr(class(M2)[1L], 1L, 3L))
     switch(classes,
@@ -88,7 +88,7 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
         }
       },
       {
-        warning("possibly inefficient (sparse) matrix addition", immediate.=TRUE)
+        warn("possibly inefficient (sparse) matrix addition")
         update <- function(M1, M2, w1=1, w2=1) w1 * M1 + w2 * M2
       }
     )
@@ -271,7 +271,7 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL) {
         }
       },
       {
-        warning("possibly inefficient (sparse) matrix addition", immediate.=TRUE)
+        warn("possibly inefficient (sparse) matrix addition")
         template <- M0
         if (is.null(M2))
           update <- function(M1, M2, w1=1, w2=1) template + w1 * M1

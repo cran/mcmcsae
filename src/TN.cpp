@@ -160,12 +160,12 @@ NumericVector Crtmvn_Gibbs_sparse(const NumericVector & v, const SEXP Ut, const 
       out[i] = Crtuvn(a, b);
     } else {
       // this seems a numerically stable way to deal with numerical inaccuracy:
-      if (a < v[i]) {
+      if (a < vi) {
         out[i] = a;
-      } else if (b > v[i]) {
+      } else if (b > vi) {
         out[i] = b;
       } else {
-        out[i] = v[i];
+        out[i] = vi;
       }
     }
     for (int j = Utp[i]; j < Utp[i + 1]; j++) {
@@ -174,6 +174,133 @@ NumericVector Crtmvn_Gibbs_sparse(const NumericVector & v, const SEXP Ut, const 
   }
   return out;
 }  
+
+//’ Use a Gibbs within slice method to generate a next draw from a standardized multivariate truncated normal distribution with dense constraint matrix
+//’
+//’ @param v start value.
+//’ @param Ut dense matrix encoding the inequality constrained linear combinations.
+//’ @param ustar vector encoding the (initial) lower bounds corresponding to Ut.
+//’ @param eps small numerical value to stabilize the Gibbs sampler.
+//’ @return A single draw from the standardized multivariate truncated normal distribution.
+//’ @references
+//’  Y. Li and S.K. Ghosh (2015). Efficient sampling methods for truncated multivariate normal
+//’    and student-t distributions subject to linear inequality constraints.
+//’    Journal of Statistical Theory and Practice 9(4), 712-732.
+//’  K.A. Valeriano, C.E. Galarza and L.A. Matos (2023). Moments and random number generation
+//’    for the truncated elliptical family of distributions.
+//’    Statistics and Computing 33(1), 1-20.
+// [[Rcpp::export(rng=true)]]
+Eigen::VectorXd Crtmvn_slice_Gibbs_dense(const Eigen::Map<Eigen::VectorXd> & v, const Eigen::Map<Eigen::MatrixXd> Ut,
+                                   const Eigen::Map<Eigen::VectorXd> & ustar, const double eps) {
+  double a, b, vi, x, temp;
+  Eigen::VectorXd u(ustar);
+  int n = v.size();
+  int m = u.size();
+  double xx = v.dot(v);  // not necessary to recompute in every iteration, but may be more numerically stable
+  double y = R::runif(0, std::exp(-0.5*xx));
+  double kappa_y = -2*std::log(y);
+  Eigen::VectorXd out(n);
+  // loop over variables
+  for (int i = 0; i < n; i++) {
+    vi = v[i];
+    xx -= vi*vi;
+    b = std::sqrt(kappa_y - xx);
+    a = -b;
+    // loop over constraints that variable i is involved in
+    for (int j = 0; j < m; j++) {
+      x = Ut(j,i);
+      u[j] += x * vi;
+      if (x > eps) {
+        temp = u[j]/x;
+        if (temp > a) a = temp;
+      } else if (x < -eps) {
+        temp = u[j]/x;
+        if (temp < b) b = temp;
+      }
+    }
+    if (a == b) {
+      out[i] = a;
+    } else if (a < b) {
+      out[i] = R::runif(a, b);
+    } else {
+      // this seems a numerically stable way to deal with numerical inaccuracy:
+      if (a < vi) {
+        out[i] = a;
+      } else if (b > vi) {
+        out[i] = b;
+      } else {
+        out[i] = vi;
+      }
+    }
+    // kan in de laatste iteratie overslaan:
+    u -= out[i] * Ut.col(i);
+    xx += out[i] * out[i];
+  }
+  return out;
+}
+
+//’ Use a Gibbs within slice method to generate a next draw from a standardized multivariate truncated normal distribution with sparse constraint matrix
+//’
+//’ @param v start value.
+//’ @param Ut sparse matrix encoding the inequality constrained linear combinations.
+//’ @param ustar vector encoding the (initial) lower bounds corresponding to Ut.
+//’ @param eps small numerical value to stabilize the Gibbs sampler.
+//’ @return A single draw from the standardized multivariate truncated normal distribution.
+// [[Rcpp::export(rng=true)]]
+NumericVector Crtmvn_slice_Gibbs_sparse(const NumericVector & v, const SEXP Ut, const NumericVector & ustar, const double eps) {
+  double a, b, vi, x, temp;
+  if (!Rf_isS4(Ut) || !Rf_inherits(Ut, "dgCMatrix")) stop("Ut is not a dgCMatrix");
+  const IntegerVector Utp(as<S4>(Ut).slot("p"));
+  const IntegerVector Uti(as<S4>(Ut).slot("i"));
+  const NumericVector Utx(as<S4>(Ut).slot("x"));
+  NumericVector u(clone(ustar));
+  int n = v.size();
+  // not necessary to recompute xx in every iteration, but may be more numerically stable
+  double xx = 0;
+  for (int i = 0; i < v.size(); i++) {
+    xx += v[i] * v[i];
+  }
+  double y = R::runif(0, std::exp(-0.5*xx));
+  double kappa_y = -2*std::log(y);
+  NumericVector out = no_init(n);
+  // loop over variables
+  for (int i = 0; i < n; i++) {
+    vi = v[i];
+    xx -= vi*vi;
+    b = std::sqrt(kappa_y - xx);
+    a = -b;
+    for (int j = Utp[i]; j < Utp[i + 1]; j++) {
+      x = Utx[j];
+      u[Uti[j]] += x * vi;
+      if (x > eps) {
+        temp = u[Uti[j]]/x;
+        if (temp > a) a = temp;
+      } else if (x < -eps) {
+        temp = u[Uti[j]]/x;
+        if (temp < b) b = temp;
+      }
+    }
+    if (a == b) {
+      out[i] = a;
+    } else if (a < b) {
+      out[i] = R::runif(a, b);
+    } else {
+      // this seems a numerically stable way to deal with numerical inaccuracy:
+      if (a < vi) {
+        out[i] = a;
+      } else if (b > vi) {
+        out[i] = b;
+      } else {
+        out[i] = vi;
+      }
+    }
+    for (int j = Utp[i]; j < Utp[i + 1]; j++) {
+      u[Uti[j]] -= Utx[j] * out[i];
+    }
+    xx += out[i] * out[i];
+  }
+  return out;
+}
 
 //’ Generate a vector of truncated normal variates for use in probit binomial model
 //’

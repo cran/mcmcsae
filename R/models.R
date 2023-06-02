@@ -143,7 +143,7 @@ combine_X0_XA <- function(X0, XA) {
 }
 
 compute_XA <- function(factor=NULL, data=NULL, enclos=.GlobalEnv) {
-  if (is.null(factor) || (inherits(factor, "formula") && intercept_only(factor))) return(NULL)
+  if (is.null(factor) || intercept_only(factor)) return(NULL)
   factor.info <- get_factor_info(factor, data, enclos=enclos)
   n <- n_row(data)
   if ("spline" %in% factor.info$types) {  # B-spline design matrix components
@@ -312,7 +312,7 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
       spatial = {
         if (D || Q) {
           if (is.null(DQcall$poly.df)) stop("'spatial()' requires argument 'poly.df'")
-          if (nrow(eval(DQcall$poly.df)@data) != factor.info$n[f]) stop("number of levels mismatch")
+          if (nrow(eval(DQcall$poly.df)@data) != factor.info$n[f]) stop("number of rows of data slot of '", DQcall$poly.df, "' not equal to number of levels of variable'", factor.info$variables[f], "'")
           # TODO check that level order is the same: first try variable in @data of the same name as factor, then try rownames of @data; if unsuccessful issue a warning
           DQcall$derive.constraints <- NULL
           DQf <- eval(DQcall)
@@ -329,7 +329,7 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
           if (D) {
             if (is.null(DQcall[["D"]])) stop("missing argument 'D' in custom factor")
             DQf <- economizeMatrix(eval(DQcall[["D"]], parent.frame(n.parent)), sparse=TRUE)
-            if (!is.null(DQcall[["Q"]])) warning("argument 'Q' in custom() ignored", immediate.=TRUE)
+            if (!is.null(DQcall[["Q"]])) warn("argument 'Q' in custom() ignored")
           } else if (is.null(DQcall[["Q"]])) {
             if (is.null(DQcall[["D"]])) stop("custom factor must specify either incidence matrix 'D' or precision matrix 'Q'")
             DQf <- economizeMatrix(crossprod(eval(DQcall[["D"]], parent.frame(n.parent))), sparse=TRUE)
@@ -341,7 +341,7 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
         if (R) {
           if (is.null(Rcall[["R"]])) {
             if (isTRUE(Rcall[["derive.constraints"]])) {
-              if (!D && !Q) warning("cannot derive constraints as custom incidence or precision matrix unavailable")
+              if (!D && !Q) warn("cannot derive constraints as custom incidence or precision matrix unavailable")
               Rf <- derive_constraints(if (D) crossprod(DQf) else DQf)
             } else {
               Rf <- NULL
@@ -349,7 +349,7 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
           } else {
             Rf <- economizeMatrix(eval(Rcall[["R"]], parent.frame(n.parent)), allow.tabMatrix=FALSE)
             if (dim(Rf)[1L] != factor.info$n[f]) stop("wrong dimension of custom restriction matrix")
-            if (isTRUE(Rcall[["derive.constraints"]])) warning("argument 'derive.constraints' ignored as restriction matrix 'R' is specified")
+            if (isTRUE(Rcall[["derive.constraints"]])) warn("argument 'derive.constraints' ignored as restriction matrix 'R' is specified")
           }
         }
       },
@@ -581,26 +581,24 @@ R_season <- function(n, period) {
   CM
 }
 
-# CAR spatial structure
-Q_spatial <- function(n=nrow(poly.df@data), poly.df, snap=sqrt(.Machine$double.eps), queen=TRUE) {
+get_neighbours_list <- function(n=nrow(poly.df@data), poly.df, snap=sqrt(.Machine$double.eps), queen=TRUE) {
   # TODO: what if n != length(nb) (out-of-sample levels) ?
   if (n < 2L) stop("Spatial component needs at least 2 areas")
   if (!requireNamespace("spdep", quietly=TRUE)) stop("Package spdep required to construct a spatial precision matrix. Please install it.")
   # derive neighbourhood structure
-  nb <- spdep::poly2nb(poly.df, snap=snap, queen=queen)
+  spdep::poly2nb(poly.df, snap=snap, queen=queen)
+}
+  
+# CAR spatial precision matrix
+Q_spatial <- function(n=nrow(poly.df@data), poly.df, snap=sqrt(.Machine$double.eps), queen=TRUE) {
   # transform into spatial precision matrix
   # cannot use spdep::nb2mat, as it returns a dense matrix
-  nb2Q(nb)
+  nb2Q(get_neighbours_list(n, poly.df, snap, queen))
 }
 
-# CAR spatial structure
+# CAR spatial incidence matrix
 D_spatial <- function(n=nrow(poly.df@data), poly.df, snap=sqrt(.Machine$double.eps), queen=TRUE) {
-  # TODO: what to do in case n != length(nb) (out-of-sample levels) ?
-  if (n < 2L) stop("Spatial component needs at least 2 areas")
-  if (!requireNamespace("spdep", quietly=TRUE)) stop("Package spdep required to construct a spatial precision matrix. Please install it.")
-  # derive neighbourhood structure
-  nb <- spdep::poly2nb(poly.df, snap=snap, queen=queen)
-  nb2D(nb)
+  nb2D(get_neighbours_list(n, poly.df, snap, queen))
 }
 
 R_spatial <- function(n=nrow(poly.df@data), poly.df, snap=sqrt(.Machine$double.eps), queen=TRUE, derive.constraints=FALSE) {
@@ -613,7 +611,7 @@ R_spatial <- function(n=nrow(poly.df@data), poly.df, snap=sqrt(.Machine$double.e
 # convert neighbourhood structure to a sparse precision matrix
 nb2Q <- function(nb) {
   d <- spdep::card(nb)  # numbers of neighbours, diagonal of the precision matrix
-  if (sum(d) %% 2L != 0L) warning("not a symmetric neighbourhood structure")
+  if (sum(d) %% 2L != 0L) warn("not a symmetric neighbourhood structure")
   i <- j <- c(seq_along(nb), rep.int(NA_integer_, sum(d) %/% 2L))  # row and column indices
   r <- length(nb)
   for (g in seq_along(nb)) {
@@ -635,7 +633,7 @@ nb2Q <- function(nb) {
 # convert neighbourhood structure to sparse oriented incidence matrix
 nb2D <- function(nb) {
   d <- spdep::card(nb)  # numbers of neighbours, diagonal of the precision matrix
-  if (sum(d) %% 2L != 0L) warning("not a symmetric neighbourhood structure")
+  if (sum(d) %% 2L != 0L) warn("not a symmetric neighbourhood structure")
   nr <- sum(d) %/% 2; nc <- length(d)  # dimension of incidence matrix
   i <- rep_each(seq_len(nr), 2L)
   j <- rep.int(NA_integer_, length(i))

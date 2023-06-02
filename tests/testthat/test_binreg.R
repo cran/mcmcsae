@@ -60,3 +60,17 @@ test_that("minimal probit binary regression example works", {
   summ <- summary(predict(sim, newdata=data.frame(1), type="response", show.progress=FALSE))  # out-of-sample probability
   expect_true(0.2 < summ[, "Mean"] && summ[, "Mean"] < 0.4)
 })
+
+test_that("binomial multilevel model runs", {
+  ex <- mcmcsae_example(1000, family="binomial")
+  set_opts(max.size.cps.template = 0)
+  sampler <- create_sampler(ex$model, data=ex$dat, family="binomial", block=TRUE)
+  expect_false(is.function(sampler$mbs[[1]]$cps_template))
+  set_opts(max.size.cps.template = 100)
+  sampler <- create_sampler(ex$model, data=ex$dat, family="binomial", block=TRUE)
+  expect_true(is.function(sampler$mbs[[1]]$cps_template))
+  sim <- MCMCsim(sampler, burnin=50, n.iter=100, n.chain=2, verbose=FALSE)
+  summary(sim)
+  sampler <- create_sampler(ex$model, data=ex$dat, family="binomial",
+    block=list(c("v", "u")))
+})

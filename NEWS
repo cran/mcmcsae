@@ -1,4 +1,18 @@
 
+version 0.7.3
+- improved handling of out-of-sample categories by predict method
+- further improvements to prepare for upcoming version of Matrix package
+  (thanks to Mikael Jagan)
+- clean-up of create_TMVN_sampler, in which now the method for truncated
+  multivariate normal sampling can be specified by means of a method function
+  that allows to pass method-specific options
+- added HMC ZigZag TMVN sampler
+- fixed a bug in soft-TMVN sampler, which did not work in case of a sparse
+  equalities constraint matrix
+- option to add a Bayesian Additive Regression Trees model component to the
+  linear predictor through package dbarts
+
+
 version 0.7.2
 - prediction for new data now handles out-of-sample random effects (at least
   for iid random effect terms), so that it becomes easier to account for

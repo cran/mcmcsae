@@ -299,8 +299,8 @@ compute_WAIC <- function(x, diagnostic=FALSE, batch.size=NULL, show.progress=TRU
     batch.size <- min(n, 10000000L %/% n.draws)
   }
   if ((x[["_model"]]$Q0.type == "symm") && (batch.size != n)) {
-    warning("For non-diagonal precision matrix, use 'batch.size' equal to the number of
-      observations for correct leave-one-out predictive densities", immediate.=TRUE)
+    warn("For non-diagonal precision matrix, use 'batch.size' equal to the number of
+      observations for correct leave-one-out predictive densities")
   }
   batch <- seq_len(batch.size)
   n.batch <- n %/% batch.size + (n %% batch.size > 0L)
@@ -389,8 +389,8 @@ compute_WAIC <- function(x, diagnostic=FALSE, batch.size=NULL, show.progress=TRU
 # based on waic.stanreg from package rstanarm
 waic.mcdraws <- function(x, by.unit=FALSE, ...) {
   if ((x[["_model"]]$Q0.type == "symm") && by.unit) {
-    warning("For non-diagonal precision matrix, use 'by.unit=FALSE'
-      for correct leave-one-out predictive densities", immediate.=TRUE)
+    warn("For non-diagonal precision matrix, use 'by.unit=FALSE'
+      for correct leave-one-out predictive densities")
   }
   llh_i <- get_lppd_function(x)
   if (by.unit) {

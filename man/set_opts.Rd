@@ -10,7 +10,8 @@ set_opts(
   chol.ordering = 0L,
   PG.approx = TRUE,
   PG.approx.m = -2L,
-  CRT.approx.m = 20L
+  CRT.approx.m = 20L,
+  max.size.cps.template = 100L
 )
 }
 \arguments{
@@ -37,6 +38,10 @@ and \code{0L} for a moment-matching gamma approximation.}
 \item{CRT.approx.m}{scalar integer specifying the degree of approximation to sampling
 from a Chinese Restaurant Table distribution. The approximation is based on Le Cam's theorem.
 Larger values yield a slower but more accurate sampler.}
+
+\item{max.size.cps.template}{maximum allowed size in MB of the sparse matrix serving as a 
+template for the sparse symmetric crossproduct X'QX of a dgCMatrix X, where Q is a diagonal
+matrix subject to change.}
 }
 \value{
 This function sets or resets options in the option environment \code{.opts}.

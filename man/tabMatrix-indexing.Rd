@@ -3,12 +3,18 @@
 \name{tabMatrix-indexing}
 \alias{tabMatrix-indexing}
 \alias{[,tabMatrix,index,missing,logical-method}
+\alias{[,tabMatrix,index,missing,missing-method}
 \alias{[,tabMatrix,missing,index,logical-method}
+\alias{[,tabMatrix,missing,index,missing-method}
 \title{S4 method for row and column subsetting a 'tabMatrix'}
 \usage{
 \S4method{[}{tabMatrix,index,missing,logical}(x, i, j, ..., drop = TRUE)
 
+\S4method{[}{tabMatrix,index,missing,missing}(x, i, j, ..., drop = TRUE)
+
 \S4method{[}{tabMatrix,missing,index,logical}(x, i, j, ..., drop = TRUE)
+
+\S4method{[}{tabMatrix,missing,index,missing}(x, i, j, ..., drop = TRUE)
 }
 \arguments{
 \item{x}{a tabMatrix object.}

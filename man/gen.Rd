@@ -158,7 +158,7 @@ draw function associated with this model component. Mainly intended for develope
 }
 \value{
 An object with precomputed quantities and functions for sampling from
- prior or conditional posterior distributions for this model component. Only intended
+ prior or conditional posterior distributions for this model component. Intended
  for internal use by other package functions.
 }
 \description{

@@ -21,7 +21,7 @@ mean(apipop$api00)
 
 ## ---- message=FALSE-------------------------------------------------------------------------------
 library(mcmcsae)
-set.seed(21)
+set.seed(1)
 sampler <- create_sampler(model, data=apisrs)
 sim <- MCMCsim(sampler, verbose=FALSE)
 (summ <- summary(sim))
@@ -55,7 +55,7 @@ sampler <- create_sampler(model, data=apisrs,
 sim <- MCMCsim(sampler, verbose=FALSE)
 plot(weights(cal)/N, weights(sim)); abline(0, 1)
 sum(weights(sim) * apisrs$api00)
-summary(sim, "linpred_")
+print(summary(sim, "linpred_"), digits=6)
 
 ## ---- fig.width=4, fig.height=4, fig.align="center", message=FALSE--------------------------------
 sampler <- create_sampler(model, formula.V=~vfac(prior=pr_invchisq(df="modeled")),

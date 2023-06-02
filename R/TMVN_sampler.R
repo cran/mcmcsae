@@ -1,11 +1,13 @@
 #' Set up a sampler object for sampling from a possibly truncated and degenerate multivariate normal distribution
 #'
-#' This function sets up an object for multivariate normal sampling based on a specified precision matrix
-#' or cholesky decomposition thereof. Linear equality and inequality restrictions are supported.
-#' For sampling under inequality restrictions three algorithms are available. The default in that case is
-#' an exact Hamiltonian Monte Carlo algorithm (Pakman and Paninski, 2014). Alternatively, a Gibbs sampling
-#' algorithm can be used (Rodriguez-Yam et al., 2004). The third option is a data augmentation method
-#' to sample from a smooth approximation to the truncated multivariate normal distribution (Souris et al., 2018).
+#' This function sets up an object for multivariate normal sampling based on a specified precision matrix.
+#' Linear equality and inequality restrictions are supported.
+#' For sampling under inequality restrictions four algorithms are available. The default in that case is
+#' an exact Hamiltonian Monte Carlo algorithm (Pakman and Paninski, 2014). A related algorithm is the zig-zag
+#' Hamiltonian Monte Carlo method (Nishimura et al., 2021) in which momentum is sampled from a Laplace instead
+#' of normal distribution. Alternatively, a Gibbs sampling algorithm can be used (Rodriguez-Yam et al., 2004).
+#' The fourth option is a data augmentation method that samples from a smooth approximation to the truncated
+#' multivariate normal distribution (Souris et al., 2018).
 #'
 #' The componentwise Gibbs sampler uses univariate truncated normal samplers as described
 #' in Botev and L'Ecuyer (2016). These samplers are implemented in R package \pkg{TruncatedNormal},
@@ -21,12 +23,17 @@
 #' sim <- MCMCsim(sampler)
 #' summary(sim)
 #' plot(as.matrix(sim$x), pch=".")
-#' # 2. Gibbs sampling approach (Rodriguez-Yam et al., 2004)
+#' # 2. exact Hamiltonian Monte Carlo with Laplace momentum (Nishimura et al., 2021)
+#' sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="HMCZigZag")
+#' sim <- MCMCsim(sampler)
+#' summary(sim)
+#' plot(as.matrix(sim$x), pch=".")
+#' # 3. Gibbs sampling approach (Rodriguez-Yam et al., 2004)
 #' sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="Gibbs")
 #' sim <- MCMCsim(sampler)
 #' summary(sim)
 #' plot(as.matrix(sim$x), pch=".")
-#' # 3. soft TMVN approximation (Souris et al., 2018)
+#' # 4. soft TMVN approximation (Souris et al., 2018)
 #' sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="softTMVN")
 #' sim <- MCMCsim(sampler)
 #' summary(sim)
@@ -35,39 +42,32 @@
 #'
 #' @export
 #' @author Harm Jan Boonstra, with help from Grzegorz Baltissen
-#' @param Q precision matrix (unconstrained) (n x n); used in case \code{cholQ} is not supplied.
+#' @param Q precision matrix of the (unconstrained) multivariate normal distribution.
 #' @param perm whether permutation/pivoting should be used to build a Cholesky object.
 #' @param mu mean of the (unconstrained) multivariate normal distribution.
-#' @param Xy alternative to specifying mu; in this case \code{mu} is computed as \code{Q^{-1} Xy}.
+#' @param Xy alternative to specifying mu; in this case \code{mu} is computed as \eqn{Q^{-1}\code{Xy}}.
 #' @param update.Q whether \code{Q} is updated for each draw.
 #' @param update.mu whether \code{mu} is updated for each draw. By default equal to \code{update.Q}.
 #' @param name name of the TMVN vector parameter.
 #' @param coef.names optional labels for the components of the vector parameter.
 #' @param R equality restriction matrix.
-#' @param r rhs vector for equality constraints \code{R^T x = r}.
+#' @param r rhs vector for equality constraints \eqn{R'x = r}, where \eqn{R'} denotes the transpose of R.
 #' @param S inequality restriction matrix.
-#' @param s rhs vector for inequality constraints \code{S^T x >= s}.
-#' @param lower alternative to \code{s} for two-sided inequality restrictions \code{lower <= S^T x <= upper}.
-#' @param upper alternative to \code{s} for two-sided inequality restrictions \code{lower <= S^T x <= upper}.
+#' @param s rhs vector for inequality constraints \eqn{S'x >= s}, where \eqn{S'} denotes the transpose of S.
+#' @param lower alternative to \code{s} for two-sided inequality restrictions \eqn{\code{lower} <= S'x <= \code{upper}}.
+#' @param upper alternative to \code{s} for two-sided inequality restrictions \eqn{\code{lower} <= S'x <= \code{upper}}.
+#' @param check.constraints if \code{TRUE} check whether the starting values satisfy all constraints.
 #' @param method sampling method. The options are "direct" for direct sampling from the
 #'  unconstrained or equality constrained multivariate normal (MVN). For inequality constrained
-#'  MVN sampling three methods are supported: "HMC" for (exact) Hamiltonian Monte Carlo, "Gibbs" for a
+#'  MVN sampling three methods are supported: "HMC" for (exact) Hamiltonian Monte Carlo,
+#'  "HMCZigZag" for (exact) Hamiltonian Monte Carlo with Laplace momentum, "Gibbs" for a
 #'  component-wise Gibbs sampling approach, and "softTMVN" for a data augmentation method that samples
-#'  from a smooth approximation to the truncated MVN.
+#'  from a smooth approximation to the truncated MVN. Alternatively, the method setting
+#'  functions \code{m_direct}, \code{m_HMC}, \code{m_HMC_ZigZag}, \code{m_Gibbs} or
+#'  \code{m_softTMVN} can be used to select the method and possibly set some of its
+#'  options to non-default values, see \code{\link{mcmcsae-TMVN-method}}.
 #' @param reduce whether to a priori restrict the simulation to the subspace defined by the
 #'  equality constraints.
-#' @param T.HMC the duration of a Hamiltonian Monte Carlo simulated particle trajectory. If a vector of
-#'  length 2 is supplied it is interpreted as an interval from which the duration is drawn uniformly,
-#'  independently in each HMC iteration.
-#' @param max.refl maximum number of reflections in HMC TMVN dynamics. Default
-#'  is unlimited.
-#' @param diagnostic whether information about violations of inequalities and bounces off inequality walls
-#'  is printed to the screen. This sometimes provides useful diagnostic information.
-#' @param sharpness for method 'softTMVN', the sharpness of the soft inequalities; the larger the better
-#'  the approximation of exact inequalities. It must be either a scalar value or a vector of length
-#'  equal to the number of inequality restrictions.
-#' @param useV for method 'softTMVN' whether to base computations on variance instead of precision
-#'  matrices.
 #' @return An environment for sampling from a possibly degenerate and truncated multivariate normal
 #'  distribution.
 #' @references
@@ -82,6 +82,10 @@
 #'  Y. Li and S.K. Ghosh (2015). Efficient sampling methods for truncated multivariate normal
 #'    and student-t distributions subject to linear inequality constraints.
 #'    Journal of Statistical Theory and Practice 9(4), 712-732.
+#'
+#'  A. Nishimura, Z. Zhang and M.A. Suchard (2021). Hamiltonian zigzag sampler got more momentum
+#'    than its Markovian counterpart: Equivalence of two zigzags under a momentum refreshment limit.
+#'    arXiv:2104.07694.
 #'
 #'  A. Pakman and L. Paninski (2014).
 #'    Exact Hamiltonian Monte Carlo for truncated multivariate gaussians.
@@ -98,17 +102,16 @@
 #'  A. Souris, A. Bhattacharya and P. Debdeep (2018).
 #'    The Soft Multivariate Truncated Normal Distribution.
 #'    arXiv:1807.09155.
-#
-# equalities: R'x = r
-# inequalities: S'x >= s
-#
+#'
+#'  K.A. Valeriano, C.E. Galarza and L.A. Matos (2023).
+#'    Moments and random number generation for the truncated elliptical family of distributions.
+#'    Statistics and Computing 33(1), 1-20.
 create_TMVN_sampler <- function(Q, perm=NULL,
                                 mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=update.Q,
                                 name="x", coef.names=NULL,
                                 R=NULL, r=NULL, S=NULL, s=NULL, lower=NULL, upper=NULL,
-                                method=NULL, reduce=(method=="Gibbs" && !is.null(R)),
-                                T.HMC=pi/2, max.refl=.Machine$integer.max,
-                                diagnostic=FALSE, sharpness=100, useV=FALSE) {
+                                check.constraints = FALSE,
+                                method=NULL, reduce=NULL) {
 
   if (name == "") stop("empty name")
   store_default <- function(prior.sampler=FALSE) name  # for direct use of create_TMVN_sampler
@@ -117,6 +120,13 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     Q <- economizeMatrix(Q, symmetric=TRUE, drop.zeros=TRUE)
   }
   n <- nrow(Q)
+
+  if (is.null(Xy)) {
+    mu <- if (is.null(mu)) rep.int(0, n) else as.numeric(mu)
+    if (length(mu) != n) stop("incompatible dimensions 'Q' and 'mu'")
+  } else {
+    if (!is.null(mu)) stop("only one of 'mu' and 'Xy' should be specified")
+  }
 
   if (!is.null(coef.names)) {
     if (length(coef.names) != n) stop("incompatible length of 'coef.names'")
@@ -129,6 +139,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     reduce <- FALSE
     eq <- FALSE
   } else {
+    if (check.constraints) Rnames <- colnames(R)
     R <- economizeMatrix(R, vec.as.diag=FALSE)
     if (nrow(R) != n || ncol(R) > n) stop("incompatible constraint matrix 'R'")
     if (is.null(r)) {
@@ -138,6 +149,22 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       if (length(r) != ncol(R)) stop("length of 'r' should equal the number of columns of 'R'")
     }
     # TODO check that R has full column rank
+    if (check.constraints) {
+      R0 <- R
+      r0 <- r
+      check_equalities <- function(x, tol=sqrt(.Machine$double.eps)) {
+        tol <- abs(tol)
+        dif <- crossprod_mv(R0, x) - r0
+        viol <- which(abs(dif) > tol)
+        if (length(viol) >= 1L) {
+          warn(length(viol), " equality restriction(s) violated")
+          message("largest discrepancies:")
+          o <- viol[order(abs(dif[viol]), decreasing = TRUE)[1:min(3L, length(viol))]]
+          fdif <- format(dif[o], digits=3L)
+          message(if (is.null(Rnames)) fdif else paste(fdif, " (", Rnames[o], ")", sep="", collapse=", "))
+        }
+      }
+    }
     eq <- TRUE
   }
 
@@ -145,12 +172,14 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     rm(S, s)
     ineq <- FALSE
   } else {
+    if (check.constraints) Snames <- colnames(S)
     if (!is.null(lower)) {
       # use lower and upper bounds, and translate to Sx >= s
       if (is.null(upper)) stop("lower and upper bound should be specified together")
-      if (!is.null(s)) warning("argument 's' ignored in combination with 'lower' and 'upper'", immediate.=TRUE)
+      if (!is.null(s)) warn("argument 's' ignored in combination with 'lower' and 'upper'")
       if (length(lower) != length(upper) || any(lower >= upper)) stop("'lower' and 'upper' incompatible")
       if (length(lower) != ncol(S)) stop("'S' incompatible with 'lower' and 'upper'")
+      if (check.constraints) Snames <- paste(c(Snames, Snames), rep_each(c("lower", "upper"), ncol(S)))
       S <- cbind(S, -S)
       s <- c(lower, -upper)
     }
@@ -163,32 +192,67 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       s <- as.numeric(s)
       if (length(s) != ncS) stop("length of 's' should equal the number of columns of 'S'")
     }
+    if (check.constraints) {
+      S0 <- S
+      s0 <- s
+      check_inequalities <- function(x, tol=sqrt(.Machine$double.eps)) {
+        dif <- crossprod_mv(S0, x) - s0
+        viol <- which(dif < -abs(tol))
+        if (length(viol) >= 1L) {
+          warn(length(viol), " inequality restriction(s) violated")
+          message("largest discrepancies:")
+          o <- viol[order(dif[viol])[1:min(3L, length(viol))]]
+          fdif <- format(dif[o], digits=3L)
+          message(if (is.null(Snames)) fdif else paste(fdif, " (", Snames[o], ")", sep="", collapse=", "))
+        }
+      }
+    }
     ineq <- TRUE
   }
   rm(lower, upper)
 
-  if (ineq) {
-    method <- match.arg(method, c("HMC", "Gibbs", "softTMVN"))  # method direct not for inequalities
-  } else {
-    method <- match.arg(method, c("direct", "HMC", "Gibbs"))
+  if (!(eq || ineq)) check.constraints <- FALSE
+
+  if (check.constraints) {
+    check_constraints <- function(x, tol=sqrt(.Machine$double.eps)) {
+      tol <- abs(tol)
+      if (eq) check_equalities(x, tol)
+      if (ineq) check_inequalities(x, tol)
+    }
   }
 
-  if (eq && method == "Gibbs" && !reduce) {
-    warning("'reduce' has been set to TRUE for Gibbs method with equalities", immediate.=TRUE)
+  if (is.null(method)) {
+    method <- if (ineq) "HMC" else "direct"
+  }
+  if (is.character(method)) {
+    method <- match.arg(method, c("direct", "Gibbs", "HMC", "HMCZigZag", "softTMVN"))
+    method <- eval(call(paste0("m_", method)))
+  }
+  if (ineq) {
+    if (method$method == "direct") stop("method 'direct' cannot be used for inequality constrained sampling")
+  } else {
+    if (method$method == "softTMVN") stop("method 'softTMVN' can only be used for inequality constrained sampling")
+  }
+  if (method$method != "direct") debug <- method$debug
+
+  if (is.null(reduce)) {
+    reduce <- eq && method$method=="Gibbs"
+  }
+  if (eq && method$method == "Gibbs" && !reduce) {
+    warn("'reduce' has been set to TRUE for Gibbs method with equalities")
     reduce <- TRUE
   }
-  if (reduce || (ineq && method == "Gibbs")) name.tr <- paste0(name, "_tr_")
+  if (reduce || (ineq && method$method == "Gibbs")) name.tr <- paste0(name, "_tr_")
 
   use.cholV <- FALSE
   if (reduce) {
     # transform to subspace defined by R
 
-    # in this case assume Q is provided (for now)
-    if (is.null(Q)) stop("precision matrix 'Q' should be provided when 'reduce=TRUE'")
-    if (update.Q || update.mu) stop("'update.Q=TRUE' and 'update.mu=TRUE' not supported in combination with 'reduce=TRUE'")
+    if (update.Q || update.mu) stop("'update.Q=TRUE' or 'update.mu=TRUE' not supported in combination with 'reduce=TRUE'")
 
-    mu <- if (is.null(mu)) rep.int(0, n) else as.numeric(mu)
-    if (length(mu) != n) stop("incompatible dimensions 'Q' and 'mu'")
+    if (!is.null(Xy)) {
+      mu <- build_chol(Q, perm)$solve(Xy)
+    }
 
     QRofR <- qr(economizeMatrix(R, sparse=FALSE))  # check the rank
     # transformation z = Q'x where Q is the orthogonal Q matrix of QRofR
@@ -205,7 +269,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     # NB cholQ will now refer to z2 subspace
     cholQ <- build_chol(crossprod_sym(Q2, Q))  # chol factor L
     mu_z2_given_z1 <- mu_z2 - cholQ$solve(crossprod_mv(Q2, (Q %m*v% (Q1 %m*v% (z1 - mu_z1)))))
-    if (method == "softTMVN") {
+    if (method$method %in% c("softTMVN", "HMCZigZag")) {
       Q <- crossprod_sym(Q2, Q)
     } else {
       rm(Q)
@@ -220,8 +284,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       S <- economizeMatrix(crossprod(Q2, S), drop.zeros=TRUE, allow.tabMatrix=FALSE)
     }
 
-    rm(Q1, z1, mu_z1, mu_z2, mu_z2_given_z1)
-    # also remove R, r, n, n1, n2 ?
+    rm(Q1, z1, mu_z1, mu_z2, mu_z2_given_z1, n1)
 
     # now we have
     #   x0 as offset
@@ -230,7 +293,8 @@ create_TMVN_sampler <- function(Q, perm=NULL,
 
   } else {  # !reduce
 
-    if (method == "direct" && !update.Q && n <= 1000L) {  # special case where we use cholV instead of cholQ
+    if (method$method == "direct" && !update.Q && n <= 1000L) {
+      # special case where we use cholV instead of cholQ
       tryCatch(
         suppressWarnings({
           V <- economizeMatrix(solve(Q), symmetric=TRUE)
@@ -253,26 +317,18 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     } else {
       cholQ <- build_chol(Q, perm)
     }
-    rm(perm)
-    if (method != "softTMVN") rm(Q)
-    if (is.null(mu)) {
-      if (is.null(Xy)) {
-        mu <- rep.int(0, n)
-      } else {
-        mu <- if (use.cholV) V %m*v% Xy else cholQ$solve(Xy)
-      }
-    } else {
-      mu <- as.numeric(mu)
+
+    if (!method$method %in% c("softTMVN", "HMCZigZag")) rm(Q)
+
+    if (!is.null(Xy)) {
+      mu <- if (use.cholV) V %m*v% Xy else cholQ$solve(Xy)
     }
-    if (length(mu) != n) stop("incompatible dimensions 'Q' and 'mu'")
 
     if (ineq) {
       # currently tabMatrix disallowed because used as solve rhs below
       S <- economizeMatrix(S, sparse=if (class(cholQ$cholM)[1L] == "matrix") FALSE else NULL, allow.tabMatrix=FALSE)
     }
-    if (method == "Gibbs") {
-      n2 <- n
-    }
+    if (method$method %in% c("Gibbs", "HMCZigZag")) n2 <- n
 
     if (eq) {
       # update.Q, dense cholQ --> faster to have dense R (and S) as well
@@ -282,43 +338,39 @@ create_TMVN_sampler <- function(Q, perm=NULL,
         #cholRVR <- build_chol(crossprod_sym2(R, cholQ$solve(R)))  # cholesky template object for (hopefully) faster projection
         cholRVR <- build_chol(crossprod_sym2(cholQ$solve(R, system="L", systemP=TRUE)))
       } else {
-        if (method != "softTMVN") {
+        if (method$method != "softTMVN") {
           VR <- if (use.cholV) economizeMatrix(V %*% R, allow.tabMatrix=FALSE) else cholQ$solve(R)
           VR.RVRinv <- economizeMatrix(VR %*% solve(crossprod_sym2(R, VR)))
+          if (method$method == "HMCZigZag" & is.null(method$prec.eq)) {
+            prec.eq <- 100 * diag(solve(crossprod_sym2(R, VR)))
+          }
           rm(VR)
         }
       }
     }  # END if (eq)
   }  # END !reduce
   if (use.cholV && !update.mu) rm(V)
-  rm(Xy)
+  rm(perm, Xy)
 
-  if (ineq && method == "Gibbs") {
+  if (ineq && method$method == "Gibbs") {
     # transform to unit covariance matrix frame
     # inequalities U'v >= u
+    u <- s - crossprod_mv(S, mu)
     # drop very small numbers in U as they give problems in the Gibbs sampler
     # and use transpose for faster col access in sparse case
     Ut <- economizeMatrix(
       t(drop0(cholQ$solve(S, system="L", systemP=TRUE), tol=1e-10)),
       vec.diag=FALSE, allow.tabMatrix=FALSE
     )
-    u <- s - crossprod_mv(S, mu)
     sparse <- !is.matrix(Ut)
     if (sparse && class(Ut)[1L] != "dgCMatrix") Ut <- as(as(Ut, "CsparseMatrix"), "generalMatrix")
   }
 
-  if (method == "HMC") {
+  if (method$method == "HMC") {
     # Hamiltonian H = 1/2 x'Mx - g'x + 1/2 p'M^{-1}p
     # precision matrix M, covariance matrix M^{-1}, mu=M^{-1}g must obey equality restrictions
     # Hamilton's equations: dx/dt = M^{-1}p, p = M dx/dt
     #                       dp/dt = - Mx + g
-    if (length(T.HMC) == 2L) {
-      drawT <- TRUE
-      runif_T <- eval(substitute(function() runif(1L, l, u), list(l=T.HMC[1L], u=T.HMC[2L])))
-    } else {
-      if (length(T.HMC) != 1L || T.HMC <= 0) stop("invalid 'T.HMC'")
-      drawT <- FALSE
-    }
     if (!reduce && eq && !update.Q) {
       # project mean mu on eq constraint surface
       mu <- mu + VR.RVRinv %m*v% (r - crossprod_mv(R, mu))
@@ -337,7 +389,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       } else {
         VS <- NULL
       }
-      if (class(S)[1L] %in% c("ddiMatrix", "tabMatrix")) S <- as(as(S, "CsparseMatrix"), "generalMatrix")
+      if (class(S)[1L] == "ddiMatrix") S <- as(as(S, "CsparseMatrix"), "generalMatrix")
       if (!is.null(VS) && class(VS)[1L] == "ddiMatrix") VS <- as(as(VS, "CsparseMatrix"), "generalMatrix")
       if (update.Q) {
         simplified <- FALSE
@@ -348,7 +400,8 @@ create_TMVN_sampler <- function(Q, perm=NULL,
         simplified <- !eq && identical(VS, S)  # simplified=TRUE is the case described in Pakman and Paninski: identity Q and no equality constraints
         if (simplified) VS <- NULL
       }
-      max.refl <- as.integer(max.refl)[1L]
+      max.events <- method$max.events
+      diagnostic <- method$diagnostic
       if (diagnostic) {
         # set up a vector of wall bounce counts
         bounces <- setNames(rep.int(0L, ncS), if (is.null(colnames(S))) seq_len(ncS) else colnames(S))
@@ -357,12 +410,72 @@ create_TMVN_sampler <- function(Q, perm=NULL,
         bounces <- integer(0L)
       }
     }
-  }
+  }  # END HMC
+
+  if (method$method == "HMCZigZag") {
+
+    base_which <- base::which  # faster, in case Matrix::which is loaded
+    eps <- sqrt(.Machine$double.eps)
+    negeps <- -eps
+
+    if (class(Q)[1L] != "matrix") {
+      iQ <- xQ <- list()
+      for (j in seq_len(ncol(Q))) {
+        temp <- Q[, j, drop=TRUE]
+        iQ[[j]] <- base_which(temp != 0)
+        xQ[[j]] <- temp[temp != 0]
+      }
+    }
+
+    if (ineq) {
+      if (class(S)[1L] == "ddiMatrix") S <- as(as(S, "CsparseMatrix"), "generalMatrix")
+      if (class(S)[1L] == "dgCMatrix") {
+        # store nonzero indices for each column
+        inds <- list()
+        len <- diff(S@p)
+        for (j in seq_len(ncS)) {
+          inds[[j]] <- S@i[(S@p[j] + 1L):(S@p[j] + len[j])] + 1L
+        }
+      }
+    }
+
+    if (!reduce && eq && !update.Q) {
+      # TODO can we use the approximate precision matrix form here using matrix-inversion lemma?
+      #      then we would nowhere need to factorize Q
+      # project mean mu on eq constraint surface
+      mu <- mu + VR.RVRinv %m*v% (r - crossprod_mv(R, mu))
+    }
+
+    if (eq && !is.null(method$prec.eq)) {
+      prec.eq <- method$prec.eq
+    }
+    adapt <- method$adapt
+    rate <- method$rate
+    if (length(rate) == 1L) rate <- rep.int(rate, n)
+    if (length(rate) != n) stop("Laplace distribution rate parameter has wrong length")
+    unit.rate <- all(rate == 1) && !adapt
+    diagnostic <- method$diagnostic
+    if (diagnostic) {
+      gradbounces <- setNames(rep.int(0L, n), seq_len(n))
+      display.n <- seq_len(min(10L, n))  # number of counts to display
+      if (ineq) {
+        # set up a vector of wall bounce counts
+        bounces <- setNames(rep.int(0L, ncS), if (is.null(colnames(S))) seq_len(ncS) else colnames(S))
+        display.ncS <- seq_len(min(10L, ncS))  # number of counts to display
+        flips <- setNames(rep.int(0L, n), seq_len(n))
+      }
+    }
+    if (adapt) {
+      if (!ineq || !diagnostic) stop("adapt only in combination with diagnostic=TRUE")
+    }
+
+  }  # END HMCZigZag
 
   zero.mu <- !update.mu && all(mu == 0)
-  if (zero.mu) numeric(0L)
+  if (zero.mu) mu <- numeric(0L)
 
-  if (method == "softTMVN") {
+  if (method$method == "softTMVN") {
+    useV <- method$useV
     if (.opts$PG.approx) {
       mPG <- as.integer(.opts$PG.approx.m)
       if (!length(mPG) %in% c(1L, n)) stop("invalid value for option 'PG.approx.m'")
@@ -390,19 +503,41 @@ create_TMVN_sampler <- function(Q, perm=NULL,
         cholRVxR <- build_chol(matsum_RVxR(M1=crossprod_sym2(SVR, ch$solve(SVR)), w1=-1))
       }
     } else {
-      # more convenient to use transpose of S for use in crossprod_sym
-      St <- t(S)
-      rm(S)
+      St <- t(S)  # for use in crossprod_sym
       if (!zero.mu) Qmu <- Q %m*v% mu
-      matsum <- make_mat_sum(M0=Q, M1=crossprod_sym(St, runif(nrow(St), 0.9, 1.1)))
+      matsum <- make_mat_sum(
+          M0 = Q, M1 = crossprod_sym(St, runif(nrow(St), 0.9, 1.1)),
+          sparse = if (eq && inherits(R, "CsparseMatrix")) TRUE else NULL
+      )
       ch <- build_chol(matsum(crossprod_sym(St, runif(nrow(St), 0.9, 1.1))))
-      if (eq && !reduce) {
+      if (eq && !reduce)
         cholRVR <- build_chol(crossprod_sym2(R, ch$solve(R)))
+    }
+  }  # END softTMVN
+
+
+  if (method$method == "Gibbs") {
+    if (eq) {
+      transform <- function(x) cholQ$Ltimes(crossprod_mv(Q2, x - x0))
+      untransform <- function(z) x0 + Q2 %m*v% cholQ$solve(z, system="Lt", systemP=TRUE)
+    } else {
+      if (zero.mu) {
+        transform <- function(x) cholQ$Ltimes(x)
+        untransform <- function(z) cholQ$solve(z, system="Lt", systemP=TRUE)
+      } else {
+        transform <- function(x) cholQ$Ltimes(x - mu)
+        untransform <- function(z) mu + cholQ$solve(z, system="Lt", systemP=TRUE)
       }
     }
-  }  # END if (method == "softTMVN")
+  } else {
+    if (reduce) {
+      transform <- function(x) crossprod_mv(Q2, x - x0)
+      untransform <- function(z) x0 + Q2 %m*v% z
+    }
+  }
 
-  if (method == "direct") {
+
+  if (method$method == "direct") {
     draw <- function(p) {}
     if (update.Q)
       draw <- add(draw, quote(cholQ$update(Q, Imult)))
@@ -440,8 +575,8 @@ create_TMVN_sampler <- function(Q, perm=NULL,
         draw <- add(draw, bquote(p[[.(name)]] <- coef + VR.RVRinv %m*v% (r - crossprod_mv(R, coef))))
       }
     } else {
-      if (reduce) {  # backtransform
-        draw <- add(draw, bquote(p[[.(name)]] <- x0 + Q2 %m*v% coef))
+      if (reduce) {
+        draw <- add(draw, bquote(p[[.(name)]] <- untransform(coef)))
       } else {
         draw <- add(draw, bquote(p[[.(name)]] <- coef))
       }
@@ -457,19 +592,23 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       else
         formals(draw) <- alist(p=, scale=1)
     }
-  }  # END if (method == "direct")
+  }  # END direct
 
-  if (method == "softTMVN") {
+  if (method$method == "softTMVN") {
+    sharpness <- method$sharpness
+    sharpness_squared <- sharpness^2
+    sharpness_inv <- 1/sharpness
     draw <- function(p) {
+      if (debug) browser()
       # 1. draw Polya-Gamma mixture precisions
       if (reduce)  # equalities have already been taken care of
         x <- p[[name.tr]]
       else
         x <- p[[name]]
-      discr <- if (useV) crossprod_mv(S, x) - s else St %m*v% x - s
+      discr <- crossprod_mv(S, x) - s
       omega <- rPolyaGamma(1, sharpness * discr)
       # 2. draw vector of coefficients
-      omega.tilde <- sharpness * sharpness * omega
+      omega.tilde <- sharpness_squared * omega
       if (useV) {
         attr(D.omega.tilde.inv, "x") <- 1 / omega.tilde
         XX_V <- matsum(D.omega.tilde.inv)
@@ -481,10 +620,10 @@ create_TMVN_sampler <- function(Q, perm=NULL,
           y1 <- mu + drawMVN_cholQ(cholQ)
         y2 <- Crnorm(length(s)) * sqrt(1/omega)
         if (reduce) {
-          p[[name.tr]] <- y1 + VS %m*v% ch$solve((alpha - sharpness * crossprod_mv(S, y1) - y2) * (1 / sharpness))
-          p[[name]] <- x0 + Q2 %m*v% p[[name.tr]]
+          p[[name.tr]] <- y1 + VS %m*v% ch$solve((alpha - sharpness * crossprod_mv(S, y1) - y2) * sharpness_inv)
+          p[[name]] <- untransform(p[[name.tr]])
         } else {
-          coef <- y1 + VS %m*v% ch$solve((alpha - sharpness * crossprod_mv(S, y1) - y2) * (1 / sharpness))
+          coef <- y1 + VS %m*v% ch$solve((alpha - sharpness * crossprod_mv(S, y1) - y2) * sharpness_inv)
           if (eq) {
             cholRVxR$update(matsum_RVxR(M1=crossprod_sym2(SVR, ch$solve(SVR)), w1=-1))
             temp <- V %m*v% (R %m*v% cholRVxR$solve(r - crossprod_mv(R, coef)))
@@ -503,7 +642,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
           Xy <- crossprod_mv(St, alpha) + Qmu
         if (reduce) {
           p[[name.tr]] <- drawMVN_cholQ(ch, Xy)
-          p[[name]] <- x0 + Q2 %m*v% p[[name.tr]]
+          p[[name]] <- untransform(p[[name.tr]])
         } else {
           coef <- drawMVN_cholQ(ch, Xy)
           if (eq) {
@@ -516,40 +655,38 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       }
       p
     }
-  }  # END if (method == "softTMVN")
+  }  # END softTMVN
 
-  if (method == "Gibbs") {
+  if (method$method == "Gibbs") {
+    draw <- function(p) {}
+    if (debug) draw <- add(draw, quote(browser()))
     if (ineq) {
       eps <- sqrt(.Machine$double.eps)  # TODO, make this a parameter?
       # draw from truncated univariate normal full conditionals
-      draw <- function(p) {
-        v <- p[[name.tr]]
-        ustar <- u - Ut %m*v% v
+      draw <- add(draw, bquote(v <- p[[.(name.tr)]]))
+      draw <- add(draw, quote(ustar <- u - Ut %m*v% v))
+      if (method$slice) {
         if (sparse)
-          v <- Crtmvn_Gibbs_sparse(v, Ut, ustar, eps)
+          draw <- add(draw, quote(v <- Crtmvn_slice_Gibbs_sparse(v, Ut, ustar, eps)))
         else
-          v <- Crtmvn_Gibbs_dense(v, Ut, ustar, eps)
-        p[[name.tr]] <- v
+          draw <- add(draw, quote(v <- Crtmvn_slice_Gibbs_dense(v, Ut, ustar, eps)))
+      } else {
+        if (sparse)
+          draw <- add(draw, quote(v <- Crtmvn_Gibbs_sparse(v, Ut, ustar, eps)))
+        else
+          draw <- add(draw, quote(v <- Crtmvn_Gibbs_dense(v, Ut, ustar, eps)))
       }
+      draw <- add(draw, bquote(p[[.(name.tr)]] <- v))
     } else {
-      draw <- function(p) {
-        v <- Crnorm(n2)
-      }
+      draw <- add(draw, bquote(v <- Crnorm(.(n2))))
     }
-    if (eq) {
-      # TODO precompute Q2 %*% Lt^-1
-      draw <- add(draw, bquote(p[[.(name)]] <- x0 + Q2 %m*v% cholQ$solve(v, system="Lt", systemP=TRUE)))
-    } else {
-      if (zero.mu)
-        draw <- add(draw, bquote(p[[.(name)]] <- cholQ$solve(v, system="Lt", systemP=TRUE)))
-      else
-        draw <- add(draw, bquote(p[[.(name)]] <- mu + cholQ$solve(v, system="Lt", systemP=TRUE)))
-    }
+    draw <- add(draw, bquote(p[[.(name)]] <- untransform(v)))
     draw <- add(draw, quote(p))
-  }  # END if (method == "Gibbs") {
+  }  # END Gibbs
 
-  if (method == "HMC") {
+  if (method$method == "HMC") {
     draw_temp <- function(p, Imult) {
+      if (debug) browser()
       if (update.Q) {
         cholQ$update(Q, Imult)
         VS <- cholQ$solve(S)
@@ -598,7 +735,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
           }
         }
       }
-      if (drawT) T.HMC <- runif_T()
+      T0 <- method$Tsim()
       # solution: x(t) = mu + v0*sin(t) + (x0 - mu)*cos(t)
       # inequalities: S'mu + S'v sin(t) + S'(x0 - mu) cos(t) >= s
       #           --> S'mu + u cos(t + phi) >= s
@@ -609,27 +746,25 @@ create_TMVN_sampler <- function(Q, perm=NULL,
             cat("\nviolated constraints:", names(bounces)[viol])
         }
         # NB bounces is updated by reference
-        x <- TMVN_HMC_C(S, ncol(S), v, x, s.adj, refl.fac, zero.mu, mu,
-               simplified, VS, diagnostic, bounces, T.HMC, max.refl)
+        x <- TMVN_HMC_C(S, ncS, v, x, s.adj, refl.fac, zero.mu, mu,
+               simplified, VS, diagnostic, bounces, T0, max.events)
         if (diagnostic) {
           most_bounces <- sort(bounces, decreasing=TRUE)[display.n]
           cat("\nmost bounces:", paste0(names(most_bounces), " (", most_bounces, ") "))
         }
       }  else {
         if (zero.mu)
-          x <- sin(T.HMC) * v + cos(T.HMC) * x
+          x <- sin(T0) * v + cos(T0) * x
         else
-          x <- mu + sin(T.HMC) * v + cos(T.HMC) * (x - mu)
+          x <- mu + sin(T0) * v + cos(T0) * (x - mu)
       }
-
       # compute final state (new draw)
       if (reduce) {
         p[[name.tr]] <- x
-        p[[name]] <- x0 + Q2 %m*v% x
+        p[[name]] <- untransform(x)
       } else {
         p[[name]] <- x
       }
-
       p
     }  # END function draw_temp
     draw <- draw_temp
@@ -642,51 +777,219 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       else
         formals(draw) <- alist(p=, scale=1)
     }
-  }  # END if (method == "HMC")
+  }  # END HMC
 
-  # start function
-  if (ineq && method == "Gibbs") {
-    start <- function(p=list(), scale=1) {
-      if (is.null(p[[name.tr]])) {
-        if (is.null(p[[name]])) {
-          if (!requireNamespace("lintools", quietly=TRUE)) stop("please install package lintools and try again")
-          temp <- -as(as(Ut, "TsparseMatrix"), "generalMatrix")
-          # sparse version
-          A <- data.frame(
-            row = temp@i,  # constraint index
-            col = temp@j,  # variable index
-            coef = temp@x
-          )
-          x0 <- Crnorm(n2, sd=scale)
-          for (i in 1:10) {  # at most 10 trials
-            epsilon <- scale * rexp(ncS)
-            res <- lintools::sparse_project(x=x0, A, b=-(u + epsilon), neq=0L, base=0L, sorted=FALSE)
-            scale <- 0.3 * scale
-            if (anyNA(res$x)) {
-              x0 <- Crnorm(n2, sd=scale)
-            } else {
-              if (all(Ut %m*v% res$x >= u)) break
-              x0 <- res$x + Crnorm(n2, sd=scale)
+  if (method$method == "HMCZigZag") {
+    # TODO: update.Q and update.mu cases
+    draw <- function(p) {
+      if (debug) browser()
+      if (reduce)
+        x <- p[[name.tr]]
+      else
+        x <- p[[name]]
+      T0 <- method$Tsim()
+      Tleft <- T0
+      if (diagnostic && ineq) {
+        viol <- crossprod_mv(S, x) < s
+        if (any(viol))
+          cat("\nviolated inequality constraints:", names(bounces)[viol])  # print violated constraints
+      }
+      # draw pM from Laplace distribution, with parameters w; use pM for momentum to distinguish from state p
+      if (unit.rate) {
+        # this seems a fast way to generate Laplace variates:
+        pM <- rexp(n2) - rexp(n2)
+        v <- sign(pM)
+      } else {
+        pM <- rexp(n2, rate=rate) - rexp(n2, rate=rate)
+        v <- rate * sign(pM)
+      }
+      Qx <- if (zero.mu) Q %m*v% x else Q %m*v% (x - mu)
+      Qv <- Q %m*v% v
+      if (eq) {
+        if (zero.mu)
+          Qx <- Qx + R %m*v% (prec.eq * crossprod_mv(R, x))
+        else
+          Qx <- Qx + R %m*v% (prec.eq * crossprod_mv(R, x - mu))
+        Qv <- Qv + R %m*v% (prec.eq * crossprod_mv(R, v))
+      }
+
+      event <- 0L
+      repeat {
+        # compute gradient event time dt.gr, and possibly boundary event times
+        discr <- Qx*Qx + 2*Qv*pM
+        iposD <- base_which(discr > 0)
+        dt.gr <- Inf
+        gradient.event <- TRUE
+        if (length(iposD)) {
+          sqrtD <- sqrt(discr[iposD])
+          t1 <- (-Qx[iposD] - sqrtD) / Qv[iposD]
+          ind1 <- base_which(t1 > 0)
+          t2 <- (-Qx[iposD] + sqrtD) / Qv[iposD]
+          ind2 <- base_which(t2 > 0)
+          if (length(ind1) && length(ind2)) {
+            i1 <- ind1[which.min(t1[ind1])]
+            i2 <- ind2[which.min(t2[ind2])]
+            dt.gr <- min(t1[i1], t2[i2])
+            istar <- if (t1[i1] < t2[i2]) iposD[i1] else iposD[i2]
+          } else {
+            if (length(ind1)) {
+              i1 <- ind1[which.min(t1[ind1])]
+              dt.gr <- t1[i1]
+              istar <- iposD[i1]
+            } else if (length(ind2)) {
+              i2 <- ind2[which.min(t2[ind2])]
+              dt.gr <- t2[i2]
+              istar <- iposD[i2]
             }
           }
-          p[[name.tr]] <- res$x
-        } else {
-          # a start value at the original scale is provided; transform to projected form
-          if (length(p[[name]]) != n) stop("wrong length of start value for '", name, "'")
-          # TODO check that the start value satisfies all constraints
-          if (eq) {
-            z2.start <- crossprod_mv(Q2, p[[name]] - x0)
-          } else {
-            if (zero.mu)
-              z2.start <- p[[name]]
-            else
-              z2.start <- p[[name]] - mu
-          }
-          p[[name.tr]] <- cholQ$Ltimes(z2.start)
         }
-      } else {
-        if (length(p[[name.tr]]) != n2) stop("wrong length of start value for '", name.tr, "'")
+        
+        dt.1st <- dt.gr
+        
+        if (ineq) {
+          # boundary events
+          # TODO can we update Sv and Sx more efficiently then simply recompute them?
+          Sv <- crossprod_mv(S, v)
+          dtS <- (s - crossprod_mv(S, x)) / Sv
+          
+          # ignore inequality boundaries at which the particle currently is (including previously hit walls) while moving to the interior
+          # use negeps here, as small round-off like violations of inequalities are bound to occur
+          iS <- base_which(dtS > negeps & Sv < 0)  # allow passing to the right side
+          if (length(iS)) {
+            jstar <- iS[which.min(dtS[iS])]
+            dt.bd <- dtS[jstar]  # first boundary event time
+            if (dt.bd < dt.gr) {
+              gradient.event <- FALSE
+              dt.1st <- dt.bd
+            }
+          }
+        }
+
+        if (dt.1st >= Tleft) {
+          x <- x + Tleft * v
+          # no need to update pM, as it will be refreshed in the next iteration
+          break
+        }
+
+        # update x and pM
+        x <- x + dt.1st * v
+        pM <- pM - dt.1st * Qx - 0.5 * dt.1st * dt.1st * Qv
+        # pM[istar] will be 0 after a gradient event,
+        # but for numerical robustness (important!!) set it to 0 below
+        # update Qx
+        if (!eq) Qx <- Qx + dt.1st * Qv
+        # all.equal(Qx, crossprod_mv(Q, x - mu))
+        # update v
+        if (gradient.event) {
+          pM[istar] <- 0  # for numerical robustness (important!)
+          v[istar] <- -v[istar]
+          if (!eq) {
+            # update Qv (NB v[istar] has already changed sign)
+            #Qv <- Qv + 2 * v[istar] * get_col(Q, istar)
+            if (class(Q)[1L] == "matrix") {
+              Qv <- Qv + 2 * v[istar] * Q[, istar, drop=TRUE]
+            } else {
+              Qv[iQ[[istar]]] <- Qv[iQ[[istar]]] + 2 * v[istar] * xQ[[istar]]
+            }
+            # all.equal(Qv, crossprod_mv(Q, v))
+          }
+          if (diagnostic) {
+            gradbounces[istar] <- gradbounces[istar] + 1L
+            if (ineq) flips[istar] <- flips[istar] + 1L
+          }
+        } else {
+          # group of L1 isometries: all signed permutations
+          # use a simple version: flip all pi's with si != 0
+          # this guarantees that sum(Sj * v) > 0 after the bounce
+          # TODO check whether other options e.g. including permutations are valid
+          if (class(S)[1L] == "matrix")
+            ind <- base_which(S[, jstar, drop=TRUE] != 0)
+          else
+            ind <- inds[[jstar]]
+          pM[ind] <- -pM[ind]
+          v[ind] <- -v[ind]
+          # update Qv
+          if (!eq) Qv <- crossprod_mv(Q, v)  # TODO update using only changed v components
+          if (diagnostic) {
+            bounces[jstar] <- bounces[jstar] + 1L
+            flips[ind] <- flips[ind] + 1L
+          }
+        }
+
+        if (eq) {
+          # recompute Qx and Qv
+          # TODO make this more efficient?
+          Qx <- if (zero.mu) Q %m*v% x else Q %m*v% (x - mu)
+          if (zero.mu)
+            Qx <- Qx + R %m*v% (prec.eq * crossprod_mv(R, x))
+          else
+            Qx <- Qx + R %m*v% (prec.eq * crossprod_mv(R, x - mu))
+          Qv <- Q %m*v% v + R %m*v% (prec.eq * crossprod_mv(R, v))
+        }
+
+        Tleft <- Tleft - dt.1st
+      }  # END repeat
+
+      if (diagnostic) {
+        if (ineq) {
+          most_bounces <- sort(flips, decreasing=TRUE)[display.n]
+          cat("\nmost flips:", paste0(names(most_bounces), " (", most_bounces, ") "))
+          most_bounces <- sort(bounces, decreasing=TRUE)[display.ncS]
+          cat("\nmost bounces:", paste0(names(most_bounces), " (", most_bounces, ") "))
+        }
+        most_bounces <- sort(gradbounces, decreasing=TRUE)[display.n]
+        cat("\nmost grad bounces:", paste0(names(most_bounces), " (", most_bounces, ") "))
+        if (adapt) {
+          # TODO account for the number of inequalities each variable is involved in
+          rate[flips > 100 * T0] <<- rate[flips > 100 * T0] / 1.1
+        }
       }
+
+      if (reduce) {
+        p[[name.tr]] <- x
+        p[[name]] <- untransform(x)
+      } else {
+        p[[name]] <- x
+      }
+      p
+    }
+
+  }  # END HMCZigZag
+
+
+  if (ineq && method$method == "Gibbs") {
+    start <- function(p=list(), scale=1) {
+      if (!is.null(p[[name.tr]])) {
+        if (length(p[[name.tr]]) != n2) stop("wrong length of start value for '", name.tr, "'")
+        p[[name]] <- untransform(p[[name.tr]])
+      } else if (!is.null(p[[name]])) {
+        if (length(p[[name]]) != n) stop("wrong length of start value for '", name, "'")
+        p[[name.tr]] <- transform(p[[name]])
+      } else {
+        if (!requireNamespace("lintools", quietly=TRUE)) stop("please install package lintools and try again")
+        temp <- -as(as(Ut, "TsparseMatrix"), "generalMatrix")
+        # sparse version
+        A <- data.frame(
+          row = temp@i,  # constraint index
+          col = temp@j,  # variable index
+          coef = temp@x
+        )
+        x0 <- Crnorm(n2, sd=scale)
+        for (i in 1:10) {  # at most 10 trials
+          epsilon <- scale * rexp(ncS)
+          res <- lintools::sparse_project(x=x0, A, b=-(u + epsilon), neq=0L, base=0L, sorted=FALSE)
+          scale <- 0.3 * scale
+          if (anyNA(res$x)) {
+            x0 <- Crnorm(n2, sd=scale)
+          } else {
+            if (all(Ut %m*v% res$x >= u)) break
+            x0 <- res$x + Crnorm(n2, sd=scale)
+          }
+        }
+        p[[name.tr]] <- res$x
+        p[[name]] <- untransform(p[[name.tr]])
+      }
+      if (check.constraints) check_constraints(p[[name]])
       p
     }
   } else {
@@ -697,7 +1000,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
           return(p)
         } else {
           if (!is.null(p[[name]])) {
-            p[[name.tr]] <- crossprod_mv(Q2, p[[name]] - x0)
+            p[[name.tr]] <- transform(p[[name]])
             return(p)
           }
         }
@@ -710,7 +1013,6 @@ create_TMVN_sampler <- function(Q, perm=NULL,
         }
       }
     }
-    # TODO check that user-provided start value has right format and(?) obeys constraints
     if (use.cholV) {
       if (zero.mu) {
         start <- add(start, bquote(coef <- drawMVN_cholV(.(n), cholV, scale)))
@@ -737,7 +1039,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
           start <- add(start, bquote(p[[.(name)]] <- coef + VR %m*v% cholRVR$solve(r - crossprod_mv(R, coef))))
         }
       } else {
-        if (method == "softTMVN") {
+        if (method$method == "softTMVN") {
           if (useV) {
             start <- add(start, quote(VxR <- VR - VS %*% ch$solve(SVR)))  # TODO for sparse matrices use matsum template
             start <- add(start, quote(cholRVxR$update(crossprod(R, VxR))))
@@ -750,29 +1052,18 @@ create_TMVN_sampler <- function(Q, perm=NULL,
         }
       }
     } else {
-      if (reduce) {  # backtransform
+      if (reduce) {
         start <- add(start, bquote(p[[.(name.tr)]] <- coef))
-        start <- add(start, bquote(p[[.(name)]] <- x0 + Q2 %m*v% coef))
+        start <- add(start, bquote(p[[.(name)]] <- untransform(coef)))
       } else {
         start <- add(start, bquote(p[[.(name)]] <- coef))
       }
     }
-    #check_constraints(p[[name]])
+    if (check.constraints) start <- add(start, bquote(check_constraints(p[[.(name)]])))
     start <- add(start, quote(p))
   }
 
-  #check_constraints <- function(x) {
-  #  if (eq) {
-  #    if (!isTRUE(all.equal(crossprod_mv(R, x), r))) stop("equality restriction(s) violated")
-  #  }
-  #  if (ineq) {
-  #    if (!all(crossprod_mv(S, x) >= s - eps)) stop("inequality restriction(S) violated")
-  #  }
-  #}
-
-  # TODO remove more unused quantities
   rm(use.cholV)
-  if (method != "HMC") rm(T.HMC, diagnostic, max.refl)
 
   environment()
 }

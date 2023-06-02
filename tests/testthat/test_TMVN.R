@@ -23,8 +23,8 @@ test_that("HMC TMVN method works", {
   summ <- summary(sim)
   expect_equal(crossprod_mv(R, summ$x[, "Mean"]), r)
   expect_true(crossprod_mv(S, summ$x[, "Mean"]) >= s)
-  expect_true(all.equal(unname(summ$x[, "Mean"]), answer, tolerance=0.04))
-  expect_true(all.equal(unname(summ$x[, "SD"]), answer.sd, tolerance=0.02))
+  expect_equal(unname(summ$x[, "Mean"]), answer, tolerance=0.04)
+  expect_equal(unname(summ$x[, "SD"]), answer.sd, tolerance=0.02)
 })
 
 test_that("HMC TMVN method works after projection on equality constraint surface", {
@@ -33,8 +33,19 @@ test_that("HMC TMVN method works after projection on equality constraint surface
   summ <- summary(sim)
   expect_equal(crossprod_mv(R, summ$x[, "Mean"]), r)
   expect_true(crossprod_mv(S, summ$x[, "Mean"]) >= s)
-  expect_true(all.equal(unname(summ$x[, "Mean"]), answer, tolerance=0.04))
-  expect_true(all.equal(unname(summ$x[, "SD"]), answer.sd, tolerance=0.02))
+  expect_equal(unname(summ$x[, "Mean"]), answer, tolerance=0.04)
+  expect_equal(unname(summ$x[, "SD"]), answer.sd, tolerance=0.02)
+})
+
+test_that("HMCZigZag TMVN method works", {
+  sampler <- create_TMVN_sampler(Q=Q0, mu=mu0, R=R, r=r, S=S, s=s,
+                                 method=m_HMCZigZag(rate=sqrt(diag(Q0))/5))
+  sim <- MCMCsim(sampler, burnin=50, n.iter=100, verbose=FALSE)
+  summ <- summary(sim)
+  expect_equal(crossprod_mv(R, summ$x[, "Mean"]), r, tolerance=0.2)
+  expect_true(crossprod_mv(S, summ$x[, "Mean"]) >= s)
+  expect_equal(unname(summ$x[, "Mean"]), answer, tolerance=0.2)
+  expect_equal(unname(summ$x[, "SD"]), answer.sd, tolerance=0.2)
 })
 
 test_that("Gibbs TMVN method works", {
@@ -43,8 +54,18 @@ test_that("Gibbs TMVN method works", {
   summ <- summary(sim)
   expect_equal(crossprod_mv(R, summ$x[, "Mean"]), r)
   expect_true(crossprod_mv(S, summ$x[, "Mean"]) >= s)
-  expect_true(all.equal(unname(summ$x[, "Mean"]), answer, tolerance=0.04))
-  expect_true(all.equal(unname(summ$x[, "SD"]), answer.sd, tolerance=0.02))
+  expect_equal(unname(summ$x[, "Mean"]), answer, tolerance=0.04)
+  expect_equal(unname(summ$x[, "SD"]), answer.sd, tolerance=0.02)
+})
+
+test_that("slice-Gibbs TMVN method works", {
+  sampler <- create_TMVN_sampler(Q=Q0, mu=mu0, R=R, r=r, S=S, s=s, method=m_Gibbs(slice=TRUE))
+  sim <- MCMCsim(sampler, burnin=500, n.iter=3000, verbose=FALSE)
+  summ <- summary(sim)
+  expect_equal(crossprod_mv(R, summ$x[, "Mean"]), r)
+  expect_true(crossprod_mv(S, summ$x[, "Mean"]) >= s)
+  expect_equal(unname(summ$x[, "Mean"]), answer, tolerance=0.05)
+  expect_equal(unname(summ$x[, "SD"]), answer.sd, tolerance=0.05)
 })
 
 test_that("Soft TMVN method works", {
@@ -53,6 +74,6 @@ test_that("Soft TMVN method works", {
   summ <- summary(sim)
   expect_equal(crossprod_mv(R, summ$x[, "Mean"]), r)
   expect_true(crossprod_mv(S, summ$x[, "Mean"]) >= s)
-  expect_true(all.equal(unname(summ$x[, "Mean"]), answer, tolerance=0.04))
-  expect_true(all.equal(unname(summ$x[, "SD"]), answer.sd, tolerance=0.02))
+  expect_equal(unname(summ$x[, "Mean"]), answer, tolerance=0.04)
+  expect_equal(unname(summ$x[, "SD"]), answer.sd, tolerance=0.02)
 })

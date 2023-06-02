@@ -102,7 +102,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
       X. <- NULL
       n <- model$n
       if (!is.null(var)) {
-        warning("argument 'var' ignored for in-sample prediction", immediate.=TRUE)
+        warn("argument 'var' ignored for in-sample prediction")
         var <- NULL
       }
       if (model$modeled.Q) {
@@ -117,7 +117,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
         cholQ <- build_chol(model$Q0)
       }
       if (!is.null(ny)) {
-        warning("argument 'ny' ignored for in-sample prediction", immediate.=TRUE)
+        warn("argument 'ny' ignored for in-sample prediction")
         ny <- NULL
       }
       # BayesLogit::rpg flags ny=0, so we have set ny to a tiny value > 0 in sampler; need to undo it here as rbinom yields NA for non-integral ny
@@ -132,23 +132,19 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
         use.linpred_ <- TRUE
         X. <- NULL
       } else {
-        if (!is.list(X.)) stop("'X.' must be a list")
+        if (!is.list(X.) || length(X.) == 0L) stop("'X.' must be a non-empty list")
         if (!all(names(X.) %in% names(model$mod)))
           stop("X. names not corresponding to a model component: ", paste(setdiff(names(X.), names(model$mod)), collapse=", "))
-        for (i in seq_along(X.)) {
-          X.[[i]] <- economizeMatrix(X.[[i]])
-          d <- dim(X.[[i]])
-          if (i == 1L) 
-            n <- d[1L]
-          else
-            if (d[1L] != n) stop("not all matrices in 'X.' have the same number of rows")
-          if (d[2L] != model$mod[[names(X.)[i]]]$q) stop("wrong number of columns for X. component ", names(X.)[i])
+        n <- nrow(X.[[1L]])
+        if (!all(sapply(X., NROW) == n)) stop("not all matrices in 'X.' have the same number of rows")
+        for (k in names(X.)) {
+          X.[[k]] <- model$mod[[k]]$make_predict(Xnew=X.[[k]], verbose=verbose)
         }
         use.linpred_ <- FALSE
       }
       # by default use unit variances for new (oos) predictions, but warn if in-sample variance matrix is not unit diagonal
       if (is.null(var)) {
-        if (type == "data" && model$Q0.type != "unit") warning("no 'var' specified; unit variances assumed for prediction", immediate.=TRUE)
+        if (type == "data" && model$Q0.type != "unit") warn("no 'var' specified; unit variances assumed for prediction")
         var <- 1
       }
       if (!(length(var) %in% c(1L, n))) stop("'var' should be either a scalar value or a vector of length 'nrow(newdata)'")
@@ -173,7 +169,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
         )
     }
   } else {
-    if (!is.null(X.)) warning("argument 'X.' is ignored", immediate.=TRUE)
+    if (!is.null(X.)) warn("argument 'X.' is ignored")
     use.linpred_ <- FALSE
     X. <- list()
     if (verbose && nrow(newdata) > 5e4L) message("setting up model design matrices for 'newdata'")
@@ -184,7 +180,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
     else
       n <- nrow(newdata)
     if (is.null(var)) {
-      if (type == "data" && model$Q0.type != "unit") warning("no 'var' specified, so unit variances are assumed for prediction", immediate.=TRUE)
+      if (type == "data" && model$Q0.type != "unit") warn("no 'var' specified, so unit variances are assumed for prediction")
       var <- 1
     }
     if (!(length(var) %in% c(1L, n))) stop("'var' should be either a scalar value or a vector of length 'nrow(newdata)'")
@@ -382,18 +378,18 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
 #' }
 #'
 #' @export
-#' @param formula A model formula, see \code{create_sampler}.
+#' @param formula A model formula, see \code{\link{create_sampler}}.
 #'  Any left-hand-side of the formula is ignored.
-#' @param data see \code{create_sampler}.
-#' @param family see \code{create_sampler}.
-#' @param ny see \code{create_sampler}.
-#' @param ry see \code{create_sampler}.
-#' @param r.mod see \code{create_sampler}.
-#' @param sigma.fixed see \code{create_sampler}.
-#' @param sigma.mod see \code{create_sampler}.
-#' @param Q0 see \code{create_sampler}.
-#' @param formula.V see \code{create_sampler}.
-#' @param linpred see \code{create_sampler}.
+#' @param data see \code{\link{create_sampler}}.
+#' @param family sampling distribution family, see \code{\link{create_sampler}}.
+#' @param ny see \code{\link{create_sampler}}.
+#' @param ry see \code{\link{create_sampler}}.
+#' @param r.mod see \code{\link{create_sampler}}.
+#' @param sigma.fixed see \code{\link{create_sampler}}.
+#' @param sigma.mod see \code{\link{create_sampler}}.
+#' @param Q0 see \code{\link{create_sampler}}.
+#' @param formula.V see \code{\link{create_sampler}}.
+#' @param linpred see \code{\link{create_sampler}}.
 #' @return A list with a generated data vector and a list of prior means of the
 #'  parameters. The parameters are drawn from their priors.
 generate_data <- function(formula, data=NULL, family="gaussian",

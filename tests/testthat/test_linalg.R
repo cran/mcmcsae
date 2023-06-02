@@ -106,10 +106,12 @@ test_that("diagonal-dgC product works", {
 test_that("tab to dgC conversion works", {
   m1 <- matrix(c(1,0,1,0,1,0,0,0,0), 3, 3)
   M1 <- as(m1, "tabMatrix")
+  expect_false(M1@reduced)
   expect_false(M1@num)
   expect_equal(Ctab2dgC(M1), as(as(m1, "CsparseMatrix"), "generalMatrix"))
   m1 <- matrix(c(2,0,0), 3, 1)
   M1 <- as(m1, "tabMatrix")
+  expect_false(M1@reduced)
   expect_true(M1@num)
   expect_equal(Ctab2dgC(M1), as(as(m1, "CsparseMatrix"), "generalMatrix"))
   M2 <- aggrMatrix(sample(1:7, 11, replace=TRUE))
@@ -119,6 +121,26 @@ test_that("tab to dgC conversion works", {
   expect_error(as(matrix(c(1,1,1,0), 2, 2), "tabMatrix"))
 })
 
+test_that("tab <-> matrix conversion works", {
+  m1 <- matrix(0, 2, 3)
+  expect_equal(as(as(m1, "tabMatrix"), "matrix"), m1)
+  m1 <- matrix(c(0, 0, 0, 1.1), 2, 2)
+  expect_equal(as(as(m1, "tabMatrix"), "matrix"), m1)
+})
+
+test_that("tabMatrix row selection works", {
+  m <- matrix(c(1,0,1,0,1,0,0,0,0), 3, 3)
+  M <- as(m, "tabMatrix")
+  expect_identical(M[1, ], m[1, ])
+  expect_identical(Ctab2mat(M[1, , drop=FALSE]), m[1, , drop=FALSE])
+  expect_identical(Ctab2mat(M[c(1, 3), ]), m[c(1, 3), ])
+  expect_identical(Ctab2mat(M[-2, ]), m[-2, ])
+  expect_identical(M[c(-2, -3), ], m[c(-2, -3), ])
+  expect_identical(Ctab2mat(M[, c(-2, -3), drop=FALSE]), m[, c(-2, -3), drop=FALSE])
+  rownames(M) <- paste0("r", seq_len(ncol(M)))
+  expect_identical(Ctab2mat(M[c("r2"), , drop=FALSE]), m[2, , drop=FALSE])
+})
+
 test_that("tabMatrix column selection works", {
   m <- matrix(c(1,0,1,0,1,0,0,0,0), 3, 3)
   M <- as(m, "tabMatrix")
@@ -126,8 +148,10 @@ test_that("tabMatrix column selection works", {
   expect_identical(Ctab2mat(M[, 1, drop=FALSE]), m[, 1, drop=FALSE])
   expect_identical(Ctab2mat(M[, c(1, 3)]), m[, c(1, 3)])
   expect_identical(Ctab2mat(M[, -2]), m[, -2])
-  expect_identical(M[, c(-2, -3)], c(1, 0, 1))
+  expect_identical(M[, c(-2, -3)], m[, c(-2, -3)])
   expect_identical(Ctab2mat(M[, c(-2, -3), drop=FALSE]), m[, c(-2, -3), drop=FALSE])
+  colnames(M) <- paste0("c", seq_len(ncol(M)))
+  expect_identical(Ctab2mat(M[, c("c2"), drop=FALSE]), m[, 2, drop=FALSE])
 })
 
 test_that("crossprod_sym works", {
@@ -157,11 +181,18 @@ test_that("crossprod_sym works", {
   expect_equal(crossprod_sym(M, q), crossprod_sym(M, Q))
   expect_equal(as(crossprod(M, Qsym %*% M), "symmetricMatrix"), crossprod_sym(M, Qsym))
   expect_equivalent(as(crossprod(M, Qmat %*% M), "matrix"), crossprod_sym(M, Qmat))
+  M <- M[, -c(10, 12, 21)]
+  expect_false(tab_isPermutation(M))
+  expect_equal(as(crossprod(M, Q %*% M), "diagonalMatrix"), crossprod_sym(M, q))
+  expect_equal(crossprod_sym(M, q), crossprod_sym(M, Q))
+  M <- economizeMatrix(M, sparse=TRUE)  # this adds slot isPermutation again
+  expect_equal(as(crossprod(M, Qsym %*% M), "symmetricMatrix"), crossprod_sym(M, Qsym))
+  expect_equivalent(as(crossprod(M, Qmat %*% M), "matrix"), crossprod_sym(M, Qmat))
   M <- aggrMatrix(sample(1:n, n), w=runif(n))
   expect_false(tab_isPermutation(M))
   expect_equal(as(crossprod(M, Q %*% M), "diagonalMatrix"), crossprod_sym(M, q))
   expect_equal(crossprod_sym(M, q), crossprod_sym(M, Q))
-  attr(M, "isPermutation") <- FALSE  # TODO add isPermutation slot to tabMatrix class definition
+  attr(M, "isPermutation") <- FALSE
   expect_equal(as(crossprod(M, Qsym %*% M), "symmetricMatrix"), crossprod_sym(M, Qsym))
   expect_equivalent(as(crossprod(M, Qmat %*% M), "matrix"), crossprod_sym(M, Qmat))
   m <- 12L
@@ -203,4 +234,51 @@ test_that("(re)defined S4 methods work", {
   M <- Diagonal(x=dM)
   expect_equal(solve(M, x), diag(1/dM) %*% x)
   expect_equal(solve(M, x[, 1L]), x[, 1L] / dM)
+})
+
+test_that("sparse symmetric weighted crossprod template works", {
+  n <- 1000
+  p <- 100
+  X <- rsparsematrix(n, p, density = 1e-2)
+  W <- 0.1 + runif(n)
+  XWX_updater <- sparse_crossprod_sym_template(X)
+  expect_equal(crossprod_sym(X, W), XWX_updater(W))
+})
+
+test_that("row and column selection of tabMatrix works", {
+  n <- 100
+  m <- 50
+  M <- aggrMatrix(sample(1:m, n, replace=TRUE))
+  expect_equal(M[11, ], as.matrix(M)[11, ])
+  expect_equal(as.matrix(M[11, , drop=FALSE]), as.matrix(M)[11, , drop=FALSE])
+  expect_equal(as.matrix(M[1:10, ]), as.matrix(M)[1:10, ])
+  expect_equal(M[, 11], as.matrix(M)[, 11])
+  expect_equal(as.matrix(M[, 11, drop=FALSE]), as.matrix(M)[, 11, drop=FALSE])
+  expect_equal(as.matrix(M[, c(11, 15, 20)]), as.matrix(M)[, c(11, 15, 20)])
+  expect_equal(as.matrix(M[, -2]), as.matrix(M)[, -2])
+  M <- aggrMatrix(sample(1:m, n, replace=TRUE), w=runif(n))
+  expect_equal(M[11, ], as.matrix(M)[11, ])
+  expect_equal(as.matrix(M[11, , drop=FALSE]), as.matrix(M)[11, , drop=FALSE])
+  expect_equal(as.matrix(M[1:10, ]), as.matrix(M)[1:10, ])
+  expect_equal(M[, 11], as.matrix(M)[, 11])
+  expect_equal(as.matrix(M[, 11, drop=FALSE]), as.matrix(M)[, 11, drop=FALSE])
+  expect_equal(as.matrix(M[, c(11, 15, 20)]), as.matrix(M)[, c(11, 15, 20)])
+  expect_equal(as.matrix(M[, -2]), as.matrix(M)[, -2])
+})
+
+test_that("rbinding tabMatrices works", {
+  n <- 100
+  m <- 50
+  M1 <- aggrMatrix(factor(sample(1:m, n, replace=TRUE), levels=1:50))
+  M2 <- aggrMatrix(factor(sample(1:m, 2*n, replace=TRUE), levels=1:50))
+  expect_identical(rbind(M1, M2), as(rbind(Ctab2dgC(M1), Ctab2dgC(M2)), "tabMatrix"))
+  M2 <- aggrMatrix(factor(sample(1:m, 2*n, replace=TRUE), levels=1:50), w=runif(2*n))
+  expect_identical(rbind(M1, M2), as(rbind(Ctab2dgC(M1), Ctab2dgC(M2)), "tabMatrix"))
+  M1 <- M1[, 1:10]
+  M2 <- M2[, 1:10]
+  expect_identical(rbind(M1, M2), as(rbind(Ctab2dgC(M1), Ctab2dgC(M2)), "tabMatrix"))
+  colnames(M1) <- paste0("c", 1:ncol(M1))
+  expect_identical(colnames(rbind(M1, M2)), colnames(M1))
+  rownames(M2) <- paste0("r", 1:nrow(M2))
+  expect_identical(rownames(rbind(M1, M2)), c(rep.int("", nrow(M1)), rownames(M2)))
 })

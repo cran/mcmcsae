@@ -1,4 +1,5 @@
 # tabMatrix class: generalization of indMatrix from Matrix package
+# it has at most one non-zero value in each row
 setClass("tabMatrix",
   slots = c(
     perm = "integer",  # as in indMatrix, but 0-based
@@ -7,7 +8,7 @@ setClass("tabMatrix",
     num = "logical",  # whether the matrix is numeric or 0/1
     # TODO generalize x to matrix/dgCMatrix
     x = "numeric",  # the numeric values in case num=TRUE
-    xlab = "character"  # name asociated with numeric x component (scalar, later to be generalized to colnames)
+    xlab = "character"  # name associated with numeric x component (scalar, later to be generalized to colnames)
   ),
   contains = c("sparseMatrix", "generalMatrix"),
   validity = function(object) {
@@ -21,6 +22,10 @@ setClass("tabMatrix",
     if (num && length(object@x) != n) return(paste("length of 'x' slot must be", n))
     if (length(xlab) > 1L) return("length of 'xlab' must not be greater than 1")
     if (n > 0L && (any(perm > d - 1L) || (!reduced && any(perm < 0L)))) return("'perm' slot is not a valid index")
+    # NB 'num' can represent zero rows, so it is more general than 'reduced'
+    #    so we disallow the case that both are TRUE
+    #    'reduced' is used for matrices having only 0/1 entries and at least one row without 1
+    if (num && reduced) return("'num' and 'reduced' cannot both be TRUE")
     TRUE
   }
 )
@@ -49,7 +54,6 @@ setAs("factor", "tabMatrix",
   }
 )
 
-# colSums method for tabMatrix (colSums promoted to S4 generic by Matrix)
 setMethod("colSums", "tabMatrix", function(x, na.rm=FALSE, dims=1, ...)
   if (x@num)
     fast_aggrC(x@x, x@perm + 1L, x@Dim[2L])
@@ -58,10 +62,8 @@ setMethod("colSums", "tabMatrix", function(x, na.rm=FALSE, dims=1, ...)
 )
 
 setMethod("rowSums", "tabMatrix", function(x, na.rm=FALSE, dims=1, ...) {
-  if (x@num)
-    out <- x@x
-  else
-    out <- rep.int(1, x@Dim[1L])
+  if (x@num) return(x@x)
+  out <- rep.int(1, x@Dim[1L])
   if (x@reduced) out[x@perm == -1L] <- 0
   out
 })
@@ -97,29 +99,24 @@ setMethod("diag", "tabMatrix", function(x=1, nrow, ncol) {
 setMethod("t", "tabMatrix", function(x) {
   if (x@reduced) {
     sub <- which(x@perm != -1L)
-    if (x@num)
-      sparseMatrix(i=x@perm[sub], j=(0:(x@Dim[1L] - 1L))[sub], x=x@x[sub], dims=rev(x@Dim), dimnames=rev(x@Dimnames), index1=FALSE, check=FALSE)
-    else
-      sparseMatrix(i=x@perm[sub], j=(0:(x@Dim[1L] - 1L))[sub], x=rep.int(1, length(sub)), dims=rev(x@Dim), dimnames=rev(x@Dimnames), index1=FALSE, check=FALSE)
+    sparseMatrix(i=x@perm[sub], j=(0:(x@Dim[1L] - 1L))[sub], x=rep.int(1, length(sub)), dims=rev(x@Dim), dimnames=rev(x@Dimnames), index1=FALSE, check=FALSE)
+  } else if (x@num) {
+    sparseMatrix(i=x@perm, j=0:(x@Dim[1L] - 1L), x=x@x, dims=rev(x@Dim), dimnames=rev(x@Dimnames), index1=FALSE, check=FALSE)
   } else {
-    if (x@num)
-      sparseMatrix(i=x@perm, j=0:(x@Dim[1L] - 1L), x=x@x, dims=rev(x@Dim), dimnames=rev(x@Dimnames), index1=FALSE, check=FALSE)
-    else
-      sparseMatrix(i=x@perm, j=0:(x@Dim[1L] - 1L), x=rep.int(1, x@Dim[1L]), dims=rev(x@Dim), dimnames=rev(x@Dimnames), index1=FALSE, check=FALSE)
+    sparseMatrix(i=x@perm, j=0:(x@Dim[1L] - 1L), x=rep.int(1, x@Dim[1L]), dims=rev(x@Dim), dimnames=rev(x@Dimnames), index1=FALSE, check=FALSE)
   }
 })
 
 setMethod("coerce", c("tabMatrix", "ddiMatrix"), function(from, to="ddiMatrix", strict=TRUE) {
   if (!isDiagonal(from)) stop("not a diagonal tabMatrix")
   if (from@reduced) {
-    x <- if (from@num) from@x else rep.int(1, from@Dim[1L])
+    x <- rep.int(1, from@Dim[1L])
     x[from@perm == -1L] <- 0
     out <- Cdiag(x)
+  } else if (from@num) {
+    out <- Cdiag(from@x)
   } else {
-    if (from@num)
-      out <- Cdiag(from@x)
-    else
-      out <- CdiagU(from@Dim[1L])
+    out <- CdiagU(from@Dim[1L])
   }
   if (!(is.null(from@Dimnames[[1L]]) && is.null(from@Dimnames[[2L]]))) attr(out, "Dimnames") <- from@Dimnames
   out
@@ -145,31 +142,25 @@ setMethod("coerce", c("ddiMatrix", "tabMatrix"), function(from, to="tabMatrix", 
 )
 
 setMethod("coerce", c("matrix", "tabMatrix"), function(from, to="tabMatrix", strict=TRUE) {
-  perm <- apply(from, 1L, function(x) which(x != 0))
-  if (is.integer(perm)) {
-    x <- from[cbind(seq_len(nrow(from)), perm)]
-    num <- any(x != 1)
-    if (!num) x <- numeric()
-    reduced <- FALSE
+  perm <- apply(from, 1L, function(x) {
+    nz <- which(x != 0)
+    if (length(nz) == 1L) nz else if (length(nz) == 0L) NA_integer_ else stop("not a tabMatrix")
+  })
+  num <- reduced <- FALSE
+  x <- from[cbind(seq_len(nrow(from)), perm)]
+  if (!all(x[!is.na(perm)] == 1)) {
+    x[is.na(perm)] <- 0
+    perm[is.na(perm)] <- 1L
+    num <- TRUE
   } else {
-    if (!is.list(perm)) stop("not a tabMatrix")
-    l <- sapply(perm, length)
-    if (any(!(l %in% 0:1))) stop("not a tabMatrix")
-    l <- l == 1L
-    perm[!l] <- 0L
-    perm <- as.integer(perm)
-    reduced = TRUE
-    xnz <- from[cbind(seq_len(nrow(from)), perm)[l, , drop=FALSE]]
-    num <- any(xnz != 1)
-    if (num) {
-      x <- rep.int(0, length(perm))
-      x[l] <- xnz
-    } else {
-      x <- numeric()
+    x <- numeric()
+    if (anyNA(perm)) {
+      perm[is.na(perm)] <- 0L
+      reduced <- TRUE
     }
   }
   tabMatrix(Dim=dim(from), Dimnames=dimnames(from),
-    reduced=reduced, perm=perm - 1L, num=num, x=x
+            reduced=reduced, perm=perm - 1L, num=num, x=x
   )
 })
 
@@ -186,14 +177,20 @@ setMethod("coerce", c("dgCMatrix", "tabMatrix"), function(from, to="tabMatrix", 
       ind <- ind + nnz[co]
     }
   }
-  if (all(x == 1)) {
-    x <- numeric(0L)
-    num <- FALSE
-  } else {
+  num <- reduced <- FALSE
+  if (!all(x[perm >= 0L] %in% c(0, 1))) {
+    x[perm < 0L] <- 0
+    perm[perm < 0L] <- 0L
     num <- TRUE
+  } else {
+    if (any(perm < 0L)) {
+      perm[x == 0] <- -1L
+      reduced <- TRUE
+    }
+    x <- numeric(0L)
   }
   tabMatrix(Dim=from@Dim, Dimnames=from@Dimnames,
-    reduced=any(perm == -1L), perm=perm, num=num, x=x
+    reduced=reduced, perm=perm, num=num, x=x
   )
 })
 
@@ -218,65 +215,112 @@ tab_isPermutation <- function(M) {
 #' @name tabMatrix-indexing
 NULL
 
-# row selection
-#' @rdname tabMatrix-indexing
-setMethod("[", c(x="tabMatrix", i="index", j="missing", drop="logical"), function (x, i, j, ..., drop=TRUE) {
-  if (is.character(i)) stop("indexing by name currently not supported for tabMatrix")
-  i <- as.integer(i)
-  if (any(i < 0L)) stop("negative integer indexing currently not supported for tabMatrix")
-  if (any(i == 0L | i > x@Dim[1L])) stop("out of range")
+# auxiliary function to get a positive integer index vector
+get_ind <- function(index, M, type="row") {
+  if (is.character(index)) {
+    ind <- match(index, if (type == "row") rownames(M) else colnames(M))
+  } else if (is.logical(index)) {
+    if (length(index) != M@Dim[if (type == "row") 1L else 2L]) stop("incompatible index vector")
+    ind <- base::which(index)
+  } else {
+    ind <- as.integer(index)
+    if (anyNA(ind)) stop("index vector with NAs not allowed")
+    if (any(ind < 0L)) {
+      if (all(ind < 0L)) {
+        ind <- if (type == "row") seq_len(nrow(M))[ind] else seq_len(ncol(M))[ind]
+      } else stop("mixed negative and nonnegative index vector")
+    }
+  }
+  if (anyNA(ind) | any(ind == 0L | ind > M@Dim[if (type == "row") 1L else 2L])) stop("index out of range")
+  ind
+}
+
+tab_row_select <- function(M, i, drop) {
+  i <- get_ind(i, M, "row")
   if (drop && length(i) == 1L) {
-    out <- rep.int(0, x@Dim[2L])
-    if (x@perm[i] >= 0L)
-      out[x@perm[i] + 1L] <- if (x@num) x@x[i] else 1
+    out <- rep.int(0, M@Dim[2L])
+    if (M@perm[i] >= 0L)
+      out[M@perm[i] + 1L] <- if (M@num) M@x[i] else 1
     out
   } else {
-    tabMatrix(Dim=c(length(i), x@Dim[2L]), Dimnames=list(x@Dimnames[[1L]][i], x@Dimnames[[2L]]),
-      reduced=x@reduced, perm=x@perm[i], num=x@num, x=if (x@num) x@x[i] else numeric(0L)
+    tabMatrix(Dim=c(length(i), M@Dim[2L]), Dimnames=list(M@Dimnames[[1L]][i], M@Dimnames[[2L]]),
+              reduced=M@reduced, perm=M@perm[i], num=M@num, x=if (M@num) M@x[i] else numeric(0L)
     )
   }
-})
+}
+
+# row selection
+#' @rdname tabMatrix-indexing
+setMethod("[", c(x="tabMatrix", i="index", j="missing", drop="logical"), function (x, i, j, ..., drop=TRUE)
+  tab_row_select(x, i, drop)
+)
+
+# row selection, missing drop
+#' @rdname tabMatrix-indexing
+setMethod("[", c(x="tabMatrix", i="index", j="missing", drop="missing"), function (x, i, j, ..., drop=TRUE)
+  tab_row_select(x, i, drop=TRUE)
+)
+
+tab_col_select <- function(M, j, drop) {
+  j <- get_ind(j, M, "col")
+  out <- Ctab2dgC(M)[, j, drop=drop]
+  if (is.vector(out)) out else as(out, "tabMatrix")
+}
 
 # column selection
 #' @rdname tabMatrix-indexing
-setMethod("[", c(x="tabMatrix", i="missing", j="index", drop="logical"), function (x, i, j, ..., drop=TRUE) {
-  if (is.character(j)) stop("indexing by name currently not supported for tabMatrix")
-  j <- as.integer(j)
-  #if (any(j < 0L)) stop("negative integer indexing currently not supported for tabMatrix")
-  if (all(j < 0L)) j <- seq_len(x@Dim[2L])[j]
-  #if (any(j == 0L | j > x@Dim[2L])) stop("out of range")
-  if (any(j <= 0L | j > x@Dim[2L])) stop("out of range")
-  if (any(duplicated(j))) stop("duplicated column indices currently not supported for tabMatrix")
-  if (drop && length(j) == 1L) {
-    out <- rep.int(0, x@Dim[1L])
-    ind <- which(x@perm == j - 1L)
-    if (length(ind)) out[ind] <- if (x@num) x@x[ind] else 1
-    out
-  } else {
-    reduced <- x@reduced
-    perm <- match(x@perm, j - 1L)
-    if (anyNA(perm)) {
-      perm[is.na(perm)] <- 0L
-      reduced <- TRUE
-    }
-    tabMatrix(Dim=c(x@Dim[1L], length(j)), Dimnames=list(x@Dimnames[[1L]], x@Dimnames[[2L]][j]),
-      reduced=reduced, perm=perm - 1L, num=x@num, x=if (x@num) x@x else numeric(0L)
+setMethod("[", c(x="tabMatrix", i="missing", j="index", drop="logical"), function (x, i, j, ..., drop=TRUE)
+  tab_col_select(x, j, drop)
+)
+
+# column selection, missing drop
+#' @rdname tabMatrix-indexing
+setMethod("[", c(x="tabMatrix", i="missing", j="index", drop="missing"), function (x, i, j, ..., drop=TRUE)
+  tab_col_select(x, j, drop=TRUE)
+)
+
+
+# rbind of tabMatrices is tabMatrix
+setMethod("rbind2", c("tabMatrix", "tabMatrix"), function(x, y, ...) {
+  if (x@Dim[2L] != y@Dim[2L]) stop("number of columns of matrices must match for rbind2")
+  perm <- c(x@perm, y@perm)
+  num <- x@num || y@num
+  if (num) {
+    outx <- c(
+      (if (x@reduced) x@perm >= 0L else 1) * (if (x@num) x@x else rep.int(1, x@Dim[1L])),
+      (if (y@reduced) y@perm >= 0L else 1) * (if (y@num) y@x else rep.int(1, y@Dim[1L]))
     )
+    if (x@reduced || y@reduced) perm[perm < 0L] <- 0L
   }
+  out <- Ctab(
+    Dim = c(x@Dim[1L] + y@Dim[1L], x@Dim[2L]),
+    reduced = !num && (x@reduced || y@reduced),
+    perm = perm,
+    num = num,
+    x = if (num) outx else numeric()
+  )
+  dnx <- dimnames(x)
+  dny <- dimnames(y)
+  if (identical(c(dnx, dny), list(NULL, NULL, NULL, NULL))) return(out)
+  cn <- if (!is.null(dnx[[2L]])) dnx[[2L]] else dny[[2L]]
+  rx <- dnx[[1L]]
+  ry <- dny[[1L]]
+  rn <- if (is.null(rx) && is.null(ry))
+    NULL
+  else c(if (!is.null(rx)) rx else character(x@Dim[1L]),
+         if (!is.null(ry)) ry else character(y@Dim[1L]))
+  out@Dimnames <- list(rn, cn)
+  out
 })
 
+
 setMethod("nnzero", "tabMatrix", function(x, na.counted=NA) {
-  if (x@reduced) {
-    if (x@num)
-      sum(x@x != 0 & x@perm != -1L)
-    else
-      sum(x@perm != -1L)
-  } else {
-    if (x@num)
-      sum(x@x != 0)
-    else
-      x@Dim[1L]
-  }
+  if (x@reduced)
+    sum(x@perm != -1L)
+  else if (x@num)
+    sum(x@x != 0)
+  else
+    x@Dim[1L]
 })
 
 #' S4 method for generic 'anyNA' and signature 'tabMatrix'
@@ -318,16 +362,12 @@ fac2tabM <- function(fvars, data, enclos=.GlobalEnv, x=numeric(), xlab=character
       #      which should be set to -1; this would be a lot faster for long factors
       if (length(contrasts) == 1L && contrasts == "contr.treatment") {  # R default: first level is baseline
         fac <- remove_levels(fac, 1L)
-      } else {
-        if (length(contrasts) == 1L && contrasts == "contr.SAS") {  # 'SAS' convention: last level is baseline
-          fac <- remove_levels(fac, length(attr(fac, "levels")))
-        } else {  # user-specified base
-          if (fvars[f] %in% names(contrasts)) {
-            m <- match(contrasts[fvars[f]], attr(fac, "levels"))
-            if (length(m) != 1L || is.na(m)) stop("invalid contrasts")
-            fac <- remove_levels(fac, m)
-          }
-        }
+      } else if (length(contrasts) == 1L && contrasts == "contr.SAS") {  # 'SAS' convention: last level is baseline
+        fac <- remove_levels(fac, length(attr(fac, "levels")))
+      } else if (fvars[f] %in% names(contrasts)) {  # user-specified base
+        m <- match(contrasts[fvars[f]], attr(fac, "levels"))
+        if (length(m) != 1L || is.na(m)) stop("invalid contrasts")
+        fac <- remove_levels(fac, m)
       }
     }
     if (f == 1L) {
@@ -342,10 +382,22 @@ fac2tabM <- function(fvars, data, enclos=.GlobalEnv, x=numeric(), xlab=character
   else
     labs <- attr(out, "levels")
   out <- as.integer(out) - 1L
-  if (!is.null(contrasts)) out[is.na(out)] <- -1L
+
+  num <- reduced <- FALSE
+  if (length(x) && !all(x[!is.na(out)] == 1)) {
+    x[is.na(out)] <- 0
+    out[is.na(out)] <- 0L
+    num <- TRUE
+  } else {
+    x <- numeric()
+    if (anyNA(out)) {
+      out[is.na(out)] <- -1L
+      reduced <- TRUE
+    }
+  }
+
   tabMatrix(Dim=c(length(out), length(labs)), Dimnames=list(NULL, labs),
-    reduced=!is.null(contrasts), perm=out, num=(length(x) > 0L), x=as.double(x),
-    xlab=xlab
+    reduced=reduced, perm=out, num=num, x=as.double(x), xlab=xlab
   )
 }
 
@@ -390,11 +442,12 @@ tables2tabM <- function(formula, data, ...) {
       }
     } else {
       if (length(countvars)) {
-        fk <- new("tabMatrix", perm=rep.int(0L, n), reduced=FALSE, num=TRUE, x=xk, xlab=labk,
-          Dim=c(n, 1L), Dimnames=list(NULL, labk))
+        fk <- new("tabMatrix", perm=rep.int(0L, n), reduced=FALSE, num=TRUE,
+                  x=xk, xlab=labk, Dim=c(n, 1L), Dimnames=list(NULL, labk))
       } else {
         # this should not happen, as the intercept only case is handled above
-        fk <- new("tabMatrix", perm=rep.int(0L, n), reduced=FALSE, num=TRUE, x=rep.int(1, n), Dim=c(n, 1L))
+        fk <- new("tabMatrix", perm=rep.int(0L, n), reduced=FALSE, num=TRUE,
+                  x=rep.int(1, n), Dim=c(n, 1L))
       }
     }
     out[[k]] <- fk

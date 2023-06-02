@@ -40,7 +40,7 @@ CG <- function(b, env, x=NULL, max.it=NULL, e=NULL, verbose=FALSE, ...) {
     z <- env$M_solve(r, ...)
     if (dotprodC(z, z) < e || k > max.it) {
       # criterion used in Nishimura and Suchard
-      if (k > max.it) warning("max.it iterations reached with discrepancy ", dotprodC(z, z), immediate.=TRUE)
+      if (k > max.it) warn("max.it iterations reached with discrepancy ", dotprodC(z, z))
       break
     }
     #if (verbose) cat("iteration ", k, "   |r| = ", sqrt(sum(r^2)), "   |z| = ", sqrt(sum(z^2)), "\n")
@@ -79,7 +79,7 @@ CG <- function(b, env, x=NULL, max.it=NULL, e=NULL, verbose=FALSE, ...) {
 # - allow updates of QA (priorA or Leroux), i.p. QA = DA' diag(w) DA where w is updated
 # - allow updates of X (model component mec)
 # - use X's of underlying model components
-#   and for each component use instead of X0 and XA instead of X, using mixed product relations
+#   and for each component use X0 and XA instead of X, using mixed product relations
 #   for Khatri-Rao etc.; X0 will typically be dense and XA tabMatrix
 # - p >> n case
 setup_CG_sampler <- function(mbs, X, sampler, max.it=NULL, stop.criterion=NULL, verbose=NULL,
@@ -154,7 +154,7 @@ setup_CG_sampler <- function(mbs, X, sampler, max.it=NULL, stop.criterion=NULL, 
   for (mc in mbs) {
     mc$i.bl <- (n_vec_list + 1L):(n_vec_list + mc[["q"]])
     n_vec_list <- n_vec_list + mc[["q"]]
-    
+
     if (mc$type == "gen") {
       # TODO handle DA in mc_gen
       if (is.null(mc$DA)) {

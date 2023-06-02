@@ -61,9 +61,10 @@ read_header <- function(con) {
 #'
 #' @export
 #' @param n the size of the generated dataset.
+#' @param family sampling distribution family, see \code{\link{create_sampler}}.
 #' @return A \code{list} containing the generated dataset, the values of the model
 #'   parameters, and the model specification as a formula.
-mcmcsae_example <- function(n=100L) {
+mcmcsae_example <- function(n=100L, family="gaussian") {
   if (n < 3L) stop("choose a size n >= 3")
   nA <- as.integer(sqrt(n))
   nT <- max(3L, as.integer(sqrt(n)))
@@ -74,9 +75,9 @@ mcmcsae_example <- function(n=100L) {
   )
   # fake data simulation
   model <- ~ reg(~x, Q0=1, name="beta") + gen(formula=~x, factor=~fA, name="v") + gen(factor=~RW2(fT), name="u")
-  gd <- generate_data(model, data=dat)
+  gd <- generate_data(model, data=dat, family=family)
   dat$y <- gd$y
-  list(dat=dat, pars=gd$pars, model=update.formula(model, y ~ .))
+  list(dat=dat, pars=gd$pars, model=update.formula(model, y ~ .), family=family)
 }
 
 # extend a function by appending a line to its body
@@ -101,3 +102,5 @@ str2lang_ <- if (getRversion() >= "3.6.0") {
 } else {
   function(x) parse(text=x, keep.source=FALSE)[[1L]]
 }
+
+warn <- function(..., immediate. = TRUE) warning(..., call. = FALSE, immediate. = immediate.)

@@ -37,13 +37,13 @@ get_vars <- function(formula, rhs.only=TRUE) {
   vars
 }
 
-get_types <- function(formula, specials=c("gen", "mec", "reg")) {
+get_types <- function(formula, specials=c("gen", "mec", "reg", "bart")) {
   vars <- get_vars(formula)
   if (!length(vars)) return(NULL)
   sapply(vars, function(x) match.arg(as.character(x[[1L]]), specials))
 }
 
-get_coefnames <- function(formula, specials=c("gen", "mec", "reg"), data=NULL) {
+get_coefnames <- function(formula, specials=c("gen", "mec", "reg", "bart"), data=NULL) {
   vars <- get_vars(formula)
   if (!length(vars)) return(NULL)
   parnames <- sapply(vars, function(x) if (is.null(x$name)) NA_character_ else x$name)
@@ -58,7 +58,7 @@ has_explicit_intercept <- function(formula) {
   grepl("(^|\\+)\\s*\\(*\\s*1\\s*\\)*\\s*(\\+|$)", fstr)
 }
 
-standardize_formula <- function(formula, specials=c("reg", "mec", "gen"), default="reg", data=NULL) {
+standardize_formula <- function(formula, specials=c("reg", "mec", "gen", "bart"), default="reg", data=NULL) {
   # interpret everything not in special terms as a default component
   tf <- terms(formula, keep.order=TRUE, specials=specials, data=data)
   # NB ~ . - var does not warn if var is not in data

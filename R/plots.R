@@ -62,7 +62,7 @@ plot.mcdraws <- function(x, vnames, nrows, ncols, ask=FALSE, ...) {
   for (v in vnames) {
     vars <- get_name_range(v, FALSE)
     if (!(vars$name %in% par_names(x))) {
-      warning("parameter '", vars$name, "' not in MCMC output")
+      warn("parameter '", vars$name, "' not in MCMC output")
       next
     }
     if (is.null(vars$range)) vars$range <- seq_len(nvars(x[[vars$name]]))

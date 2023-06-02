@@ -19,23 +19,19 @@ create_TMVN_sampler(
   s = NULL,
   lower = NULL,
   upper = NULL,
+  check.constraints = FALSE,
   method = NULL,
-  reduce = (method == "Gibbs" && !is.null(R)),
-  T.HMC = pi/2,
-  max.refl = .Machine$integer.max,
-  diagnostic = FALSE,
-  sharpness = 100,
-  useV = FALSE
+  reduce = NULL
 )
 }
 \arguments{
-\item{Q}{precision matrix (unconstrained) (n x n); used in case \code{cholQ} is not supplied.}
+\item{Q}{precision matrix of the (unconstrained) multivariate normal distribution.}
 
 \item{perm}{whether permutation/pivoting should be used to build a Cholesky object.}
 
 \item{mu}{mean of the (unconstrained) multivariate normal distribution.}
 
-\item{Xy}{alternative to specifying mu; in this case \code{mu} is computed as \code{Q^{-1} Xy}.}
+\item{Xy}{alternative to specifying mu; in this case \code{mu} is computed as \eqn{Q^{-1}\code{Xy}}.}
 
 \item{update.Q}{whether \code{Q} is updated for each draw.}
 
@@ -47,53 +43,44 @@ create_TMVN_sampler(
 
 \item{R}{equality restriction matrix.}
 
-\item{r}{rhs vector for equality constraints \code{R^T x = r}.}
+\item{r}{rhs vector for equality constraints \eqn{R'x = r}, where \eqn{R'} denotes the transpose of R.}
 
 \item{S}{inequality restriction matrix.}
 
-\item{s}{rhs vector for inequality constraints \code{S^T x >= s}.}
+\item{s}{rhs vector for inequality constraints \eqn{S'x >= s}, where \eqn{S'} denotes the transpose of S.}
 
-\item{lower}{alternative to \code{s} for two-sided inequality restrictions \code{lower <= S^T x <= upper}.}
+\item{lower}{alternative to \code{s} for two-sided inequality restrictions \eqn{\code{lower} <= S'x <= \code{upper}}.}
 
-\item{upper}{alternative to \code{s} for two-sided inequality restrictions \code{lower <= S^T x <= upper}.}
+\item{upper}{alternative to \code{s} for two-sided inequality restrictions \eqn{\code{lower} <= S'x <= \code{upper}}.}
+
+\item{check.constraints}{if \code{TRUE} check whether the starting values satisfy all constraints.}
 
 \item{method}{sampling method. The options are "direct" for direct sampling from the
 unconstrained or equality constrained multivariate normal (MVN). For inequality constrained
-MVN sampling three methods are supported: "HMC" for (exact) Hamiltonian Monte Carlo, "Gibbs" for a
+MVN sampling three methods are supported: "HMC" for (exact) Hamiltonian Monte Carlo,
+"HMCZigZag" for (exact) Hamiltonian Monte Carlo with Laplace momentum, "Gibbs" for a
 component-wise Gibbs sampling approach, and "softTMVN" for a data augmentation method that samples
-from a smooth approximation to the truncated MVN.}
+from a smooth approximation to the truncated MVN. Alternatively, the method setting
+functions \code{m_direct}, \code{m_HMC}, \code{m_HMC_ZigZag}, \code{m_Gibbs} or
+\code{m_softTMVN} can be used to select the method and possibly set some of its
+options to non-default values, see \code{\link{mcmcsae-TMVN-method}}.}
 
 \item{reduce}{whether to a priori restrict the simulation to the subspace defined by the
 equality constraints.}
-
-\item{T.HMC}{the duration of a Hamiltonian Monte Carlo simulated particle trajectory. If a vector of
-length 2 is supplied it is interpreted as an interval from which the duration is drawn uniformly,
-independently in each HMC iteration.}
-
-\item{max.refl}{maximum number of reflections in HMC TMVN dynamics. Default
-is unlimited.}
-
-\item{diagnostic}{whether information about violations of inequalities and bounces off inequality walls
-is printed to the screen. This sometimes provides useful diagnostic information.}
-
-\item{sharpness}{for method 'softTMVN', the sharpness of the soft inequalities; the larger the better
-the approximation of exact inequalities. It must be either a scalar value or a vector of length
-equal to the number of inequality restrictions.}
-
-\item{useV}{for method 'softTMVN' whether to base computations on variance instead of precision
-matrices.}
 }
 \value{
 An environment for sampling from a possibly degenerate and truncated multivariate normal
  distribution.
 }
 \description{
-This function sets up an object for multivariate normal sampling based on a specified precision matrix
-or cholesky decomposition thereof. Linear equality and inequality restrictions are supported.
-For sampling under inequality restrictions three algorithms are available. The default in that case is
-an exact Hamiltonian Monte Carlo algorithm (Pakman and Paninski, 2014). Alternatively, a Gibbs sampling
-algorithm can be used (Rodriguez-Yam et al., 2004). The third option is a data augmentation method
-to sample from a smooth approximation to the truncated multivariate normal distribution (Souris et al., 2018).
+This function sets up an object for multivariate normal sampling based on a specified precision matrix.
+Linear equality and inequality restrictions are supported.
+For sampling under inequality restrictions four algorithms are available. The default in that case is
+an exact Hamiltonian Monte Carlo algorithm (Pakman and Paninski, 2014). A related algorithm is the zig-zag
+Hamiltonian Monte Carlo method (Nishimura et al., 2021) in which momentum is sampled from a Laplace instead
+of normal distribution. Alternatively, a Gibbs sampling algorithm can be used (Rodriguez-Yam et al., 2004).
+The fourth option is a data augmentation method that samples from a smooth approximation to the truncated
+multivariate normal distribution (Souris et al., 2018).
 }
 \details{
 The componentwise Gibbs sampler uses univariate truncated normal samplers as described
@@ -110,12 +97,17 @@ sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="HMC")
 sim <- MCMCsim(sampler)
 summary(sim)
 plot(as.matrix(sim$x), pch=".")
-# 2. Gibbs sampling approach (Rodriguez-Yam et al., 2004)
+# 2. exact Hamiltonian Monte Carlo with Laplace momentum (Nishimura et al., 2021)
+sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="HMCZigZag")
+sim <- MCMCsim(sampler)
+summary(sim)
+plot(as.matrix(sim$x), pch=".")
+# 3. Gibbs sampling approach (Rodriguez-Yam et al., 2004)
 sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="Gibbs")
 sim <- MCMCsim(sampler)
 summary(sim)
 plot(as.matrix(sim$x), pch=".")
-# 3. soft TMVN approximation (Souris et al., 2018)
+# 4. soft TMVN approximation (Souris et al., 2018)
 sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="softTMVN")
 sim <- MCMCsim(sampler)
 summary(sim)
@@ -136,6 +128,10 @@ Z.I. Botev and P. L'Ecuyer (2016).
    and student-t distributions subject to linear inequality constraints.
    Journal of Statistical Theory and Practice 9(4), 712-732.
 
+ A. Nishimura, Z. Zhang and M.A. Suchard (2021). Hamiltonian zigzag sampler got more momentum
+   than its Markovian counterpart: Equivalence of two zigzags under a momentum refreshment limit.
+   arXiv:2104.07694.
+
  A. Pakman and L. Paninski (2014).
    Exact Hamiltonian Monte Carlo for truncated multivariate gaussians.
    Journal of Computational and Graphical Statistics 23(2), 518-542.
@@ -151,6 +147,10 @@ Z.I. Botev and P. L'Ecuyer (2016).
  A. Souris, A. Bhattacharya and P. Debdeep (2018).
    The Soft Multivariate Truncated Normal Distribution.
    arXiv:1807.09155.
+
+ K.A. Valeriano, C.E. Galarza and L.A. Matos (2023).
+   Moments and random number generation for the truncated elliptical family of distributions.
+   Statistics and Computing 33(1), 1-20.
 }
 \author{
 Harm Jan Boonstra, with help from Grzegorz Baltissen

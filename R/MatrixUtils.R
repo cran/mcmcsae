@@ -53,7 +53,7 @@ remove_redundancy <- function(X, method="chol", tol=NULL) {
 is_a_matrix <- function(x) is.matrix(x) || inherits(x, "Matrix")
 
 is_zero_matrix <- function(x) {
-  if (is.matrix(x)) return(all(x == 0))
+  if (is.matrix(x) || is.vector(x)) return(all(x == 0))
   if (inherits(x, "Matrix")) {
     if (class(x)[1L] == "tabMatrix") return(tab_is_zero(x))
     if (length(x@x))
@@ -331,6 +331,29 @@ crossprod_sym <- function(M, Q) {
   )
 }
 
+# create a template for fast updating of X'QX under changing
+# diagonal matrix Q, and fixed sparse (dgC) X
+sparse_crossprod_sym_template <- function(X) {
+  if (!inherits(X, "dgCMatrix")) stop("matrix of class 'dgCMatrix' expected")
+  XtQX <- crossprod_sym(X, 0.1 + runif(nrow(X)))
+  XtQX_nsT <- as(as(XtQX, "nMatrix"), "TsparseMatrix")
+  nnz_per_col <- Cnnz_per_col_scps_template(X, XtQX_nsT@i, XtQX_nsT@j)
+  # check whether the total number of nonzeros is above a certain threshold
+  # if so, then we revert to direct computation of the sparse symmetric crossproduct 
+  # approximate size of the sparse template matrix in MB:
+  mem <- ((8 + 4) * sum(nnz_per_col) + length(nnz_per_col)) / 1e6
+  if (mem > .opts$max.size.cps.template) {
+    stop("sparse symmetric crossproduct template requires ", mem, " MB of memory")
+  }
+  spX <- Ccreate_sparse_crossprod_sym_template(X, XtQX_nsT@i, XtQX_nsT@j, nnz_per_col)
+  rm(X, XtQX_nsT, nnz_per_col, mem)
+  function(Q) {
+    out <- XtQX
+    attr(out, "x") <- Csparse_numeric_crossprod(spX, Q)
+    out
+  }
+}
+
 # symmetric crossprod: compute M1'M2, known to be symmetric because M2 = Q M1 with Q symmetric
 crossprod_sym2 <- function(M1, M2=M1) {
   switch(class(M2)[1L],
@@ -406,8 +429,14 @@ setMethod("%*%", signature("ddiMatrix", "tabMatrix"), function(x, y) {
   if (y@num) {
     attr(y, "x") <- x@x * y@x
   } else {
+    yx <- x@x
+    if (y@reduced) {
+      yx[y@perm < 0L] <- 0
+      y@perm[y@perm < 0L] <- 0L
+      attr(y, "reduced") <- FALSE
+    }
+    attr(y, "x") <- yx
     attr(y, "num") <- TRUE
-    attr(y, "x") <- x@x
   }
   y
 })
@@ -544,7 +573,7 @@ economizeMatrix <- function(M, sparse=NULL, symmetric=FALSE, strip.names=TRUE,
   if (symmetric && !identical(sparse, FALSE) && isDiagonal(M)) {
     return(economizeDiagMatrix(M, strip.names, vec.diag))
   }
-  if (is.null(sparse)) sparse <- better_sparse(M)
+  if (is.null(sparse)) sparse <- better_sparse(M, symmetric)
   if (sparse) {
     if (is.matrix(M)) M <- as(as(as(M, "CsparseMatrix"), "generalMatrix"), "dMatrix")
   } else {
@@ -586,8 +615,14 @@ sparsity <- function(x) 1 - nnzero(x) / prod(dim(x))
 #' @noRd
 #' @param x a matrix or Matrix.
 #' @return whether a sparse matrix would probably be better based on a simple heuristic.
-# TODO improve heuristic, perhaps have it depend on whether matrix is symmetric
-better_sparse <- function(x) sparsity(x) > 0.5 && prod(dim(x)) > 500L
+better_sparse <- function(x, symmetric=FALSE) {
+  if (symmetric) {
+    # the packed dsC format is another advantage compared to matrix
+    sparsity(x) > 0.25 && prod(dim(x)) > 500L
+  } else {
+    sparsity(x) > 0.5 && prod(dim(x)) > 500L
+  }
+}
 
 # assume x is a matrix object; if dense, it is assumed to be matrix
 large_and_sparse <- function(x) !is.matrix(x) && prod(dim(x)) > 1e6L

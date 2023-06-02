@@ -4,10 +4,12 @@
 \alias{mcmcsae_example}
 \title{Generate artificial data according to an additive spatio-temporal model}
 \usage{
-mcmcsae_example(n = 100L)
+mcmcsae_example(n = 100L, family = "gaussian")
 }
 \arguments{
 \item{n}{the size of the generated dataset.}
+
+\item{family}{sampling distribution family, see \code{\link{create_sampler}}.}
 }
 \value{
 A \code{list} containing the generated dataset, the values of the model

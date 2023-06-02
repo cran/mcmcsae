@@ -85,7 +85,7 @@
 #'  draw function associated with this model component. Mainly intended for developers.
 #' @param e for internal use only.
 #' @return an object with precomputed quantities and functions for sampling from
-#'  prior or conditional posterior distributions for this model component. Only intended
+#'  prior or conditional posterior distributions for this model component. Intended
 #'  for internal use by other package functions.
 #' @references
 #'  L.M. Ybarra and S.L. Lohr (2008).
@@ -194,27 +194,30 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL, Q0=NULL, b0=NULL,
 
   # function that creates an oos prediction function (closure) based on new data
   # this computes the contribution of this component to the linear predictor
-  make_predict <- function(newdata, verbose=TRUE) {
-    if (!V.in.formula) stop("for out-of-sample prediction with mec components make sure to specify the",
-                            "measurement error variances using the formula argument")
+  make_predict <- function(newdata=NULL, Xnew, verbose=TRUE) {
+    if (is.null(newdata)) stop("for out-of-sample prediction with 'mec' components a data frame",
+                               "must be supplied")
+    if (!V.in.formula) stop("for out-of-sample prediction with 'mec' components make sure to specify",
+                            "the measurement error variances using the formula argument")
     Xnew <- model_matrix(formula.X, newdata, sparse=sparse)
     dimnames(Xnew) <- list(NULL, NULL)
-    Vnew <- model_matrix(formula.V, newdata, sparse=sparse)
-    dimnames(Vnew) <- list(NULL, NULL)
-    if (any(Vnew < 0)) stop("negative measurement error variance(s) in 'newdata'")
-    i.me.new <- which(apply(Vnew, 1L, function(x) all(x > 0)))  # TODO add tolerance + allow list of matrix
-    if (length(i.me.new) == nrow(newdata)) i.me.new <- seq_len(nrow(newdata))
-    if (nrow(Vnew) < 0.5 * nrow(Xnew)) {
-      rm(i.me.new)
-      pred <- function(p) (Xnew + sqrt(Vnew) * Crnorm(length(Vnew))) %m*v% p[[name]]
+    SEnew <- model_matrix(formula.V, newdata, sparse=sparse)
+    dimnames(SEnew) <- list(NULL, NULL)
+    if (any(SEnew < 0)) stop("negative measurement error variance(s) in 'newdata'")
+    SEnew <- sqrt(SEnew)
+    if (nrow(SEnew) < 0.5 * nrow(Xnew)) {
+      pred <- function(p) (Xnew + SEnew * Crnorm(length(SEnew))) %m*v% p[[name]]
     } else {
-      Vnew <- Vnew[i.me.new, ]
+      i.me.new <- which(apply(SEnew, 1L, function(x) all(x > 0)))  # TODO add tolerance + allow list of matrix
+      if (length(i.me.new) == nrow(newdata)) i.me.new <- seq_len(nrow(newdata))
+      SEnew <- SEnew[i.me.new, ]
       pred <- function(p) {
         out <- Xnew
-        out[i.me.new, ] <- out[i.me.new, ] + sqrt(Vnew) * Crnorm(length(Vnew))
+        out[i.me.new, ] <- out[i.me.new, ] + SEnew * Crnorm(length(SEnew))
         out %m*v% p[[name]]
       }
     }
+    rm(newdata, verbose)
     pred
   }
 
@@ -241,9 +244,9 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL, Q0=NULL, b0=NULL,
       draw <- add(draw, quote(p$e_ <- e$y_eff()))
     } else {
       if (e$e.is.res)
-        draw <- add(draw, bquote(p$e_ <- p[["e_"]] + p[[.(name_X)]] %m*v% p[[.(name)]]))
+        draw <- add(draw, bquote(mv_update(p[["e_"]], plus=TRUE, p[[.(name_X)]], p[[.(name)]])))
       else
-        draw <- add(draw, bquote(p$e_ <- p[["e_"]] - p[[.(name_X)]] %m*v% p[[.(name)]]))
+        draw <- add(draw, bquote(mv_update(p[["e_"]], plus=FALSE, p[[.(name_X)]], p[[.(name)]])))
     }
 
     # 1. draw covariates p[[name_X]]
@@ -311,9 +314,9 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL, Q0=NULL, b0=NULL,
 
     # compute full residuals/fitted values
     if (e$e.is.res)
-      draw <- add(draw, bquote(p$e_ <- p[["e_"]] - p[[.(name_X)]] %m*v% p[[.(name)]]))
+      draw <- add(draw, bquote(mv_update(p[["e_"]], plus=FALSE, p[[.(name_X)]], p[[.(name)]])))
     else
-      draw <- add(draw, bquote(p$e_ <- p[["e_"]] + p[[.(name_X)]] %m*v% p[[.(name)]]))
+      draw <- add(draw, bquote(mv_update(p[["e_"]], plus=TRUE, p[[.(name_X)]], p[[.(name)]])))
     draw <- add(draw, quote(p))
 
     start <- function(p) {

@@ -110,7 +110,7 @@
 #'  draw function associated with this model component. Mainly intended for developers.
 #' @param e for internal use only.
 #' @return An object with precomputed quantities and functions for sampling from
-#'  prior or conditional posterior distributions for this model component. Only intended
+#'  prior or conditional posterior distributions for this model component. Intended
 #'  for internal use by other package functions.
 #' @references
 #'  J. Besag and C. Kooperberg (1995).
@@ -159,7 +159,7 @@ gen <- function(formula = ~ 1, factor=NULL,
   type <- "gen"  # for generic (random effects)
   if (name == "") stop("missing model component name")
 
-  # check supplied var component (and if NULL leave them to be filled in later)
+  # check supplied var component; if NULL leave it to be filled in later
   if (!is.null(var)) var <- match.arg(var, c("unstructured", "diagonal", "scalar"))
   if (!is.null(factor) && !inherits(factor, "formula")) stop("element 'factor' of a model component must be a formula")
   if (is.list(Leroux)) {
@@ -184,24 +184,26 @@ gen <- function(formula = ~ 1, factor=NULL,
 
   varnames <- factor.cols.removed <- NULL
   if (is.null(X)) {
-    has.factor <- inherits(factor, "formula") && !intercept_only(factor)
-    XA <- NULL
     if (e$family$family == "multinomial") {
       edat <- new.env(parent = .GlobalEnv)
-      X0 <- NULL
       for (k in seq_len(e$Km1)) {
         edat$cat_ <- factor(rep.int(e$cats[k], e$n0), levels=e$cats[-length(e$cats)])
-        X0 <- rbind(X0, model_matrix(formula, e$data, sparse=sparse, enclos=edat))
-        if (has.factor) XA <- rbind(XA, compute_XA(factor, e$data, enclos=edat))
+        if (k == 1L) {
+          X0 <- model_matrix(formula, e$data, sparse=sparse, enclos=edat)
+          XA <- compute_XA(factor, e$data, enclos=edat)
+        } else {
+          X0 <- rbind(X0, model_matrix(formula, e$data, sparse=sparse, enclos=edat))
+          if (!is.null(XA)) XA <- rbind(XA, compute_XA(factor, e$data, enclos=edat))
+        }
       }
       rm(edat)
     } else {
       X0 <- model_matrix(formula, e$data, sparse=sparse)
-      if (has.factor) XA <- compute_XA(factor, e$data)
+      XA <- compute_XA(factor, e$data)
     }
     if (remove.redundant) X0 <- remove_redundancy(X0)
     varnames <- colnames(X0)
-    if (has.factor) {
+    if (!is.null(XA)) {
       if (drop.empty.levels) {
         factor.cols.removed <- which(zero_col(XA))
         if (length(factor.cols.removed)) XA <- XA[, -factor.cols.removed, drop=FALSE]
@@ -210,7 +212,7 @@ gen <- function(formula = ~ 1, factor=NULL,
     } else {
       X <- X0
     }
-    rm(has.factor, X0, XA)
+    rm(X0, XA)
   }
   if (nrow(X) != e$n) stop("design matrix with incompatible number of rows")
   e$coef.names[[name]] <- colnames(X)
@@ -270,13 +272,13 @@ gen <- function(formula = ~ 1, factor=NULL,
   } else if (is.null(var)) {
     if (l == 1L)
       var <- "diagonal"  # single group, default ARD prior
-    else if (q0 <= 1000L)
+    else if (q0 <= 500L)
       var <- "unstructured"
     else {
-      warning("model component '", name, "': default variance structure changed
+      warn("model component '", name, "': default variance structure changed
         to 'diagonal' because of the large number ", q0, " of varying effects.
         If you instead intend to model a full covariance matrix among all varying effects,
-        use var='unstructured', though it may be very slow.", immediate.=TRUE)
+        use var='unstructured', though it may be very slow.")
       var <- "diagonal"
     }
   }
@@ -299,7 +301,6 @@ gen <- function(formula = ~ 1, factor=NULL,
     if (q0 == 1L) PX$vector <- FALSE
     if (!PX$vector) PX$sparse <- FALSE
     PX$dim <- if (PX$vector) q0 else 1L
-
     if (PX$vector) {
       if (length(PX$mu0) == 1L) PX$mu0 <- rep.int(PX$mu0, q0)
       if (is.numeric(PX$Q0)) {
@@ -315,7 +316,7 @@ gen <- function(formula = ~ 1, factor=NULL,
   }
 
   if (Leroux_type != "none") {
-    if (isUnitDiag(QA)) warning("Leroux extension for iid random effects has no effect")
+    if (isUnitDiag(QA)) warn("Leroux extension for iid random effects has no effect")
     if (Leroux_type == "fixed") {
       # compute the weighted average once and for all
       QA <- economizeMatrix(Leroux * QA + (1 - Leroux) * CdiagU(l), symmetric=TRUE, sparse=if (in_block) TRUE else NULL)
@@ -420,11 +421,11 @@ gen <- function(formula = ~ 1, factor=NULL,
       df <- prior$df + l
       if (!is.null(RA)) df <- df - ncol(RA)
     }
-    if (!is.null(Q0)) warning("'Q0' ignored")
+    if (!is.null(Q0)) warn("'Q0' ignored")
   }
   rm(RA)
 
-  gl <- !is.null(formula.gl)  # group-level predictors?
+  gl <- !is.null(formula.gl)
   if (gl) {  # group-level covariates
     if (!inherits(formula.gl, "formula")) stop("'formula.gl' must be a formula")
     vars <- as.list(attr(terms(formula.gl), "variables"))[-1L]
@@ -472,71 +473,79 @@ gen <- function(formula = ~ 1, factor=NULL,
 
   linpred <- function(p) X %m*v% p[[name]]
 
-  make_predict <- function(newdata, verbose=TRUE) {
-    has.factor <- inherits(factor, "formula") && !intercept_only(factor)
-    if (e$family$family == "multinomial") {
-      edat <- new.env(parent = .GlobalEnv)
-      X0 <- NULL
-      if (has.factor) XA <- NULL
-      for (k in seq_len(e$Km1)) {
-        edat$cat_ <- factor(rep.int(e$cats[k], nrow(newdata)), levels=e$cats[-length(e$cats)])
-        X0 <- rbind(X0, model_matrix(formula, data=newdata, sparse=sparse, enclos=edat))
-        if (has.factor) XA <- rbind(XA, compute_XA(factor, newdata, enclos=edat))
-      }
-      rm(edat)
+  make_predict <- function(newdata=NULL, Xnew, verbose=TRUE) {
+    if (is.null(newdata)) {
+      Xnew <- economizeMatrix(Xnew, strip.names=TRUE)
+      if (ncol(Xnew) != q) stop("wrong number of columns for Xnew matrix of component ", name)
+      linpred <- function(p) Xnew %m*v% p[[name]]
     } else {
-      X0 <- model_matrix(formula, newdata, sparse=sparse)
-      if (has.factor) XA <- compute_XA(factor, newdata)
-    }
-    if (has.factor)
-      Xnew <- combine_X0_XA(X0, XA)
-    else
-      Xnew <- X0
-    rm(has.factor, X0, XA)
-
-    if (unit_Q) {
-      # in this case we allow oos random effects and mixed cases by matching training and test levels
-      m <- match(colnames(Xnew), e$coef.names[[name]])
-      qnew <- ncol(Xnew)
-      Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE)
-      if (all(is.na(m))) {
-        # all random effects in Xnew are new
-        if (verbose) message("model component '", name, "': all effects in 'newdata' are out-of-sample effects")
-        linpred <- function(p) Xnew %m*v% Crnorm(qnew, sd = p[[name_sigma]])
-      } else if (anyNA(m)) {
-        # both existing and new levels in newdata
-        q_unmatched <- sum(is.na(m))
-        if (verbose) message("model component '", name, "': ", q_unmatched, " out of ", qnew, " effects in 'newdata' are out-of-sample effects")
-        I_matched <- which(!is.na(m))
-        I_unmatched <- setdiff(seq_len(qnew), I_matched)
-        I_coef <- m[!is.na(m)]
-        # TODO next function in C++ (no need to initialize)
-        linpred <- function(p) {
-          v <- vector("double", qnew)
-          v[I_matched] <- p[[name]][I_coef]  # TODO distinguish case where I_coef = 1:q
-          v[I_unmatched] <- Crnorm(q_unmatched, sd=p[[name_sigma]])
-          Xnew %m*v% v
+      if (e$family$family == "multinomial") {
+        edat <- new.env(parent = .GlobalEnv)
+        for (k in seq_len(e$Km1)) {
+          edat$cat_ <- factor(rep.int(e$cats[k], nrow(newdata)), levels=e$cats[-length(e$cats)])
+          if (k == 1L) {
+            X0 <- model_matrix(formula, data=newdata, sparse=sparse, enclos=edat)
+            XA <- compute_XA(factor, newdata, enclos=edat)
+          } else {
+            X0 <- rbind(X0, model_matrix(formula, data=newdata, sparse=sparse, enclos=edat))
+            if (!is.null(XA)) XA <- rbind(XA, compute_XA(factor, newdata, enclos=edat))
+          }
         }
+        rm(edat)
       } else {
-        # all rows of Xnew correspond to existing levels
-        if (identical(m, seq_len(q))) {
-          linpred <- function(p) Xnew %m*v% p[[name]]
-        } else {
-          I_coef <- m
-          linpred <- function(p) Xnew %m*v% p[[name]][I_coef]
-        }
+        X0 <- model_matrix(formula, newdata, sparse=sparse)
+        XA <- compute_XA(factor, newdata)
       }
-      rm(m)
-      linpred
-    } else {
-      # generic case: here we expect the same levels in training and test sets
-      # for prediction do not (automatically) remove redundant columns!
-      if (remove.redundant || drop.empty.levels)
+      if (!is.null(XA))
+        Xnew <- combine_X0_XA(X0, XA)
+      else
+        Xnew <- X0
+      rm(X0, XA)
+      if (unit_Q) {
+        # in this case we allow oos random effects and mixed cases by matching training and test levels
+        m <- match(colnames(Xnew), e$coef.names[[name]])
+        qnew <- ncol(Xnew)
+        Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE)
+        if (all(is.na(m))) {
+          # all random effects in Xnew are new
+          if (verbose) message("model component '", name, "': all categories in 'newdata' are out-of-sample categories")
+          linpred <- function(p) Xnew %m*v% Crnorm(qnew, sd = p[[name_sigma]])
+        } else if (anyNA(m)) {
+          # both existing and new levels in newdata
+          q_unmatched <- sum(is.na(m))
+          if (verbose) message("model component '", name, "': ", q_unmatched, " out of ", qnew, " categories in 'newdata' are out-of-sample categories")
+          I_matched <- which(!is.na(m))
+          I_unmatched <- setdiff(seq_len(qnew), I_matched)
+          I_coef <- m[!is.na(m)]
+          # TODO next function in C++ (no need to initialize)
+          linpred <- function(p) {
+            v <- vector("double", qnew)
+            v[I_matched] <- p[[name]][I_coef]  # TODO distinguish case where I_coef = 1:q
+            v[I_unmatched] <- Crnorm(q_unmatched, sd=p[[name_sigma]])
+            Xnew %m*v% v
+          }
+        } else {
+          # all columns of Xnew correspond to existing levels
+          if (identical(m, seq_len(q))) {
+            linpred <- function(p) Xnew %m*v% p[[name]]
+          } else {
+            I_coef <- m
+            linpred <- function(p) Xnew %m*v% p[[name]][I_coef]
+          }
+        }
+        rm(m)
+      } else {
+        # generic case: here we expect the same levels in training and test sets
+        # for prediction do not (automatically) remove redundant columns!
+        if (remove.redundant || drop.empty.levels)
         Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
-      if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
-      Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE)
-      function(p) Xnew %m*v% p[[name]]
+        if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
+        Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE)
+        linpred <- function(p) Xnew %m*v% p[[name]]
+      }
     }
+    rm(newdata, verbose)
+    linpred
   }
 
   if (gl) {  # group-level covariates
@@ -653,9 +662,9 @@ gen <- function(formula = ~ 1, factor=NULL,
     draw <- add(draw, quote(p$e_ <- e$y_eff()))
   } else {
     if (e$e.is.res)
-      draw <- add(draw, bquote(p$e_ <- p[["e_"]] + X %m*v% p[[.(name)]]))
+      draw <- add(draw, bquote(mv_update(p[["e_"]], plus=TRUE, X, p[[.(name)]])))
     else
-      draw <- add(draw, bquote(p$e_ <- p[["e_"]] - X %m*v% p[[.(name)]]))
+      draw <- add(draw, bquote(mv_update(p[["e_"]], plus=FALSE, X, p[[.(name)]])))
   }
 
   if (!e$e.is.res && e$single.block && !e$use.offset && length(e$mod) != 1L) {
@@ -921,9 +930,9 @@ gen <- function(formula = ~ 1, factor=NULL,
   }
 
   if (e$e.is.res)
-    draw <- add(draw, bquote(p$e_ <- p[["e_"]] - X %m*v% p[[.(name)]]))
+    draw <- add(draw, bquote(mv_update(p[["e_"]], plus=FALSE, X, p[[.(name)]])))
   else
-    draw <- add(draw, bquote(p$e_ <- p[["e_"]] + X %m*v% p[[.(name)]]))
+    draw <- add(draw, bquote(mv_update(p[["e_"]], plus=TRUE, X, p[[.(name)]])))
   draw <- add(draw, quote(p))
   # END draw function
 

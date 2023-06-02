@@ -8,6 +8,9 @@
 # optionally uses consistent naming, e.g., var1$cat1:var2$cat2
 # forbid use of category separator and : in variable names to guarantee unique column names
 # option to aggregate by a factor variable (term by term, i.e. in a memory-efficient way)
+# another difference compared to model_matrix is that model_matrix is tolerant
+# to factors with a single level: in case contrasts are applied a warning is issued
+# and the corresponding term is removed; otherwise the term is kept without warning
 
 # TODO
 # - composite matrix as list of tabMatrices
@@ -82,7 +85,6 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
   # 1. analyse
   # which variables are quantitative
   qvar <- !catvars(trms, envir, enclos=enclos)
-  qterm <- apply(tmat, 2L, function(x) any(qvar[x == 1L]))
   qvar <- vnames[which(qvar)]
   q <- if (has_intercept) 1L else 0L  # nr of columns
   qd <- q  # equivalent nr of dense columns, for estimation of sparseness
@@ -91,7 +93,8 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
     if (contrasts.arg == "contr.none") contrasts.arg <- NULL
   }
   contr.list <- NULL
-  first <- TRUE
+  first <- TRUE  # keep track of first categorical variable if the model has no intercept
+  terms.removed <- rep.int(FALSE, length(tnames))  # terms with a single-level factor are removed when contrasts are applied
   # loop over terms to determine nr of columns, and store levels to be removed
   for (k in seq_along(tnames)) {
     nc <- 1L  # number of cells (or columns in design matrix)
@@ -112,7 +115,6 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
       if (anyNA(fac)) stop("missing(s) in variable ", f)
       levs <- attr(fac, "levels")
       ncat <- length(levs)
-      if (ncat <= 1L && !is.null(contrasts.arg)) stop("factor variable with fewer than two levels: ", f)
       # NB if tmat[f, k] == 2L a main effect is missing and we should not remove a level!
       # also, if there is no intercept, no level should be removed for the first main factor effect
       # see the documentation of terms.formula
@@ -134,6 +136,10 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
           rml <- levs[ncat]  # remove last category
         }
         ncat <- ncat - 1L
+        if (ncat == 0L) {
+          warn("model term '", tnames[k], "' is removed as contrasts are applied to the single-level factor variable '", f, "'")
+          terms.removed[k] <- TRUE  # contrasts applied to single-level factor
+        }
         rmlevs <- c(rmlevs, setNames(rml, f))
       }
       nc <- nc * ncat
@@ -176,6 +182,7 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
     col <- 1L
   }
   for (k in seq_along(tnames)) {
+    if (terms.removed[k]) next
     countvars <- intersect(vnames[tmat[, k] > 0L], qvar)
     if (length(countvars)) {
       xk <- eval_in(countvars[1L], envir, enclos)
@@ -202,9 +209,9 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
     if (length(facvars)) {
       if (length(countvars) && !is.matrix(xk)) {
         # TODO allow matrix; --> generalize x-slot in tabMatrix to matrix (and even dgCMatrix)
-        fk <- fac2tabM(facvars, envir, enclos, x=xk, contrasts=contr.list[[tnames[k]]], catsep=catsep)
+        fk <- fac2tabM(facvars, envir, enclos, x=xk, drop.unused.levels=drop.unused.levels, contrasts=contr.list[[tnames[k]]], catsep=catsep)
       } else {
-        fk <- fac2tabM(facvars, envir, enclos, contrasts=contr.list[[tnames[k]]], catsep=catsep)
+        fk <- fac2tabM(facvars, envir, enclos, drop.unused.levels=drop.unused.levels, contrasts=contr.list[[tnames[k]]], catsep=catsep)
       }
       if (is.matrix(xk)) {
         lab[col:(col + ncol(fk)*ncol(xk) - 1L)] <- outer(colnames(fk), labk, paste, sep=":")

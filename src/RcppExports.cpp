@@ -51,6 +51,34 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// Crtmvn_slice_Gibbs_dense
+Eigen::VectorXd Crtmvn_slice_Gibbs_dense(const Eigen::Map<Eigen::VectorXd>& v, const Eigen::Map<Eigen::MatrixXd> Ut, const Eigen::Map<Eigen::VectorXd>& ustar, const double eps);
+RcppExport SEXP _mcmcsae_Crtmvn_slice_Gibbs_dense(SEXP vSEXP, SEXP UtSEXP, SEXP ustarSEXP, SEXP epsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type v(vSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd> >::type Ut(UtSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type ustar(ustarSEXP);
+    Rcpp::traits::input_parameter< const double >::type eps(epsSEXP);
+    rcpp_result_gen = Rcpp::wrap(Crtmvn_slice_Gibbs_dense(v, Ut, ustar, eps));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Crtmvn_slice_Gibbs_sparse
+NumericVector Crtmvn_slice_Gibbs_sparse(const NumericVector& v, const SEXP Ut, const NumericVector& ustar, const double eps);
+RcppExport SEXP _mcmcsae_Crtmvn_slice_Gibbs_sparse(SEXP vSEXP, SEXP UtSEXP, SEXP ustarSEXP, SEXP epsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericVector& >::type v(vSEXP);
+    Rcpp::traits::input_parameter< const SEXP >::type Ut(UtSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type ustar(ustarSEXP);
+    Rcpp::traits::input_parameter< const double >::type eps(epsSEXP);
+    rcpp_result_gen = Rcpp::wrap(Crtmvn_slice_Gibbs_sparse(v, Ut, ustar, eps));
+    return rcpp_result_gen;
+END_RCPP
+}
 // CrTNprobit
 NumericVector CrTNprobit(const NumericVector& mu, const NumericVector& y);
 RcppExport SEXP _mcmcsae_CrTNprobit(SEXP muSEXP, SEXP ySEXP) {
@@ -208,14 +236,35 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// addto
-void addto(Eigen::Map<Eigen::VectorXd>& x, const double a, const Eigen::Map<Eigen::VectorXd>& y);
-RcppExport SEXP _mcmcsae_addto(SEXP xSEXP, SEXP aSEXP, SEXP ySEXP) {
+// copy_vector
+NumericVector copy_vector(const NumericVector& x);
+RcppExport SEXP _mcmcsae_copy_vector(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< const NumericVector& >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(copy_vector(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// add_vector
+void add_vector(Eigen::Map<Eigen::VectorXd>& x, const Eigen::Map<Eigen::VectorXd>& y);
+RcppExport SEXP _mcmcsae_add_vector(SEXP xSEXP, SEXP ySEXP) {
 BEGIN_RCPP
     Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type x(xSEXP);
-    Rcpp::traits::input_parameter< const double >::type a(aSEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type y(ySEXP);
-    addto(x, a, y);
+    add_vector(x, y);
+    return R_NilValue;
+END_RCPP
+}
+// mv_update
+void mv_update(Eigen::Map<Eigen::VectorXd>& y, const bool plus, const SEXP M, const Eigen::Map<Eigen::VectorXd>& x);
+RcppExport SEXP _mcmcsae_mv_update(SEXP ySEXP, SEXP plusSEXP, SEXP MSEXP, SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const bool >::type plus(plusSEXP);
+    Rcpp::traits::input_parameter< const SEXP >::type M(MSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type x(xSEXP);
+    mv_update(y, plus, M, x);
     return R_NilValue;
 END_RCPP
 }
@@ -295,13 +344,13 @@ BEGIN_RCPP
 END_RCPP
 }
 // fast_aggrC
-NumericVector fast_aggrC(const NumericVector& x, const IntegerVector& group, int n);
+NumericVector fast_aggrC(const NumericVector& x, const IntegerVector& group, const int n);
 RcppExport SEXP _mcmcsae_fast_aggrC(SEXP xSEXP, SEXP groupSEXP, SEXP nSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::traits::input_parameter< const NumericVector& >::type x(xSEXP);
     Rcpp::traits::input_parameter< const IntegerVector& >::type group(groupSEXP);
-    Rcpp::traits::input_parameter< int >::type n(nSEXP);
+    Rcpp::traits::input_parameter< const int >::type n(nSEXP);
     rcpp_result_gen = Rcpp::wrap(fast_aggrC(x, group, n));
     return rcpp_result_gen;
 END_RCPP
@@ -701,6 +750,31 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXi>& >::type n(nSEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type M2(M2SEXP);
     rcpp_result_gen = Rcpp::wrap(Crepgen(v, n, M2));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Cnnz_per_col_scps_template
+Eigen::VectorXi Cnnz_per_col_scps_template(const Eigen::MappedSparseMatrix<double>& X, const Eigen::VectorXi& j1_ind, const Eigen::VectorXi& j2_ind);
+RcppExport SEXP _mcmcsae_Cnnz_per_col_scps_template(SEXP XSEXP, SEXP j1_indSEXP, SEXP j2_indSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< const Eigen::MappedSparseMatrix<double>& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const Eigen::VectorXi& >::type j1_ind(j1_indSEXP);
+    Rcpp::traits::input_parameter< const Eigen::VectorXi& >::type j2_ind(j2_indSEXP);
+    rcpp_result_gen = Rcpp::wrap(Cnnz_per_col_scps_template(X, j1_ind, j2_ind));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Ccreate_sparse_crossprod_sym_template
+Eigen::SparseMatrix<double> Ccreate_sparse_crossprod_sym_template(const Eigen::MappedSparseMatrix<double>& X, const Eigen::VectorXi& j1_ind, const Eigen::VectorXi& j2_ind, const Eigen::Map<Eigen::VectorXi>& nnz_per_col);
+RcppExport SEXP _mcmcsae_Ccreate_sparse_crossprod_sym_template(SEXP XSEXP, SEXP j1_indSEXP, SEXP j2_indSEXP, SEXP nnz_per_colSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< const Eigen::MappedSparseMatrix<double>& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const Eigen::VectorXi& >::type j1_ind(j1_indSEXP);
+    Rcpp::traits::input_parameter< const Eigen::VectorXi& >::type j2_ind(j2_indSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXi>& >::type nnz_per_col(nnz_per_colSEXP);
+    rcpp_result_gen = Rcpp::wrap(Ccreate_sparse_crossprod_sym_template(X, j1_ind, j2_ind, nnz_per_col));
     return rcpp_result_gen;
 END_RCPP
 }

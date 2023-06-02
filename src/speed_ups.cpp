@@ -4,16 +4,88 @@
 using namespace Rcpp;
 
 
-//’ In-place addition of a multiple of another vector
+//’ Copy an existing numeric vector
 //’ 
-//’ @param x a vector to be added to.
-//’ @param a a scalar value.
-//’ @param y a vector of the same length as x.
-//’ @return No return value, but x is updated in-place to x + a*y.
+//’ @param x a vector to be copied.
+//’ @return A newly allocated copy of the vector.
 // [[Rcpp::export(rng=false)]]
-void addto(Eigen::Map<Eigen::VectorXd> & x, const double a, const Eigen::Map<Eigen::VectorXd> & y) {
+NumericVector copy_vector(const NumericVector & x) {
+  return clone(x);
+}
+
+//’ Add a numeric vector to another numeric vector, in-place.
+//’ 
+//’ @param x a numeric vector.
+//’ @param y a numeric vector.
+//’ @return No return value, but x is updated in-place to x + y.
+// [[Rcpp::export(rng=false)]]
+void add_vector(Eigen::Map<Eigen::VectorXd> & x, const Eigen::Map<Eigen::VectorXd> & y) {
   if (x.size() != y.size()) stop("incompatible dimensions");
-  x += a * y;
+  x += y;
+}
+
+
+//’ Update an existing numeric vector by adding or subtracting the product of a matrix and a vector
+//’
+//’ @param y the vector to be updated in-place.
+//’ @param plus whether the matrix-vector product is to be added or subtracted.
+//’ @param M a matrix object.
+//’ @param x a numeric vector.
+//’ @return No return value, but y is updated in-place to y +/- Mx.
+// [[Rcpp::export(rng=false)]]
+void mv_update(Eigen::Map<Eigen::VectorXd> & y, const bool plus, const SEXP M, const Eigen::Map<Eigen::VectorXd> & x) {
+  if (Rf_isS4(M)) {
+    IntegerVector Dim = as<S4>(M).slot("Dim");
+    if (Dim[0] != y.size() || Dim[1] != x.size()) stop("incompatible dimensions");
+    if(Rf_inherits(M, "dgCMatrix")) {
+      if (plus) {
+        y += as<Eigen::Map<Eigen::SparseMatrix<double> > >(M) * x;
+      } else {
+        y -= as<Eigen::Map<Eigen::SparseMatrix<double> > >(M) * x;
+      }
+    } else if (Rf_inherits(M, "ddiMatrix")) {
+      Eigen::Map<Eigen::VectorXd> Mxslot = as<Eigen::Map<Eigen::VectorXd> >(as<S4>(M).slot("x"));
+      if (Mxslot.size() == 0) {
+        if (plus) y += x; else y -= x;
+      } else {
+        if (plus) {
+          y.array() += Mxslot.array() * x.array();
+        } else {
+          y.array() -= Mxslot.array() * x.array();
+        }
+      }
+    } else {
+      if (!Rf_inherits(M, "tabMatrix")) stop("unexpected matrix type");
+      const IntegerVector perm(as<S4>(M).slot("perm"));
+      const int n = perm.size();
+      const bool reduced(::Rf_asLogical(as<S4>(M).slot("reduced")));
+      const bool num(::Rf_asLogical(as<S4>(M).slot("num")));
+      if (reduced) {
+        if (plus) {
+          for (int i = 0; i < n; i++) y[i] += (perm[i] >= 0) * x[perm[i]];
+        } else {
+          for (int i = 0; i < n; i++) y[i] -= (perm[i] >= 0) * x[perm[i]];
+        }
+      } else if (num) {
+        const NumericVector Mxslot(as<S4>(M).slot("x"));
+        if (plus) {
+          for (int i = 0; i < n; i++) y[i] += Mxslot[i] * x[perm[i]];
+        } else {
+          for (int i = 0; i < n; i++) y[i] -= Mxslot[i] * x[perm[i]];
+        }
+      } else {
+        if (plus) {
+          for (int i = 0; i < n; i++) y[i] += x[perm[i]];
+        } else {
+          for (int i = 0; i < n; i++) y[i] -= x[perm[i]];
+        }
+      }
+    }
+  } else {
+    Eigen::Map<Eigen::MatrixXd> MM = as<Eigen::Map<Eigen::MatrixXd> >(M);
+    if (MM.cols() != x.size() || MM.rows() != y.size()) stop("incompatible dimensions");
+    if (plus) y += MM * x; else y -= MM * x;
+  }
 }
 
 //’ Inverse of a symmetric positive definite dense matrix
@@ -98,7 +170,7 @@ double dotprodC(const Eigen::Map<Eigen::VectorXd> & x, const Eigen::Map<Eigen::V
 //’ @param n the number of groups, assumed to be labeled \code{1:n}.
 //’ @return A vector with totals of \code{x} by group.
 // [[Rcpp::export(rng=false)]]
-NumericVector fast_aggrC(const NumericVector & x, const IntegerVector & group, int n) {
+NumericVector fast_aggrC(const NumericVector & x, const IntegerVector & group, const int n) {
   const int xsize = x.size();
   if (xsize != group.size()) stop("incompatible dimensions");
   NumericVector out(n);
@@ -596,6 +668,86 @@ Eigen::VectorXd Crepgen(const Eigen::Map<Eigen::VectorXd> & v, const Eigen::Map<
       ind_out += ni;
     }
     ind += ni;
+  }
+  return out;
+}
+
+//’ Compute the number of non-zeros per column of a sparse template matrix
+//’
+//’ This function computes the number of non-zeros per column of the sparse
+//’ template matrix for weighted sparse symmetric crossproducts, as computed
+//’ by function Ccreate_sparse_crossprod_sym.
+//’
+//’ @param X a sparse (dgC) matrix.
+//’ @param j1_ind integer vector containing row indices of nonzero elements in X'QX.
+//’ @param j2_ind integer vector containing column indices of nonzero elements in X'QX.
+//’ @return An integer vector containing the number of non-zeros per column of a
+//’  sparse template matrix for fast updating of the weighted symmetric crossproduct
+//’  of X.
+// [[Rcpp::export(rng=false)]]
+Eigen::VectorXi Cnnz_per_col_scps_template(
+    const Eigen::MappedSparseMatrix<double> & X,
+    const Eigen::VectorXi & j1_ind,
+    const Eigen::VectorXi & j2_ind) {
+
+  const int nnz = j1_ind.size();
+  if (j2_ind.size() != nnz) stop("'j1_ind' and 'j2_ind' should have the same length");
+
+  Eigen::VectorXi nnz_per_col(nnz);
+
+  // loop over nonzero elements of dsCMatrix X'QX in the order of its i and x slots
+  for (int j = 0; j < nnz; j++) {
+    int nnz_in_col_prod = 0;
+    Eigen::MappedSparseMatrix<double>::InnerIterator i1_(X, j1_ind[j]);
+    Eigen::MappedSparseMatrix<double>::InnerIterator i2_(X, j2_ind[j]);
+    while (i1_) {
+      while (i2_ && i2_.index() < i1_.index()) ++i2_;
+      if (i2_ && i2_.index() == i1_.index()) nnz_in_col_prod++;
+      ++i1_;
+    }
+    nnz_per_col[j] = nnz_in_col_prod;
+  }
+  return nnz_per_col;
+}
+
+//’ Compute a sparse template matrix for the sparse weighted symmetric crossproduct
+//’
+//’ The sparse template matrix can be used for fast updating of the sparse weighted
+//’ symmetric crossproduct of X, when the diagonal matrix of weights W is subject
+//’ to change
+//’
+//’ @param X a sparse (dgC) matrix.
+//’ @param j1_ind integer vector containing row indices of nonzero elements in X'QX.
+//’ @param j2_ind integer vector containing column indices of nonzero elements in X'QX.
+//’ @param nnz_per_col integer vector containing the number of non-zeros per column
+//’  of the sparse template matrix.
+//’ @return A sparse matrix containing the nonzero products of columns of X.
+// [[Rcpp::export(rng=false)]]
+Eigen::SparseMatrix<double> Ccreate_sparse_crossprod_sym_template(
+    const Eigen::MappedSparseMatrix<double> & X,
+    const Eigen::VectorXi & j1_ind,
+    const Eigen::VectorXi & j2_ind,
+    const Eigen::Map<Eigen::VectorXi> & nnz_per_col) {
+
+  const int n = X.rows();
+  const int nnz = j1_ind.size();
+  if (j2_ind.size() != nnz) stop("'j1_ind' and 'j2_ind' should have the same length");
+
+  // reserve space for the sparse matrix using the computed nnz's per column
+  Eigen::SparseMatrix<double> out(n, nnz);
+  out.reserve(nnz_per_col);
+
+  // fill the columns of the sparse matrix with X[,j1] * X[,j2]
+  for (int j = 0; j < nnz; j++) {
+    Eigen::MappedSparseMatrix<double>::InnerIterator i1_(X, j1_ind[j]);
+    Eigen::MappedSparseMatrix<double>::InnerIterator i2_(X, j2_ind[j]);
+    while (i1_) {
+      while (i2_ && i2_.index() < i1_.index()) ++i2_;
+      if (i2_ && i2_.index() == i1_.index()) {
+        out.insert(i1_.index(), j) = i1_.value() * i2_.value();
+      }
+      ++i1_;
+    }
   }
   return out;
 }

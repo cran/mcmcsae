@@ -23,7 +23,7 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   ind <- 0L
   for (mc in mcs) {
     if (mc$type == "gen" && mc$gl)
-      X <- cbind(X, cbind(mc$X, zeroMatrix(e$n, mc$glp$q)))
+      X <- cbind(X, mc$X, zeroMatrix(e$n, mc$glp$q))
     else
       X <- cbind(X, mc$X)
     vec_list[[mc$name]] <- (ind + 1L):ncol(X)
@@ -134,8 +134,7 @@ create_mc_block <- function(mcs, e=parent.frame()) {
     if (is.null(e$linpred)) {
       linpred <- economizeMatrix(t(X), strip.names=FALSE)
     } else {
-      linpred <- economizeMatrix(t(do.call(cbind, e$linpred[names(vec_list)])), strip.names=FALSE)
-      # TODO as this matrix is passed to Cholesky's solve method it must be matrix or dgCMatrix
+      linpred <- economizeMatrix(t(do.call(cbind, lapply(e$linpred[names(vec_list)], function(x) environment(x)$Xnew))), allow.tabMatrix=FALSE)
     }
   }
 
@@ -180,13 +179,28 @@ create_mc_block <- function(mcs, e=parent.frame()) {
     if (e$modeled.Q) {
       if (e$Q0.type == "symm")
         draw <- add(draw, quote(XX <- crossprod_sym(X, p[["QM_"]])))
-      else
-        draw <- add(draw, quote(XX <- crossprod_sym(X, p[["Q_"]])))
+      else {
+        cps_template <- NULL
+        if (inherits(X, "dgCMatrix")) {
+          tryCatch(
+            cps_template <- sparse_crossprod_sym_template(X),
+            error = function(e) {
+              # template too large
+              NULL
+            }
+          )
+        }
+        if (is.null(cps_template)) {
+          draw <- add(draw, quote(XX <- crossprod_sym(X, p[["Q_"]])))
+        } else {
+          draw <- add(draw, quote(XX <- cps_template(p[["Q_"]])))
+        }
+      }
     } else if (any(sapply(mcs, `[[`, "type") == "mec")) {
       draw <- add(draw, quote(XX <- crossprod_sym(X, e$Q0)))
     }
     draw <- add(draw, quote(Qlist <- update(XX, QT, 1, 1/tau)))
-    draw <- add(draw, bquote(coef <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else bquote(p[["sigma_"]])), Q=Qlist$Q, Imult=Qlist$Imult, Xy=Xy)[[.(name)]]))
+    draw <- add(draw, bquote(coef <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])), Q=Qlist$Q, Imult=Qlist$Imult, Xy=Xy)[[.(name)]]))
   } else {
     draw <- add(draw, quote(CGstart <- vector("numeric", ncol(X))))
     draw <- add(draw, quote(for (mc in mcs) CGstart[vec_list[[mc$name]]] <- p[[mc$name]]))

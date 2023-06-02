@@ -22,6 +22,9 @@
 #' @param CRT.approx.m scalar integer specifying the degree of approximation to sampling
 #'  from a Chinese Restaurant Table distribution. The approximation is based on Le Cam's theorem.
 #'  Larger values yield a slower but more accurate sampler.
+#' @param max.size.cps.template maximum allowed size in MB of the sparse matrix serving as a 
+#'  template for the sparse symmetric crossproduct X'QX of a dgCMatrix X, where Q is a diagonal
+#'  matrix subject to change.
 #' @return This function sets or resets options in the option environment \code{.opts}.
 #' @references
 #'  D. Bates, M. Maechler, B. Bolker and S.C. Walker (2015).
@@ -32,13 +35,15 @@
 #'    Algorithm 887: CHOLMOD, supernodal sparse Cholesky factorization and update/downdate.
 #'    ACM Transactions on Mathematical Software 35(3), 1-14.
 set_opts <- function(auto.order.block=TRUE, chol.inplace=TRUE, chol.ordering=0L,
-                     PG.approx=TRUE, PG.approx.m=-2L, CRT.approx.m=20L) {
+                     PG.approx=TRUE, PG.approx.m=-2L, CRT.approx.m=20L,
+                     max.size.cps.template=100L) {
   .opts$auto.order.block <- auto.order.block
   .opts$chol.inplace <- chol.inplace
   .opts$chol.ordering <- as.integer(chol.ordering)
   .opts$PG.approx <- PG.approx
   .opts$PG.approx.m <- as.integer(PG.approx.m)
   .opts$CRT.approx.m <- as.integer(CRT.approx.m)
+  .opts$max.size.cps.template <- as.integer(max.size.cps.template)
 }
 set_opts()
 
@@ -60,7 +65,7 @@ check_ny <- function(ny, data) {
     if (anyNA(ny)) stop("missings in 'ny' not allowed")
     if (any(ny < 0)) stop("'ny' cannot be negative")
   }
-  if (any(ny - as.integer(ny) > sqrt(.Machine$double.eps))) warning("non-integral values in 'ny' have been rounded")
+  if (any(ny - as.integer(ny) > sqrt(.Machine$double.eps))) warn("non-integral values in 'ny' have been rounded")
   as.integer(round(ny))
   # or should we allow non-integral ny? allowed for model fitting but not for prediction by rbinom
   # note that y in create_sampler is currently not rounded, but y <= ny is checked

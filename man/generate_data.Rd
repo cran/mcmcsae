@@ -19,28 +19,28 @@ generate_data(
 )
 }
 \arguments{
-\item{formula}{A model formula, see \code{create_sampler}.
+\item{formula}{A model formula, see \code{\link{create_sampler}}.
 Any left-hand-side of the formula is ignored.}
 
-\item{data}{see \code{create_sampler}.}
+\item{data}{see \code{\link{create_sampler}}.}
 
-\item{family}{see \code{create_sampler}.}
+\item{family}{sampling distribution family, see \code{\link{create_sampler}}.}
 
-\item{ny}{see \code{create_sampler}.}
+\item{ny}{see \code{\link{create_sampler}}.}
 
-\item{ry}{see \code{create_sampler}.}
+\item{ry}{see \code{\link{create_sampler}}.}
 
-\item{r.mod}{see \code{create_sampler}.}
+\item{r.mod}{see \code{\link{create_sampler}}.}
 
-\item{sigma.fixed}{see \code{create_sampler}.}
+\item{sigma.fixed}{see \code{\link{create_sampler}}.}
 
-\item{sigma.mod}{see \code{create_sampler}.}
+\item{sigma.mod}{see \code{\link{create_sampler}}.}
 
-\item{Q0}{see \code{create_sampler}.}
+\item{Q0}{see \code{\link{create_sampler}}.}
 
-\item{formula.V}{see \code{create_sampler}.}
+\item{formula.V}{see \code{\link{create_sampler}}.}
 
-\item{linpred}{see \code{create_sampler}.}
+\item{linpred}{see \code{\link{create_sampler}}.}
 }
 \value{
 A list with a generated data vector and a list of prior means of the

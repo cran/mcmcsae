@@ -298,7 +298,7 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
 
   for (v in store.mean) {
     if (is.null(test_draw[[v]])) {
-      warning("parameter '", v, "' not in sampler output", immediate.=TRUE)
+      warn("parameter '", v, "' not in sampler output")
       store.mean <- setdiff(store.mean, v)
       next
     }
@@ -316,17 +316,17 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
   n.draw <- n.iter %/% thin  # number of saved draws
   for (v in store) {
     if (is.null(test_draw[[v]])) {
-      warning("parameter '", v, "' not in sampler output", immediate.=TRUE)
+      warn("parameter '", v, "' not in sampler output")
       store <- setdiff(store, v)
       next
     }
     if (!is.numeric(test_draw[[v]])) {
-      warning("non-numeric parameter '", v, "'", immediate.=TRUE)
+      warn("non-numeric parameter '", v, "'")
       store <- setdiff(store, v)
       next
     }
     if (!length(test_draw[[v]])) {
-      warning("parameter '", v, "' has length 0", immediate.=TRUE)
+      warn("parameter '", v, "' has length 0")
       store <- setdiff(store, v)
       next
     }
@@ -345,7 +345,7 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
     outfile <- list()
     for (v in to.file) {  # one output file per parameter (multiple chains in the same file)
       if (is.null(test_draw[[v]])) {
-        warning("parameter name '", v, "' not in sampler output", immediate.=TRUE)
+        warn("parameter name '", v, "' not in sampler output")
       } else {
         outfile[[v]] <- file(paste0(filename, v, ".dat"), "wb")
         write_header(outfile[[v]], n.iter, n.chain, length(test_draw[[v]]),
@@ -419,9 +419,9 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
       for (ch in chains) {
         for (v in store) out[[v]][[ch]][index, ] <- p[[ch]][[v]]
         for (v in store.mean) {
-          addto(out[["_means"]][[v]][[ch]], 1, p[[ch]][[v]])
+          add_vector(out[["_means"]][[v]][[ch]], p[[ch]][[v]])
           if (store.sds)
-            addto(out[["_sds"]][[v]][[ch]], 1, (p[[ch]][[v]])^2)
+            add_vector(out[["_sds"]][[v]][[ch]], p[[ch]][[v]]^2)
         }
       }  # END for (ch in chains)
       if (write.to.file)
@@ -865,7 +865,7 @@ summary.mcdraws <- function(object, vnames=NULL, probs=c(0.05, 0.5, 0.95), na.rm
   out <- list()
   for (v in vnames) {
     if (is.null(object[[v]])) {
-      warning("parameter ", v, " not found")
+      warn("parameter ", v, " not found")
       next
     }
     if (is.null(object[["_cluster"]]) || "cl" %in% names(list(...))) {
@@ -995,6 +995,8 @@ labels.dc <- function(object, ...) attr(object, "labels")
 #' ex <- mcmcsae_example(n=50)
 #' sampler <- create_sampler(ex$model, data=ex$dat)
 #' sim <- MCMCsim(sampler, burnin=100, n.iter=300, thin=2, n.chain=5, store.all=TRUE)
+#' # resolve possible conflict with posterior package:
+#' nchains <- mcmcsae::nchains; ndraws <- mcmcsae::ndraws
 #' nchains(sim); nchains(sim$beta)
 #' ndraws(sim); ndraws(sim$beta)
 #' nvars(sim$beta); nvars(sim$sigma_); nvars(sim$llh_); nvars(sim$v)
@@ -1109,7 +1111,7 @@ n_eff <- function(dc, useFFT=TRUE, lag.max, cl=NULL) {
     lag.max <- n.draw - 1L
   } else {
     if (useFFT) {
-      warning("'lag.max' argument ignored because 'useFFT=TRUE'")
+      warn("'lag.max' argument ignored because 'useFFT=TRUE'")
       lag.max <- n.draw - 1L
     } else {
       lag.max <- min(lag.max, n.draw - 1L)

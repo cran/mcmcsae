@@ -89,7 +89,7 @@
 #'  draw function associated with this model component. Mainly intended for developers.
 #' @param e for internal use only.
 #' @return an object with precomputed quantities and functions for sampling from
-#'  prior or conditional posterior distributions for this model component. Only intended
+#'  prior or conditional posterior distributions for this model component. Intended
 #'  for internal use by other package functions.
 reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
                 Q0=NULL, b0=NULL, R=NULL, r=NULL, S=NULL, s=NULL, lower=NULL, upper=NULL,
@@ -150,26 +150,42 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
 
   linpred <- function(p) X %m*v% p[[name]]
 
-  make_predict <- function(newdata, verbose=TRUE) {
-    nnew <- nrow(newdata)
-    if (e$family$family == "multinomial") {
-      edat <- new.env(parent = .GlobalEnv)
-      Xnew <- NULL
-      for (k in seq_len(e$Km1)) {
-        edat$cat_ <- factor(rep.int(e$cats[k], nnew), levels=e$cats[-length(e$cats)])
-        Xnew <- rbind(Xnew, model_matrix(formula, data=newdata, sparse=sparse, enclos=edat))
-      }
-      rm(edat)
+  # for regression components assume that categorical variables in newdata
+  #   carry the exact same levels as those in the training data
+  make_predict <- function(newdata=NULL, Xnew, verbose=TRUE) {
+    if (is.null(newdata)) {
+      Xnew <- economizeMatrix(Xnew, strip.names=TRUE)
+      if (ncol(Xnew) != q) stop("wrong number of columns for Xnew matrix of component ", name)
     } else {
-      Xnew <- model_matrix(formula, newdata, sparse=sparse)
+      nnew <- nrow(newdata)
+      if (e$family$family == "multinomial") {
+        edat <- new.env(parent = .GlobalEnv)
+        Xnew <- NULL
+        for (k in seq_len(e$Km1)) {
+          edat$cat_ <- factor(rep.int(e$cats[k], nnew), levels=e$cats[-length(e$cats)])
+          Xnew <- rbind(Xnew, model_matrix(formula, data=newdata, sparse=sparse, enclos=edat))
+        }
+        rm(edat)
+      } else {
+        Xnew <- model_matrix(formula, newdata, sparse=sparse)
+      }
+      if (anyNA(match(colnames(Xnew), e$coef.names[[name]]))) {
+        # one option would be to sample the 'new' coefficients from their prior, but what prior?
+        stop("regression component '", name, "': some categories in 'newdata' do not match effect labels", immediate.=TRUE)
+      }
+      if (remove.redundant) {
+        # TODO check that any columns removed are redundant
+        Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
+      } else {
+        if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
+        if (!identical(colnames(Xnew), e$coef.names[[name]])) {
+          Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
+        }
+      }
+      Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE)
     }
-    # for prediction do not (automatically) remove redundant columns!
-    if (remove.redundant)
-      Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
-    # check that X has the right number of columns
-    if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
-    # TODO check the category names as well; allow oos categories; insert missing categories in newdata
-    economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE)
+    rm(newdata, verbose)
+    function(p) Xnew %m*v% p[[name]]
   }
 
   rprior <- function(p) {}
@@ -181,16 +197,21 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
     draw <- function(p) {}
     if (debug) draw <- add(draw, quote(browser()))
     if (e$single.block) {
-      draw <- add(draw, quote(p$e_ <- e$y_eff()))
+      if (e$use.offset || e$e.is.res)
+        draw <- add(draw, quote(p$e_ <- e$y_eff()))
     } else {
       if (e$e.is.res)
-        draw <- add(draw, bquote(p$e_ <- p[["e_"]] + X %m*v% p[[.(name)]]))
+        draw <- add(draw, bquote(mv_update(p[["e_"]], plus=TRUE, X, p[[.(name)]])))
       else
-        draw <- add(draw, bquote(p$e_ <- p[["e_"]] - X %m*v% p[[.(name)]]))
+        draw <- add(draw, bquote(mv_update(p[["e_"]], plus=FALSE, X, p[[.(name)]])))
     }
-    if (e$single.block && !e$modeled.Q && e$family$link != "probit") {
+    if (e$single.block && e$family$link != "probit" &&
+        (!e$modeled.Q || (e$family$family != "gaussian" && !e$use.offset && !e$modeled.r))) {
       # single regression component, no variance modeling, Xy fixed
-      Xy <- crossprod_mv(X, e$Q0 %m*v% e$y_eff()) + Q0b0
+      if (e$family$family == "gaussian")
+        Xy <- crossprod_mv(X, e$Q0 %m*v% e$y_eff()) + Q0b0
+      else
+        Xy <- crossprod_mv(X, e$Q_e(e$y_eff())) + Q0b0
     } else {  # Xy updated in each iteration
       if (all(Q0b0 == 0))
         draw <- add(draw, quote(Xy <- crossprod_mv(X, e$Q_e(p))))
@@ -238,9 +259,13 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
       }
     }
     if (e$e.is.res)
-      draw <- add(draw, bquote(p$e_ <- p[["e_"]] - X %m*v% p[[.(name)]]))
-    else
-      draw <- add(draw, bquote(p$e_ <- p[["e_"]] + X %m*v% p[[.(name)]]))
+      draw <- add(draw, bquote(mv_update(p[["e_"]], plus=FALSE, X, p[[.(name)]])))
+    else {
+      if (e$use.offset || !e$single.block)
+        draw <- add(draw, bquote(mv_update(p[["e_"]], plus=TRUE, X, p[[.(name)]])))
+      else
+        draw <- add(draw, bquote(p$e_ <- X %m*v% p[[.(name)]]))
+    }
     draw <- add(draw, quote(p))
 
     start <- function(p) MVNsampler$start(p)

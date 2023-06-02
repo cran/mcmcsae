@@ -102,5 +102,4 @@ theta <- c(tapply(apipop$sch.wide == "Yes", apipop$cname, mean))  # true populat
 plot_coef(summ, list(est=theta), n.se=2, est.names=c("mcmcsae", "true"), maxrows=30)
 ```
 
-
 ## References
