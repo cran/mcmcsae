@@ -97,7 +97,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
   if (is.null(newdata)) {
     if (is.null(X.)) stop("one of 'newdata' and 'X.' must be supplied")
     if (identical(X., "in-sample")) {
-      use.linpred_ <- "linpred_" %in% par.names && model$do.linpred && is.null(model$linpred)
+      use.linpred_ <- any("linpred_" == par.names) && model$do.linpred && is.null(model$linpred)
       if (!use.linpred_ && !all(names(model$mod) %in% par.names)) stop("for prediction all coefficients must be stored in 'object' (use 'store.all=TRUE' in MCMCsim)")
       X. <- NULL
       n <- model$n
@@ -121,12 +121,12 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
         ny <- NULL
       }
       # BayesLogit::rpg flags ny=0, so we have set ny to a tiny value > 0 in sampler; need to undo it here as rbinom yields NA for non-integral ny
-      if (fam$family %in% c("binomial", "multinomial")) ny <- as.integer(round(model$ny))
+      if (any(fam$family == c("binomial", "multinomial"))) ny <- as.integer(round(model$ny))
       if (fam$family == "multinomial" && type == "data_cat") n <- n %/% model$Km1
       if (fam$family == "negbinomial") ry <- model$ry
     } else {
       if (identical(X., "linpred")) {
-        if (!("linpred_" %in% par.names))
+        if (all("linpred_" != par.names))
           stop("'linpred_' not found in object. Use linpred='fitted' in create_sampler.")
         n <- nvars(object[["linpred_"]])
         use.linpred_ <- TRUE
@@ -147,9 +147,9 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
         if (type == "data" && model$Q0.type != "unit") warn("no 'var' specified; unit variances assumed for prediction")
         var <- 1
       }
-      if (!(length(var) %in% c(1L, n))) stop("'var' should be either a scalar value or a vector of length 'nrow(newdata)'")
+      if (all(length(var) != c(1L, n))) stop("'var' should be either a scalar value or a vector of length 'nrow(newdata)'")
       if (model$modeled.Q && fam$family == "gaussian") stop("please use argument 'newdata' instead of 'X.' to also supply information about the factors determining the (modeled) sampling variances")
-      if (fam$family %in% c("binomial", "multinomial") && type == "data") {
+      if (any(fam$family == c("binomial", "multinomial")) && type == "data") {
         if (is.null(ny)) ny <- model$ny.input
         if (is.character(ny)) stop("please supply number of binomial trials 'ny' as a vector")
         ny <- check_ny(ny, n)
@@ -161,7 +161,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
     }
     if (!use.linpred_) {
       # check that for mec components name_X is stored
-      name_Xs <- unlist(lapply(model$mod, `[[`, "name_X"))
+      name_Xs <- unlist(lapply(model$mod, `[[`, "name_X"), use.names=FALSE)
       if (!is.null(X.)) name_Xs <- name_Xs[names(X.)]
       if (!all(name_Xs %in% par.names))
         stop("(in-sample) prediction for a model with measurement error components requires ",
@@ -183,12 +183,12 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
       if (type == "data" && model$Q0.type != "unit") warn("no 'var' specified, so unit variances are assumed for prediction")
       var <- 1
     }
-    if (!(length(var) %in% c(1L, n))) stop("'var' should be either a scalar value or a vector of length 'nrow(newdata)'")
+    if (all(length(var) != c(1L, n))) stop("'var' should be either a scalar value or a vector of length 'nrow(newdata)'")
     if (model$modeled.Q && fam$family == "gaussian") {
       V <- list()
       for (Vmc in model$Vmod) V[[Vmc$name]] <- Vmc$make_predict_Vfactor(newdata)
     }
-    if (fam$family %in% c("binomial", "multinomial") && type %in% c("data", "data_cat")) {
+    if (any(fam$family == c("binomial", "multinomial")) && any(type == c("data", "data_cat"))) {
       if (is.null(ny) && fam$family == "binomial") ny <- model$ny.input
       ny <- check_ny(ny, newdata)
     } else if (fam$family == "negbinomial" && type == "data") {
@@ -215,7 +215,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
   }
   d <- length(temp)
   out_type <- storage.mode(temp)
-  if (!(out_type %in% c("logical", "integer", "double"))) stop("'fun.' must return an integer or numeric vector")
+  if (all(out_type != c("logical", "integer", "double"))) stop("'fun.' must return an integer or numeric vector")
   rm(temp)
 
   if (!is.null(labels) && length(labels) != d) stop("incompatible 'labels' vector")
@@ -264,7 +264,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
     predict_obj <- function(obj) {
       chains <- seq_len(nchains(obj))
       iters <- seq_len(ndraws(obj))
-      if (out_type %in% c("logical", "integer"))
+      if (any(out_type == c("logical", "integer")))
         out <- rep.int(list(matrix(NA_integer_, length(iters), d)), length(chains))
       else
         out <- rep.int(list(matrix(NA_real_, length(iters), d)), length(chains))
@@ -306,7 +306,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
       write.size <- if (write.single.prec) 4L else NA_integer_
       ppcheck <- FALSE  # TODO allow ppcheck in the case that predictions are written to file
     } else {
-      if (out_type %in% c("logical", "integer"))
+      if (any(out_type == c("logical", "integer")))
         out <- rep.int(list(matrix(NA_integer_, n.it, d)), n.chain)
       else
         out <- rep.int(list(matrix(NA_real_, n.it, d)), n.chain)

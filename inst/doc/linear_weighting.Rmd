@@ -48,7 +48,7 @@ As the starting values for the MCMC simulation are randomly generated, we set a 
 The results of the simulation are subsequently summarized,
 and the DIC model criterion is computed. The simulation summary shows several statistics for the model parameters,
 including the posterior mean, standard error, quantiles, as
-well as the Rhat convergence diagnostic.
+well as the R-hat convergence diagnostic.
 
 ```{r, message=FALSE}
 library(mcmcsae)

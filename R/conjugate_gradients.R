@@ -62,11 +62,8 @@ CG <- function(b, env, x=NULL, max.it=NULL, e=NULL, verbose=FALSE, ...) {
 #' @param mbs block component containing several model components.
 #' @param X design matrix.
 #' @param sampler sampler object as created by \code{\link{create_sampler}}.
-#' @param max.it passed to \code{\link{CG}}.
-#' @param stop.criterion passed to \code{\link{CG}}.
-#' @param verbose passed to \code{\link{CG}}.
-#' @param preconditioner one of  "GMRF", "GMRF2", "GMRF3" and "identity".
-#' @param scale scale parameter for GMRF3 preconditioner.
+#' @param control a list of options for the conjugate gradient algorithm that can be passed
+#'   using function \code{\link{CG_control}}.
 #' @return An environment with precomputed quantities and functions for multiplication
 #'   by A and by an (inverse) preconditioning matrix.
 #' @references
@@ -82,15 +79,12 @@ CG <- function(b, env, x=NULL, max.it=NULL, e=NULL, verbose=FALSE, ...) {
 #   and for each component use X0 and XA instead of X, using mixed product relations
 #   for Khatri-Rao etc.; X0 will typically be dense and XA tabMatrix
 # - p >> n case
-setup_CG_sampler <- function(mbs, X, sampler, max.it=NULL, stop.criterion=NULL, verbose=NULL,
-                             preconditioner=c("GMRF", "GMRF2", "GMRF3", "identity"),
-                             scale) {
+setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
   n <- nrow(X)
   q <- ncol(X)
-  if (is.null(max.it)) max.it <- q
-  if (is.null(stop.criterion)) stop.criterion <- 1e-12 * q
-  if (is.null(verbose)) verbose <- FALSE
-  preconditioner <- match.arg(preconditioner)
+  control <- check_CG_control(control)
+  if (is.null(control$max.it)) control$max.it <- q
+  if (is.null(control$stop.criterion)) control$stop.criterion <- 1e-9 * q
 
   if (sampler$family$family == "gaussian") {
     if (sampler$modeled.Q) {
@@ -174,7 +168,7 @@ setup_CG_sampler <- function(mbs, X, sampler, max.it=NULL, stop.criterion=NULL, 
   }
   rm(n_vec_list)
 
-  switch(preconditioner,
+  switch(control$preconditioner,
     GMRF =
       # multiply by D+ DA x V, the (pseudo-)inverse of preconditioner M
       M_solve <- function(x, X, QT, cholQV, p) {
@@ -204,8 +198,9 @@ setup_CG_sampler <- function(mbs, X, sampler, max.it=NULL, stop.criterion=NULL, 
         }
         out
       },
-    GMRF3 =
+    GMRF3 = {
       # multiply by D+ D+' x QV^-1, cf. Nishimura and Suchard + scaling
+      scale <- control$scale
       M_solve <- function(x, X, QT, cholQV, p) {
         out <- vector("numeric", q)
         for (mc in mbs) {
@@ -218,7 +213,8 @@ setup_CG_sampler <- function(mbs, X, sampler, max.it=NULL, stop.criterion=NULL, 
           }
         }
         out
-      },
+      }
+    },
     identity =
       M_solve <- function(x, X, QT, cholQV, p) x
   )
@@ -249,10 +245,35 @@ setup_CG_sampler <- function(mbs, X, sampler, max.it=NULL, stop.criterion=NULL, 
       }
     }
     # solve Qtot v = u using preconditioned conjugate gradients, where Qtot = X'QX + sigma^2 QT
-    out <- CG(u, self, start, max.it=max.it, e=stop.criterion, verbose=verbose, X=X, QT=QT, cholQV=cholQV, p=p)
-    if (verbose) cat("discrepancies: ", summary(A_times(out, X, QT, cholQV, p) - u), "\n")
+    out <- CG(u, self, start, max.it=control$max.it, e=control$stop.criterion, verbose=control$verbose,
+              X=X, QT=QT, cholQV=cholQV, p=p)
+    if (control$verbose) cat("discrepancies: ", summary(A_times(out, X, QT, cholQV, p) - u), "\n")
     out
   }  # END function draw
 
   self
+}
+
+#' Set options for the conjugate gradient (CG) sampler
+#'
+#' @export
+#' @param max.it maximum number of CG iterations.
+#' @param stop.criterion total squared error stop criterion for the CG algorithm.
+#' @param preconditioner one of  "GMRF", "GMRF2", "GMRF3" and "identity".
+#' @param scale scale parameter; only used by the "GMRF3" preconditioner.
+#' @param verbose whether diagnostic information about the CG sampler is shown.
+#' @return A list of options used by the conjugate gradients algorithm.
+CG_control <- function(max.it=NULL, stop.criterion=NULL,
+                       preconditioner=c("GMRF", "GMRF2", "GMRF3", "identity"),
+                       scale=1, verbose=FALSE) {
+  preconditioner <- match.arg(preconditioner)
+  list(max.it=max.it, stop.criterion=stop.criterion, preconditioner=preconditioner, scale=scale, verbose=verbose)
+}
+
+# a manually specified list of control options might not be complete or consistent --> check it
+check_CG_control <- function(control) {
+  defaults <- CG_control()
+  w <- which(!(names(control) %in% names(defaults)))
+  if (length(w)) stop("unrecognized control parameters ", paste(names(control)[w], collapse=", "))
+  modifyList(defaults, control)
 }

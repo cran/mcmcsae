@@ -4,9 +4,11 @@
 \alias{correlation}
 \title{Correlation structures}
 \description{
-Element 'factor' of a model component is a formula composed of several possible terms described below.
-It is used to derive a (sparse) precision matrix for a set of coefficient, and possibly a matrix representing
-a set of linear constraints to be imposed on the coefficient vector.
+Element 'factor' of a model component created using function
+\code{\link{gen}} is a formula composed of several possible terms described
+below. It is used to derive a (sparse) precision matrix for a set of
+coefficients, and possibly a matrix representing a set of linear constraints
+to be imposed on the coefficient vector.
 \describe{
   \item{iid(f)}{Independent effects corresponding to the levels of factor \code{f}.}
   \item{RW1(f, circular=FALSE, w=NULL)}{First-order random walk over the levels of factor \code{f}.
@@ -22,9 +24,10 @@ a set of linear constraints to be imposed on the coefficient vector.
     \code{RW1}.}
   \item{season(f, period)}{Dummy seasonal with period \code{period}.}
   \item{spatial(f, poly.df, snap, queen, derive.constraints=FALSE)}{CAR spatial correlation.
-    Argument \code{poly.df} should be an object of class \code{SpatialPolygonsDataFrame} obtained
-    e.g. from reading in a shape file with \code{\link[maptools]{readShapeSpatial}} from
-    package \pkg{maptools}. Arguments \code{snap} and \code{queen} are passed to \code{\link[spdep]{poly2nb}}.
+    Argument \code{poly.df} can either be an object of (S4) class \code{SpatialPolygonsDataFrame}
+    or an object of (S3) class \code{sf}. The latter can be obtained, e.g., from reading in a
+    shape file using function \code{\link[sf]{st_read}}. Arguments \code{snap} and \code{queen}
+    are passed to \code{\link[spdep]{poly2nb}}.
     If \code{derive.constraints=TRUE} the constraint matrix for an IGMRF model component
     is formed by computing the singular vectors of the precision matrix.}
   \item{spline(f, knots, degree)}{P-splines, i.e. penalized B-splines structure over
@@ -37,6 +40,40 @@ a set of linear constraints to be imposed on the coefficient vector.
     constraint matrix can be supplied as \code{R}, or constraints can be derived from the null space
     of the precision matrix by setting \code{derive.constraints=TRUE}.}
 }
+}
+\examples{
+\donttest{
+# example of CAR spatial random effects
+if (requireNamespace("sf")) {
+  # 1. load a shape file of counties in North Carolina
+  nc <- sf::st_read(system.file("shape/nc.shp", package="sf"))
+  # 2. generate some data according to a model with a few regression
+  # effects, as well as spatial random effects
+  gd <- generate_data(
+    ~ reg(~ AREA + BIR74, Q0=1, name="beta") +
+      gen(factor = ~ spatial(NAME, poly.df=nc), name="vs"),
+    sigma.mod = pr_invchisq(df=10, scale=1),
+    data = nc
+  )
+  # add the generated target variable and the spatial random effects to the
+  # spatial dataframe object
+  nc$y <- gd$y
+  nc$vs_true <- gd$pars$vs
+  # 3. fit a model to the generated data, and see to what extent the
+  #    parameters used to generate the data, gd$pars, are reproduced
+  sampler <- create_sampler(
+    y ~ reg(~ AREA + BIR74, Q0=1, name="beta") +
+    gen(factor = ~ spatial(NAME, poly.df=nc), name="vs"),
+    block=TRUE, data=nc
+  )
+  sim <- MCMCsim(sampler, store.all=TRUE)
+  (summ <- summary(sim))
+  nc$vs <- summ$vs[, "Mean"]
+  plot(nc[c("vs_true", "vs")])
+  plot(gd$pars$vs, summ$vs[, "Mean"]); abline(0, 1, col="red")
+}
+}
+
 }
 \references{
 B. Allevius (2018).

@@ -32,8 +32,8 @@
 #' @param var the (co)variance structure among the varying effects defined by \code{formula}
 #'  over the levels of the factors defined by \code{factor}.
 #'  The default is \code{"unstructured"}, meaning that a full covariance matrix
-#'  parameterization is used. For uncorrelated effects with different variances use
-#'  \code{var="diagonal"}. For uncorrelated and equal variances use \code{var="scalar"}.
+#'  parameterization is used. For uncorrelated effects with unequal variances use
+#'  \code{var="diagonal"}. For uncorrelated effects with equal variances use \code{var="scalar"}.
 #'  In the case of a single varying effect there is no difference between these choices.
 #' @param prior the prior specification for the variance parameters of the random effects.
 #'  These can currently be specified by a call to \code{\link{pr_invwishart}} in case
@@ -168,7 +168,7 @@ gen <- function(formula = ~ 1, factor=NULL,
     if (is.null(Leroux$b)) Leroux$b <- 1
     if (is.null(Leroux$a.star)) Leroux$a.star <- 1
     if (is.null(Leroux$b.star)) Leroux$b.star <- 1
-    if (any(unlist(Leroux) < 0)) stop("parameters of beta distribution cannot be negative")
+    if (any(unlist(Leroux, use.names=FALSE) < 0)) stop("parameters of beta distribution cannot be negative")
     Leroux_type <- "general"
   } else {
     if (is.numeric(Leroux)) {
@@ -180,7 +180,7 @@ gen <- function(formula = ~ 1, factor=NULL,
       Leroux_type <- if (Leroux) "default" else "none"
     }
   }
-  Leroux_update <- Leroux_type %in% c("general", "default")
+  Leroux_update <- any(Leroux_type == c("general", "default"))
 
   varnames <- factor.cols.removed <- NULL
   if (is.null(X)) {
@@ -218,7 +218,7 @@ gen <- function(formula = ~ 1, factor=NULL,
   e$coef.names[[name]] <- colnames(X)
   X <- economizeMatrix(X, strip.names=TRUE)
   q <- ncol(X)
-  in_block <- name %in% unlist(e$block)
+  in_block <- any(name == unlist(e$block, use.names=FALSE))
 
   self <- environment()
 
@@ -283,7 +283,7 @@ gen <- function(formula = ~ 1, factor=NULL,
     }
   }
 
-  PX.defaults <- list(mu0=0, Q0=1, data.scale=TRUE, vector=var %in% c("diagonal", "unstructured"), sparse=NULL)
+  PX.defaults <- list(mu0=0, Q0=1, data.scale=TRUE, vector=var != "scalar", sparse=NULL)
   if (is.list(PX)) {
     usePX <- TRUE
     if (!all(names(PX) %in% names(PX.defaults))) stop("invalid 'PX' options list")
@@ -378,7 +378,7 @@ gen <- function(formula = ~ 1, factor=NULL,
       diagonal=, scalar = pr_invchisq(if (usePX) 1 else 1e-3, 1)
     )
   }
-  if (!(prior$type %in% if (var == "unstructured") "invwishart" else c("invchisq", "exp"))) stop("unsupported prior")
+  if (all(prior$type != if (var == "unstructured") "invwishart" else c("invchisq", "exp"))) stop("unsupported prior")
   if (is.list(prior$df)) stop("not supported: modeled df for random effect variance prior")
   switch(prior$type,
     invwishart = prior <- pr_invwishart(prior$df, prior$scale, q0),
@@ -409,7 +409,7 @@ gen <- function(formula = ~ 1, factor=NULL,
     if (!is.null(Q0)) {
       Q0 <- economizeMatrix(Q0, symmetric=TRUE, vec.diag=TRUE)
       if (is.vector(Q0)) {
-        if (!(length(Q0) %in% c(1L, q0))) stop("incompatible 'Q0'")
+        if (all(length(Q0) != c(1L, q0))) stop("incompatible 'Q0'")
       } else {
         if (!identical(dim(Q0), c(q0, q0))) stop("incompatible 'Q0'")
       }
@@ -455,7 +455,7 @@ gen <- function(formula = ~ 1, factor=NULL,
   if (var == "unstructured") name_rho <- paste0(name, "_rho")
 
   if (q0 > 1L) {  # add labels for sigma, rho, xi to e$coef.names
-    if (var %in% c("unstructured", "diagonal") || (usePX && PX$vector)) {
+    if (var != "scalar" || (usePX && PX$vector)) {
       e$coef.names[[name_sigma]] <- varnames
       if (var == "unstructured")
         e$coef.names[[name_rho]] <- outer(varnames, varnames, FUN=paste, sep=":")[upper.tri(diag(q0))]

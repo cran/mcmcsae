@@ -64,8 +64,8 @@ associated with \code{formula}. Default is \code{FALSE}.}
 \item{var}{the (co)variance structure among the varying effects defined by \code{formula}
 over the levels of the factors defined by \code{factor}.
 The default is \code{"unstructured"}, meaning that a full covariance matrix
-parameterization is used. For uncorrelated effects with different variances use
-\code{var="diagonal"}. For uncorrelated and equal variances use \code{var="scalar"}.
+parameterization is used. For uncorrelated effects with unequal variances use
+\code{var="diagonal"}. For uncorrelated effects with equal variances use \code{var="scalar"}.
 In the case of a single varying effect there is no difference between these choices.}
 
 \item{prior}{the prior specification for the variance parameters of the random effects.

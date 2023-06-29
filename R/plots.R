@@ -61,7 +61,7 @@ plot.mcdraws <- function(x, vnames, nrows, ncols, ask=FALSE, ...) {
   labs <- NULL
   for (v in vnames) {
     vars <- get_name_range(v, FALSE)
-    if (!(vars$name %in% par_names(x))) {
+    if (all(vars$name != par_names(x))) {
       warn("parameter '", vars$name, "' not in MCMC output")
       next
     }
@@ -156,7 +156,7 @@ plot_coef <- function(..., n.se=1, est.names, sort.by=NULL, decreasing=FALSE,
                       offset=0.1, cex.var=0.8, mar=c(0.1,2.1,5.1,0.1)) {
 
   dotargs <- list(...)
-  toplot <- sapply(dotargs, function(obj) class(obj)[1L] %in% c("dc_summary", "matrix", "sae", "list"))
+  toplot <- sapply(dotargs, function(obj) any(class(obj)[1L] == c("dc_summary", "matrix", "sae", "list")))
   grpar <- dotargs[!toplot]  # other graphical parameters
   if (!length(grpar)) grpar <- NULL
 
@@ -248,7 +248,7 @@ plot_coef <- function(..., n.se=1, est.names, sort.by=NULL, decreasing=FALSE,
   cols <- ceiling(M/maxrows)
   pages <- ceiling(cols/maxcols)
 
-  compute.xlim <- !("xlim" %in% names(grpar))
+  compute.xlim <- all("xlim" != names(grpar))
 
   oldpar <- par(no.readonly=TRUE)
   on.exit(par(oldpar))
@@ -308,7 +308,7 @@ cplot <- function (coefs, intervals=NULL,
                    mar=c(0.1,2.1,5.1,0.1), plot=TRUE,
                    add=FALSE, offset=0.1, ...) {
   
-  if (is.list(coefs)) coefs <- unlist(coefs)
+  if (is.list(coefs)) coefs <- unlist(coefs, use.names=FALSE)
   m <- length(coefs)
   id <- seq_len(m)
   if (is.null(intervals)) intervals <- cbind(coefs, coefs)

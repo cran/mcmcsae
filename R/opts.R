@@ -16,7 +16,7 @@
 #' @param PG.approx.m if \code{PG.approx=TRUE}, the number of explicit gamma draws in the
 #'  sum-of-gammas representation of the Polya-Gamma distribution. The remainder (infinite)
 #'  convolution is approximated by a single moment-matching gamma draw. Special values are:
-#'  \code{-2L} for a default choice depending on the value of the shape parameter and
+#'  \code{-2L} for a default choice depending on the value of the shape parameter
 #'  balancing performance and accuracy, \code{-1L} for a moment-matching normal approximation,
 #'  and \code{0L} for a moment-matching gamma approximation.
 #' @param CRT.approx.m scalar integer specifying the degree of approximation to sampling
@@ -61,7 +61,7 @@ check_ny <- function(ny, data) {
     } else {
       n <- nrow(data)
     }
-    if (!(length(ny) %in% c(1L, n))) stop("wrong length for 'ny'")
+    if (all(length(ny) != c(1L, n))) stop("wrong length for 'ny'")
     if (anyNA(ny)) stop("missings in 'ny' not allowed")
     if (any(ny < 0)) stop("'ny' cannot be negative")
   }
@@ -85,7 +85,7 @@ check_ry <- function(ry, data) {
     } else {
       n <- nrow(data)
     }
-    if (!(length(ry) %in% c(1L, n))) stop("wrong length for 'ry'")
+    if (all(length(ry) != c(1L, n))) stop("wrong length for 'ry'")
     if (anyNA(ry)) stop("missings in 'ry' not allowed")
     if (any(ry <= 0)) stop("'ry' must be positive")
   }

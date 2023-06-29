@@ -129,7 +129,7 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
           if (is.null(rml))
             rml <- levs[1L]
           else
-            if (!rml %in% levs) stop("invalid contrasts.arg: cannot remove level '", rml, "' from factor ", f)
+            if (all(rml != levs)) stop("invalid contrasts.arg: cannot remove level '", rml, "' from factor ", f)
         } else if (contrasts.arg == "contr.treatment") {
           rml <- levs[1L]  # remove first category
         } else if (contrasts.arg == "contr.SAS") {

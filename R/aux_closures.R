@@ -9,7 +9,7 @@
 make_mat_sum <- function(M0=NULL, M1, M2=NULL, sparse=NULL) {
   # TODO multiply M1 and M2 by a positive random number, to exclude the possibility of coincidental cancellations in the sum
   if (!is.null(M0)) {
-    if (!(class(M0)[1L] %in% c("ddiMatrix", "dsCMatrix", "matrix"))) stop("unsupported matrix type")
+    if (all(class(M0)[1L] != c("ddiMatrix", "dsCMatrix", "matrix"))) stop("unsupported matrix type")
     if (class(M0)[1L] == "dsCMatrix") M0 <- drop0(M0, is.Csparse=TRUE)
   }
   if (is.null(M2)) {

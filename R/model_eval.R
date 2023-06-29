@@ -279,7 +279,7 @@ compute_DIC <- function(x, use.pV=FALSE) {
 get_lppd_function <- function(x) {
   llh_i <- x[["_model"]]$llh_i
   if (is.null(llh_i)) stop("pointwise log-likelihood function not implemented; cannot compute WAIC")
-  if (!("e_" %in% par_names(x) || all(names(x[["_model"]]$mod) %in% par_names(x))))
+  if (!(any("e_" == par_names(x)) || all(names(x[["_model"]]$mod) %in% par_names(x))))
     stop("WAIC can only be computed if all coefficients are stored. Please use 'store.all=TRUE' in MCMCsim.")
   if (x[["_model"]]$modeled.Q && x[["_model"]]$family$family == "gaussian" && !all(names(x[["_model"]]$Vmod) %in% par_names(x)))
     stop("WAIC can only be computed if all modeled variance factors are stored. Please use 'store.all=TRUE' in MCMCsim.")

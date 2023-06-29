@@ -364,7 +364,7 @@ fac2tabM <- function(fvars, data, enclos=.GlobalEnv, x=numeric(), xlab=character
         fac <- remove_levels(fac, 1L)
       } else if (length(contrasts) == 1L && contrasts == "contr.SAS") {  # 'SAS' convention: last level is baseline
         fac <- remove_levels(fac, length(attr(fac, "levels")))
-      } else if (fvars[f] %in% names(contrasts)) {  # user-specified base
+      } else if (any(fvars[f] == names(contrasts))) {  # user-specified base
         m <- match(contrasts[fvars[f]], attr(fac, "levels"))
         if (length(m) != 1L || is.na(m)) stop("invalid contrasts")
         fac <- remove_levels(fac, m)

@@ -7,26 +7,14 @@
 #' The sampler object is the main input for the MCMC simulation function \code{\link{MCMCsim}}.
 #'
 #' The right hand side of the \code{formula} argument to \code{create_sampler} can be used to specify
-#' additive model components. Currently two specialized model components are supported, \code{\link{reg}(...)}
-#' and \code{\link{gen}(...)} for regression and generic random effects components, respectively.
+#' additive model components. Currently four model components are supported: \code{\link{reg}(...)}
+#' for regression or 'fixed' effects, \code{\link{gen}(...)} for generic random effects,
+#' \code{\link{mec}(...)} for measurement in covariates effects, and \code{\link{bart}(...)}
+#' for a Bayesian additive regression trees component.
 #'
 #' For gaussian models, \code{formula.V} can be used to specify the variance structure of the model.
 #' Currently two specialized variance model components are supported, \code{\link{vreg}(...)} for regression
 #' effects predicting the log-variance and \code{\link{vfac}(...)} for modeled variance factors.
-#'
-#' Further computational options can be set using the \code{control} parameter, which should be
-#' passed as a list with possible elements
-#' \describe{
-#'   \item{add.outer.R}{whether to add the outer product of the constraint matrix for a better conditioned solve system
-#'     for blocks. This is done by default when using blocked Gibbs sampling for blocks with constraints.}
-#'   \item{recompute.e}{when \code{FALSE} residuals or linear predictors are only computed at the start of the simulation.
-#'     This may give a modest speedup but in some cases may be less accurate due to round-off error accumulation.
-#'     Default is \code{TRUE}.}
-#'   \item{CG}{for a conjugate gradient iterative algorithm instead of Cholesky updates for sampling
-#'     the model's coefficients. This must be a list with possible components \code{max.it},
-#'     \code{stop.criterion}, \code{verbose}, \code{preconditioner} and \code{scale},
-#'     see \code{\link{setup_CG_sampler}}}. This is currently an experimental feature.
-#' }
 #'
 #' @examples
 #' # first generate some data
@@ -163,7 +151,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
                            linpred=NULL,
                            compute.weights=FALSE, block=compute.weights,
                            prior.only=FALSE,
-                           control=NULL) {
+                           control=sampler_control()) {
 
   if (is.character(family)) {
     family <- match.arg(family, c("gaussian", "binomial", "negbinomial", "poisson", "multinomial"))
@@ -325,7 +313,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
     if (!prior.only && family$link != "probit") {
       if (.opts$PG.approx) {
         mPG <- as.integer(.opts$PG.approx.m)
-        if (!length(mPG) %in% c(1L, n)) stop("invalid value for option 'PG.approx.m'")
+        if (all(length(mPG) != c(1L, n))) stop("invalid value for option 'PG.approx.m'")
         rPolyaGamma <- function(b, c) CrPGapprox(n, b, c, mPG)
       } else {
         if (!requireNamespace("BayesLogit", quietly=TRUE)) stop("please install package 'BayesLogit' and try again")
@@ -418,18 +406,14 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
         stop("invalid name(s) '", paste(setdiff(block[[b]], names(mod)), collapse="', '"), "' in block ", b)
       }
     }
-    if (any(duplicated(unlist(block)))) stop("a model component name can only appear once in 'block'")
+    if (any(duplicated(unlist(block, use.names=FALSE)))) stop("a model component name can only appear once in 'block'")
   }
-  single.block <- length(mod) %in% c(1L, length(unlist(block)))
+  single.block <- any(length(mod) == c(1L, length(unlist(block, use.names=FALSE))))
 
   if (!prior.only) {
-    if (is.null(control)) control <- list()
-    if (!is.list(control)) stop("'control' must be a list")
-    control.defaults <- list(add.outer.R = length(block) > 0L, recompute.e=TRUE, CG=NULL)
-    if (!all(names(control) %in% names(control.defaults))) stop("unrecognized 'control' parameters")
-    control <- modifyList(control.defaults, control)
-    rm(control.defaults)
-    if (isTRUE(control$CG)) control$CG <- list()  # TODO allow different control$CG for each block
+    control <- check_sampler_control(control)
+    if (is.null(control$add.outer.R)) control$add.outer.R <- length(block) > 0L
+    # TODO allow to specify the block(s) in which the CG sampler should be used, or even different control$CG per block
     if (is.list(control$CG) && !length(block))
       warn("conjugate gradient algorithm currently only used inside blocks; see argument 'block'")
     if (single.block) {  # computation of working response simplifies
@@ -465,7 +449,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
         else
           Q_e <- function(p) 0.5 * (y - ry*p[["negbin_r_"]]) - p[["Q_"]] * p[["e_"]]
       } else {
-        if (family$family %in% c("negbinomial", "poisson"))
+        if (any(family$family == c("negbinomial", "poisson")))
           y_shifted <- 0.5 * (y - ry)
         else  # binomial or multinomial
           y_shifted <- y - 0.5 * ny
@@ -869,7 +853,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
     start <- add(start, quote(ny <- y + ry*p[["negbin_r_"]]))
   }
 
-  if (family$family %in% c("binomial", "multinomial", "negbinomial", "poisson") && family$link != "probit") {
+  if (any(family$family == c("binomial", "multinomial", "negbinomial", "poisson")) && family$link != "probit") {
     draw <- add(draw, quote(p[["Q_"]] <- rPolyaGamma(ny, p[["e_"]])))
     draw <- add(draw, quote(p$llh_ <- llh(p)))
     start <- add(start, quote(if (is.null(p[["Q_"]])) p$Q_ <- rPolyaGamma(ny, p[["e_"]])))
@@ -1103,7 +1087,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
     },
     binomial=, multinomial=, negbinomial=, poisson = {
       # NB for Poisson we use the actual negative binomial likelihood used to approximate Poisson
-      if (family$family %in% c("negbinomial", "poisson")) {
+      if (any(family$family == c("negbinomial", "poisson"))) {
         if (modeled.r)
           llh_0 <- - sum(lgamma(y + 1))
         else
@@ -1152,7 +1136,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
           neg_fitted_i <- -as.matrix.dc(get_from(draws[["e_"]], vars=i))
         }
 
-        if (family$family %in% c("negbinomial", "poisson")) {
+        if (any(family$family == c("negbinomial", "poisson"))) {
           if (modeled.r) {
             r <- as.numeric(as.matrix.dc(draws[["negbin_r_"]], colnames=FALSE))
             if (length(ry) == 1L) {
@@ -1194,4 +1178,35 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
 
   # return the function environment, including draw, rprior, start functions
   environment()
+}
+
+
+#' Set computational options for the sampling algorithms
+#'
+#' @export
+#' @param add.outer.R whether to add the outer product of the constraint matrix for a better conditioned solve system
+#'   for blocks. This is done by default when using blocked Gibbs sampling for blocks with constraints.
+#' @param recompute.e when \code{FALSE}, residuals or linear predictors are only computed at the start of the simulation.
+#'   This may give a modest speedup but in some cases may be less accurate due to round-off error accumulation.
+#'   Default is \code{TRUE}.
+#' @param CG use a conjugate gradient iterative algorithm instead of Cholesky updates for sampling
+#'   the model's coefficients. This must be a list with possible components \code{max.it},
+#'   \code{stop.criterion}, \code{verbose}, \code{preconditioner} and \code{scale}.
+#'   See the help for function \code{\link{CG_control}}, which can be used to specify these options.
+#'   Conjugate gradient sampling is currently an experimental feature that can be used for
+#'   blocked Gibbs sampling but with some limitations.
+#' @return A list with specified computational options that is used to set up the sampling functions.
+sampler_control <- function(add.outer.R=NULL, recompute.e=TRUE, CG=NULL) {
+  list(add.outer.R=add.outer.R, recompute.e=recompute.e, CG=CG)
+}
+
+check_sampler_control <- function(control) {
+  if (is.null(control)) control <- list()
+  if (!is.list(control)) stop("control options must be specified as a list, preferably using the appropriate control setter function")
+  defaults <- sampler_control()
+  w <- which(!(names(control) %in% names(defaults)))
+  if (length(w)) stop("unrecognized control parameters ", paste(names(control)[w], collapse=", "))
+  control <- modifyList(defaults, control)
+  if (isTRUE(control$CG)) control$CG <- CG_control()
+  control
 }

@@ -6,7 +6,7 @@
 check_mod_names <- function(x) {
   if (any(duplicated(x))) stop("duplicate model component name '", x[duplicated(x)], "'")
   firstlast <- c(substring(x, 1L, 1L), substring(x, nchar(x), nchar(x)))
-  if ("_" %in% firstlast) stop("\'_\' as first or last character of a model component name is reserved for internal use")
+  if (any("_" == firstlast)) stop("\'_\' as first or last character of a model component name is reserved for internal use")
   # check for names ending with extensions like _sigma, _rho, _xi etc since they might clash
   reserved.exts <- c("_df", "_gl", "_Leroux", "_omega", "_rho", "_sigma", "_xi")
   if (any(grepl(paste0("(", paste(reserved.exts, collapse="|"), ")$"), x)))
@@ -51,7 +51,7 @@ computeDesignMatrix <- function(formula=NULL, data=NULL, labels=TRUE) {
     else
       mc$formula <- as.formula(eval(mc$formula))
     environment(mc$formula) <- environment(formula)
-    if ("|" %in% all.names(mc$formula)) {
+    if (any("|" == all.names(mc$formula))) {
       # assume this is a mec component; we use as design matrix the covariate matrix subject to error
       vs <- as.list(attr(terms(mc$formula), "variables")[-1L])
       formula.X <- as.formula(paste0("~ 0 + ", paste(sapply(vs, function(x) deparse(x[[2L]])), collapse=" + ")), env=environment(formula))
@@ -146,7 +146,7 @@ compute_XA <- function(factor=NULL, data=NULL, enclos=.GlobalEnv) {
   if (is.null(factor) || intercept_only(factor)) return(NULL)
   factor.info <- get_factor_info(factor, data, enclos=enclos)
   n <- n_row(data)
-  if ("spline" %in% factor.info$types) {  # B-spline design matrix components
+  if (any("spline" == factor.info$types)) {  # B-spline design matrix components
     fs <- as.list(attr(terms(factor), "variables"))[-1L]
     out <- matrix(1, nrow=1L, ncol=n)
     labs <- ""
@@ -211,8 +211,8 @@ get_factor_info <- function(formula, data, enclos=.GlobalEnv) {
 }
 
 eval_in <- function(text, data, enclos=.GlobalEnv) {
-  if (text == "local_" && !("local_" %in% colnames(data))) return(seq_len(n_row(data)))
-  if (text == "global_" && !("global_" %in% colnames(data))) return(rep.int(1, n_row(data)))
+  if (text == "local_" && all("local_" != colnames(data))) return(seq_len(n_row(data)))
+  if (text == "global_" && all("global_" != colnames(data))) return(rep.int(1, n_row(data)))
   if (is.environment(data)) {
     # if data is not a (pair)list/data.frame enclos is not searched, so do it manually if needed
     tryCatch(
@@ -293,7 +293,7 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
       spline = {
         penalty <- fcall$penalty
         if (is.null(penalty)) penalty <- "RW2"
-        if (!(penalty %in% c("iid", "RW1", "RW2"))) stop("unsupported spline penalty argument")
+        if (all(penalty != c("iid", "RW1", "RW2"))) stop("unsupported spline penalty argument")
         if (D || Q) {
           DQcall[[1L]] <- as.name(paste0(if (D) "D_" else "Q_", penalty))
           DQcall$knots <- DQcall$degree <- DQcall$penalty <- NULL
@@ -310,14 +310,22 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
         }
       },
       spatial = {
+        poly.df <- if (D || Q) eval(DQcall$poly.df) else eval(Rcall$poly.df)
+        if (is.null(poly.df)) stop("'spatial()' requires argument 'poly.df'")
+        if (inherits(poly.df, "SpatialPolygonsDataFrame")) {
+          if (!requireNamespace("sf", quietly=TRUE)) stop("Package sf required to handle a SpatialPolygonsDataFrame. Please install it.")
+          poly.df <- sf::st_as_sf(poly.df)
+        }
+        if (!inherits(poly.df, "sf")) stop("unexpected input for argument 'poly.df'")
+        if (nrow(poly.df) != factor.info$n[f]) stop("number of rows of data slot of '", DQcall$poly.df, "' not equal to number of levels of variable'", factor.info$variables[f], "'")
+        # TODO check that level order is the same: first try variable of the same name as factor, then try rownames of @data; if unsuccessful issue a warning
         if (D || Q) {
-          if (is.null(DQcall$poly.df)) stop("'spatial()' requires argument 'poly.df'")
-          if (nrow(eval(DQcall$poly.df)@data) != factor.info$n[f]) stop("number of rows of data slot of '", DQcall$poly.df, "' not equal to number of levels of variable'", factor.info$variables[f], "'")
-          # TODO check that level order is the same: first try variable in @data of the same name as factor, then try rownames of @data; if unsuccessful issue a warning
+          DQcall$poly.df <- quote(poly.df)
           DQcall$derive.constraints <- NULL
           DQf <- eval(DQcall)
         }
         if (R) {
+          Rcall$poly.df <- quote(poly.df)
           if (isTRUE(Rcall$derive.constraints) && (D || Q))
             Rf <- derive_constraints(if (Q) DQf else crossprod(DQf))
           else
@@ -356,7 +364,7 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
       {
         if (D || Q) DQf <- eval(DQcall)
         if (R) {
-          if (factor.info$types[f] %in% c("iid", "AR1"))
+          if (any(factor.info$types[f] == c("iid", "AR1")))
             Rf <- NULL
           else
             Rf <- eval(Rcall)
@@ -412,9 +420,11 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
 
 #' Correlation structures
 #'
-#' Element 'factor' of a model component is a formula composed of several possible terms described below.
-#' It is used to derive a (sparse) precision matrix for a set of coefficient, and possibly a matrix representing
-#' a set of linear constraints to be imposed on the coefficient vector.
+#' Element 'factor' of a model component created using function
+#' \code{\link{gen}} is a formula composed of several possible terms described
+#' below. It is used to derive a (sparse) precision matrix for a set of
+#' coefficients, and possibly a matrix representing a set of linear constraints
+#' to be imposed on the coefficient vector.
 #' \describe{
 #'   \item{iid(f)}{Independent effects corresponding to the levels of factor \code{f}.}
 #'   \item{RW1(f, circular=FALSE, w=NULL)}{First-order random walk over the levels of factor \code{f}.
@@ -430,9 +440,10 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
 #'     \code{RW1}.}
 #'   \item{season(f, period)}{Dummy seasonal with period \code{period}.}
 #'   \item{spatial(f, poly.df, snap, queen, derive.constraints=FALSE)}{CAR spatial correlation.
-#'     Argument \code{poly.df} should be an object of class \code{SpatialPolygonsDataFrame} obtained
-#'     e.g. from reading in a shape file with \code{\link[maptools]{readShapeSpatial}} from
-#'     package \pkg{maptools}. Arguments \code{snap} and \code{queen} are passed to \code{\link[spdep]{poly2nb}}.
+#'     Argument \code{poly.df} can either be an object of (S4) class \code{SpatialPolygonsDataFrame}
+#'     or an object of (S3) class \code{sf}. The latter can be obtained, e.g., from reading in a
+#'     shape file using function \code{\link[sf]{st_read}}. Arguments \code{snap} and \code{queen}
+#'     are passed to \code{\link[spdep]{poly2nb}}.
 #'     If \code{derive.constraints=TRUE} the constraint matrix for an IGMRF model component
 #'     is formed by computing the singular vectors of the precision matrix.}
 #'   \item{spline(f, knots, degree)}{P-splines, i.e. penalized B-splines structure over
@@ -445,6 +456,40 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
 #'     constraint matrix can be supplied as \code{R}, or constraints can be derived from the null space
 #'     of the precision matrix by setting \code{derive.constraints=TRUE}.}
 #' }
+#' 
+#' @examples
+#' \donttest{
+#' # example of CAR spatial random effects
+#' if (requireNamespace("sf")) {
+#'   # 1. load a shape file of counties in North Carolina
+#'   nc <- sf::st_read(system.file("shape/nc.shp", package="sf"))
+#'   # 2. generate some data according to a model with a few regression
+#'   # effects, as well as spatial random effects
+#'   gd <- generate_data(
+#'     ~ reg(~ AREA + BIR74, Q0=1, name="beta") +
+#'       gen(factor = ~ spatial(NAME, poly.df=nc), name="vs"),
+#'     sigma.mod = pr_invchisq(df=10, scale=1),
+#'     data = nc
+#'   )
+#'   # add the generated target variable and the spatial random effects to the
+#'   # spatial dataframe object
+#'   nc$y <- gd$y
+#'   nc$vs_true <- gd$pars$vs
+#'   # 3. fit a model to the generated data, and see to what extent the
+#'   #    parameters used to generate the data, gd$pars, are reproduced
+#'   sampler <- create_sampler(
+#'     y ~ reg(~ AREA + BIR74, Q0=1, name="beta") +
+#'     gen(factor = ~ spatial(NAME, poly.df=nc), name="vs"),
+#'     block=TRUE, data=nc
+#'   )
+#'   sim <- MCMCsim(sampler, store.all=TRUE)
+#'   (summ <- summary(sim))
+#'   nc$vs <- summ$vs[, "Mean"]
+#'   plot(nc[c("vs_true", "vs")])
+#'   plot(gd$pars$vs, summ$vs[, "Mean"]); abline(0, 1, col="red")
+#' }
+#' }
+#'
 #' @name correlation
 #' @references
 #'  B. Allevius (2018).
@@ -581,7 +626,7 @@ R_season <- function(n, period) {
   CM
 }
 
-get_neighbours_list <- function(n=nrow(poly.df@data), poly.df, snap=sqrt(.Machine$double.eps), queen=TRUE) {
+get_neighbours_list <- function(n=nrow(poly.df), poly.df, snap=sqrt(.Machine$double.eps), queen=TRUE) {
   # TODO: what if n != length(nb) (out-of-sample levels) ?
   if (n < 2L) stop("Spatial component needs at least 2 areas")
   if (!requireNamespace("spdep", quietly=TRUE)) stop("Package spdep required to construct a spatial precision matrix. Please install it.")
@@ -590,18 +635,18 @@ get_neighbours_list <- function(n=nrow(poly.df@data), poly.df, snap=sqrt(.Machin
 }
   
 # CAR spatial precision matrix
-Q_spatial <- function(n=nrow(poly.df@data), poly.df, snap=sqrt(.Machine$double.eps), queen=TRUE) {
+Q_spatial <- function(n=nrow(poly.df), poly.df, snap=sqrt(.Machine$double.eps), queen=TRUE) {
   # transform into spatial precision matrix
   # cannot use spdep::nb2mat, as it returns a dense matrix
   nb2Q(get_neighbours_list(n, poly.df, snap, queen))
 }
 
 # CAR spatial incidence matrix
-D_spatial <- function(n=nrow(poly.df@data), poly.df, snap=sqrt(.Machine$double.eps), queen=TRUE) {
+D_spatial <- function(n=nrow(poly.df), poly.df, snap=sqrt(.Machine$double.eps), queen=TRUE) {
   nb2D(get_neighbours_list(n, poly.df, snap, queen))
 }
 
-R_spatial <- function(n=nrow(poly.df@data), poly.df, snap=sqrt(.Machine$double.eps), queen=TRUE, derive.constraints=FALSE) {
+R_spatial <- function(n=nrow(poly.df), poly.df, snap=sqrt(.Machine$double.eps), queen=TRUE, derive.constraints=FALSE) {
   if (derive.constraints)
     derive_constraints(Q_spatial(n, poly.df, snap, queen))
   else

@@ -1,4 +1,17 @@
 
+version 0.7.4
+- replaced maptools in Suggests by sf for reading shape files; now both
+  SpatialPolygonsDataframe (for backward compatibility) and sf spatial data
+  frames are supported
+- updated documentation of spatial() (in help topic 'correlation') and added
+  an example of a CAR spatial random effects model
+- fixed a bug so that conjugate gradients algorithm works again
+- added control functions to set computational options for create_sampler
+  and setup_CG_sampler
+- updated a few unit tests to be compatible with upcoming Matrix 1.6.0
+- small documentation and code improvements
+
+
 version 0.7.3
 - improved handling of out-of-sample categories by predict method
 - further improvements to prepare for upcoming version of Matrix package

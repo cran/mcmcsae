@@ -35,7 +35,7 @@ set_prior_precision <- function(Q0=NULL, q, sparse=NULL) {
 pr_fixed <- function(value=1, n=NULL, post=FALSE) {
   if (!is.null(n)) {
     n <- as.integer(n)
-    if (!(length(value) %in% c(1L, n))) stop("value parameter has wrong length")
+    if (all(length(value) != c(1L, n))) stop("value parameter has wrong length")
     rprior <- function() value
     if (post) draw <- function() value
   }
@@ -59,7 +59,7 @@ pr_exp <- function(scale=1, n=NULL, post=FALSE) {
   if (!all(scale > 0)) stop("scale parameter must be positive")
   if (!is.null(n)) {
     n <- as.integer(n)
-    if (!(length(scale) %in% c(1L, n))) stop("scale parameter has wrong length")
+    if (all(length(scale) != c(1L, n))) stop("scale parameter has wrong length")
     rprior <- function() scale * rexp(n)
     if (post) {
       # TODO set a=2/scale here, and default p=-1/2
@@ -89,9 +89,9 @@ pr_gig <- function(a, b, p, n=NULL, post=FALSE) {
   if (any(b[p <= 0] == 0)) stop("parameter 'b' should not be 0 when p <= 0")
   if (!is.null(n)) {
     n <- as.integer(n)
-    if (!(length(a) %in% c(1L, n))) stop("parameter 'a' has wrong length")
-    if (!(length(b) %in% c(1L, n))) stop("parameter 'b' has wrong length")
-    if (!(length(p) %in% c(1L, n))) stop("parameter 'p' has wrong length")
+    if (all(length(a) != c(1L, n))) stop("parameter 'a' has wrong length")
+    if (all(length(b) != c(1L, n))) stop("parameter 'b' has wrong length")
+    if (all(length(p) != c(1L, n))) stop("parameter 'p' has wrong length")
     rprior <- function() Crgig(n, p, a, b)
     if (post) draw <- function(p, a, b) Crgig(n, p, a, b)
   }
@@ -136,8 +136,8 @@ pr_gig <- function(a, b, p, n=NULL, post=FALSE) {
 #'  posterior distribution(s), to be used by other package functions.
 # TODO sample precisions instead of variances
 pr_invchisq <- function(df=1, scale=1, n=NULL, post=FALSE) {
-  if (is.character(df) && df %in% c("modeled", "modelled")) df <- list()
-  if (is.character(scale) && scale %in% c("modeled", "modelled")) scale <- list()
+  if (is.character(df) && any(df == c("modeled", "modelled"))) df <- list()
+  if (is.character(scale) && any(scale == c("modeled", "modelled"))) scale <- list()
   if (!is.null(n)) {
     n <- as.integer(n)
     rprior <- function() {}
@@ -168,7 +168,7 @@ pr_invchisq <- function(df=1, scale=1, n=NULL, post=FALSE) {
     }
   } else {
     if (!is.null(n)) {
-      if (!(length(df) %in% c(1L, n))) stop("degrees of freedom parameter has wrong length")
+      if (all(length(df) != c(1L, n))) stop("degrees of freedom parameter has wrong length")
       # do not enforce df > 0 to allow improper prior for data scale variance
     }
   }
@@ -178,8 +178,8 @@ pr_invchisq <- function(df=1, scale=1, n=NULL, post=FALSE) {
     scale <- modifyList(defaults, scale)
     rm(defaults)
     if (!is.null(n)) {
-      if (!(length(scale$df) %in% c(1L, n))) stop("degrees of freedom parameter has wrong length")
-      if (!(length(scale$scale) %in% c(1L, n))) stop("scale parameter has wrong length")
+      if (all(length(scale$df) != c(1L, n))) stop("degrees of freedom parameter has wrong length")
+      if (all(length(scale$scale) != c(1L, n))) stop("scale parameter has wrong length")
       if (scale$common && n == 1L) scale$common <- FALSE
       psi0 <- scale$df / scale$scale
       if (scale$common) {
@@ -205,7 +205,7 @@ pr_invchisq <- function(df=1, scale=1, n=NULL, post=FALSE) {
     }
   } else {
     if (!is.null(n)) {
-      if (!(length(scale) %in% c(1L, n))) stop("scale parameter has wrong length")
+      if (all(length(scale) != c(1L, n))) stop("scale parameter has wrong length")
       if (is.list(df)) {
         rprior <- add(rprior, bquote(1 / rchisq_scaled(.(n), df, scale)))
       } else {
@@ -263,14 +263,14 @@ pr_invwishart <- function(df=NULL, scale=NULL, n=NULL) {
   if (is.null(scale)) {
     if (!is.null(n)) scale <- diag(n)
   } else {
-    if (is.character(scale) && scale %in% c("modeled", "modelled")) scale <- list()
+    if (is.character(scale) && any(scale == c("modeled", "modelled"))) scale <- list()
     if (is.list(scale)) {  # Huang-Wand prior
       if (is.null(scale$df)) scale$df <- 1
       if (is.null(scale$scale)) scale$scale <- 1
       if (is.null(scale$common)) scale$common <- FALSE  # by default (HW prior)
       if (!is.null(n)) {
-        if (!(length(scale$df) %in% c(1L, n))) stop("degrees of freedom parameter has wrong length")
-        if (!(length(scale$scale) %in% c(1L, n))) stop("scale parameter has wrong length")
+        if (all(length(scale$df) != c(1L, n))) stop("degrees of freedom parameter has wrong length")
+        if (all(length(scale$scale) != c(1L, n))) stop("scale parameter has wrong length")
         if (scale$common) {
           if (length(scale$df) != 1L || length(scale$scale) != 1L) stop("scalar 'df' and 'scale' expected in common scale model")
         }

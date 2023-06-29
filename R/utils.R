@@ -44,7 +44,7 @@ read_header <- function(con) {
   if (readBin(con, "logical", n=1L))
     out$parnames <- readBin(con, "character", n=out$n.par)
   precision <- readBin(con, "integer", n=1L)
-  if (!(precision %in% c(4L, 8L))) stop("unexpected file content")
+  if (all(precision != c(4L, 8L))) stop("unexpected file content")
   out$single <- precision == 4L
   out
 }

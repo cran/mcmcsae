@@ -131,7 +131,7 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL, Q0=NULL, b0=NULL,
   e$coef.names[[name]] <- colnames(X)
   X <- unname(X)
   q <- ncol(X)
-  in_block <- name %in% unlist(e$block)
+  in_block <- any(name == unlist(e$block, use.names=FALSE))
 
   if (!V.in.formula) {
     if (is.null(V)) stop("no measurement error variances supplied in mec component")

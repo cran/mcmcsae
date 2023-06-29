@@ -62,7 +62,7 @@ A matrix object. In case one of the arguments is a regular (dense) \code{matrix}
  the result is a \code{matrix} as well.
 }
 \description{
-Several methods for products of matrix objects. Here a matrix object can be 
+Several methods for products of matrix objects. Here a matrix object can be
 an ordinary (dense) \code{matrix} or a (sparse) \code{\link[Matrix]{Matrix}} of class
 \code{\link[Matrix]{ddiMatrix-class}}, \code{tabMatrix},
 \code{\link[Matrix]{dgCMatrix-class}}, or \code{\link[Matrix]{dsCMatrix-class}}.

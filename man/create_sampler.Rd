@@ -20,7 +20,7 @@ create_sampler(
   compute.weights = FALSE,
   block = compute.weights,
   prior.only = FALSE,
-  control = NULL
+  control = sampler_control()
 )
 }
 \arguments{
@@ -138,26 +138,14 @@ The sampler object is the main input for the MCMC simulation function \code{\lin
 }
 \details{
 The right hand side of the \code{formula} argument to \code{create_sampler} can be used to specify
-additive model components. Currently two specialized model components are supported, \code{\link{reg}(...)}
-and \code{\link{gen}(...)} for regression and generic random effects components, respectively.
+additive model components. Currently four model components are supported: \code{\link{reg}(...)}
+for regression or 'fixed' effects, \code{\link{gen}(...)} for generic random effects,
+\code{\link{mec}(...)} for measurement in covariates effects, and \code{\link{bart}(...)}
+for a Bayesian additive regression trees component.
 
 For gaussian models, \code{formula.V} can be used to specify the variance structure of the model.
 Currently two specialized variance model components are supported, \code{\link{vreg}(...)} for regression
 effects predicting the log-variance and \code{\link{vfac}(...)} for modeled variance factors.
-
-Further computational options can be set using the \code{control} parameter, which should be
-passed as a list with possible elements
-\describe{
-  \item{add.outer.R}{whether to add the outer product of the constraint matrix for a better conditioned solve system
-    for blocks. This is done by default when using blocked Gibbs sampling for blocks with constraints.}
-  \item{recompute.e}{when \code{FALSE} residuals or linear predictors are only computed at the start of the simulation.
-    This may give a modest speedup but in some cases may be less accurate due to round-off error accumulation.
-    Default is \code{TRUE}.}
-  \item{CG}{for a conjugate gradient iterative algorithm instead of Cholesky updates for sampling
-    the model's coefficients. This must be a list with possible components \code{max.it},
-    \code{stop.criterion}, \code{verbose}, \code{preconditioner} and \code{scale},
-    see \code{\link{setup_CG_sampler}}}. This is currently an experimental feature.
-}
 }
 \examples{
 # first generate some data

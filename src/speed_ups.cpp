@@ -37,11 +37,11 @@ void mv_update(Eigen::Map<Eigen::VectorXd> & y, const bool plus, const SEXP M, c
   if (Rf_isS4(M)) {
     IntegerVector Dim = as<S4>(M).slot("Dim");
     if (Dim[0] != y.size() || Dim[1] != x.size()) stop("incompatible dimensions");
-    if(Rf_inherits(M, "dgCMatrix")) {
+    if (Rf_inherits(M, "dgCMatrix")) {
       if (plus) {
-        y += as<Eigen::Map<Eigen::SparseMatrix<double> > >(M) * x;
+        y.noalias() += as<Eigen::Map<Eigen::SparseMatrix<double> > >(M) * x;
       } else {
-        y -= as<Eigen::Map<Eigen::SparseMatrix<double> > >(M) * x;
+        y.noalias() -= as<Eigen::Map<Eigen::SparseMatrix<double> > >(M) * x;
       }
     } else if (Rf_inherits(M, "ddiMatrix")) {
       Eigen::Map<Eigen::VectorXd> Mxslot = as<Eigen::Map<Eigen::VectorXd> >(as<S4>(M).slot("x"));
@@ -84,7 +84,7 @@ void mv_update(Eigen::Map<Eigen::VectorXd> & y, const bool plus, const SEXP M, c
   } else {
     Eigen::Map<Eigen::MatrixXd> MM = as<Eigen::Map<Eigen::MatrixXd> >(M);
     if (MM.cols() != x.size() || MM.rows() != y.size()) stop("incompatible dimensions");
-    if (plus) y += MM * x; else y -= MM * x;
+    if (plus) y.noalias() += MM * x; else y.noalias() -= MM * x;
   }
 }
 

@@ -62,7 +62,7 @@ standardize_formula <- function(formula, specials=c("reg", "mec", "gen", "bart")
   # interpret everything not in special terms as a default component
   tf <- terms(formula, keep.order=TRUE, specials=specials, data=data)
   # NB ~ . - var does not warn if var is not in data
-  idx <- unlist(attr(tf, "specials"))  # variable indices of special terms
+  idx <- unlist(attr(tf, "specials"), use.names=FALSE)  # variable indices of special terms
   if (length(idx)) {
     fac <- attr(tf, "factors")
     for (i in seq_along(idx)) {

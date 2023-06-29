@@ -31,7 +31,7 @@ is used, which is exact for some values of the shape parameter.}
 \item{PG.approx.m}{if \code{PG.approx=TRUE}, the number of explicit gamma draws in the
 sum-of-gammas representation of the Polya-Gamma distribution. The remainder (infinite)
 convolution is approximated by a single moment-matching gamma draw. Special values are:
-\code{-2L} for a default choice depending on the value of the shape parameter and
+\code{-2L} for a default choice depending on the value of the shape parameter
 balancing performance and accuracy, \code{-1L} for a moment-matching normal approximation,
 and \code{0L} for a moment-matching gamma approximation.}
 

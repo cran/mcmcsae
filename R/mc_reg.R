@@ -119,7 +119,7 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
   e$coef.names[[name]] <- colnames(X)
   X <- unname(X)
   q <- ncol(X)
-  in_block <- name %in% unlist(e$block)
+  in_block <- any(name == unlist(e$block, use.names=FALSE))
 
   Q0 <- set_prior_precision(Q0, q, sparse=if (in_block) TRUE else NULL)  # mc_block uses x-slot of precision matrix
   informative.prior <- !is_zero_matrix(Q0)

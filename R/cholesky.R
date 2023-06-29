@@ -14,7 +14,7 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
 
   if (LDL) stop("LDL decompositions not (yet) supported")
   type <- class(M)[1L]
-  if (!(type %in% c("numeric", "matrix", "ddiMatrix", "dsCMatrix"))) stop("build_chol: unsupported matrix class '", type, "'")
+  if (all(type != c("numeric", "matrix", "ddiMatrix", "dsCMatrix"))) stop("'", type, "' is not a supported matrix class")
   size <- if (type == "numeric") length(M) else dim(M)[1L]
 
   if (type == "dsCMatrix") {

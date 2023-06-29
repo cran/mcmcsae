@@ -378,7 +378,7 @@ commutator <- function(M1, M2) M1 %*% M2 - M2 %*% M1
 
 #' S4 methods for products of matrix objects
 #'
-#' Several methods for products of matrix objects. Here a matrix object can be 
+#' Several methods for products of matrix objects. Here a matrix object can be
 #' an ordinary (dense) \code{matrix} or a (sparse) \code{\link[Matrix]{Matrix}} of class
 #' \code{\link[Matrix]{ddiMatrix-class}}, \code{tabMatrix},
 #' \code{\link[Matrix]{dgCMatrix-class}}, or \code{\link[Matrix]{dsCMatrix-class}}.
@@ -594,7 +594,7 @@ economizeMatrix <- function(M, sparse=NULL, symmetric=FALSE, strip.names=TRUE,
       return(if (strip.names) rm_Matrix_names(M) else M)
     }
   }
-  if (!(class(M)[1L] %in% c("dgCMatrix", "dsCMatrix")))
+  if (all(class(M)[1L] != c("dgCMatrix", "dsCMatrix")))
     M <- as(as(as(M, "CsparseMatrix"), "generalMatrix"), "dMatrix")
   if (drop.zeros) M <- drop0(M)
   if (symmetric && class(M)[1L] == "dgCMatrix")

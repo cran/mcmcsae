@@ -124,8 +124,10 @@ create_mc_block <- function(mcs, e=parent.frame()) {
                     add.outer.R=e$control$add.outer.R, prior.only=e$prior.only)
 
   } else {
-    # TODO check that the only constraints are GMRF constraints
-    CG_sampler <- do.call(setup_CG_sampler, c(list(mbs=mcs, X=X, sampler=e), e$control$CG))
+    # TODO check that the only constraints are GMRF equality constraints
+    S <- NULL
+    #CG_sampler <- do.call(setup_CG_sampler, c(list(mbs=mcs, X=X, sampler=e), e$control$CG))
+    CG_sampler <- setup_CG_sampler(mbs=mcs, X=X, sampler=e, control = e$control$CG)
   }
 
   if (e$compute.weights) {
@@ -207,21 +209,20 @@ create_mc_block <- function(mcs, e=parent.frame()) {
     draw <- add(draw, quote(coef <- CG_sampler$draw(p, Xy, X, QT, e, start=CGstart)))
   }
   # split coef and assign to the separate coefficient batches
-  draw <- add(draw, quote(
-    for (mc in mcs) {
-      if (mc$type == "gen" && mc$gl) {
-        u <- coef[vec_list[[mc$name]]]
-        p[[mc$name]] <- u[mc$i.v]
-        p[[mc$name_gl]] <- u[mc$i.alpha]
-      } else {
-        p[[mc$name]] <- coef[vec_list[[mc$name]]]
-      }
-      if (e$e.is.res)
-        p$e_ <- p[["e_"]] - mc$linpred(p)
-      else
-        p$e_ <- p[["e_"]] + mc$linpred(p)
+  for (m in seq_along(mcs)) {
+    if (mcs[[m]]$type == "gen" && mcs[[m]]$gl) {
+      draw <- add(draw, bquote(u <- coef[vec_list[[.(mcs[[m]]$name)]]]))
+      draw <- add(draw, bquote(p[[.(mcs[[m]]$name)]] <- u[mcs[[.(m)]]$i.v]))
+      draw <- add(draw, bquote(p[[.(mcs[[m]]$name_gl)]] <- u[mcs[[.(m)]]$i.alpha]))
+    } else {
+      draw <- add(draw, bquote(p[[.(mcs[[m]]$name)]] <- coef[vec_list[[.(mcs[[m]]$name)]]]))
     }
-  ))
+    if (e$e.is.res) {
+      draw <- add(draw, bquote(mv_update(p[["e_"]], plus=FALSE, mcs[[.(m)]][["X"]], p[[.(mcs[[m]]$name)]])))
+    } else {
+      draw <- add(draw, bquote(p$e_ <- p[["e_"]] + mcs[[.(m)]]$linpred(p)))
+    }
+  }
   if (e$compute.weights) {
     # TODO solve-sparse method that returns dense
     draw <- add(draw, quote(p$weights_ <- X %m*m% as.matrix(MVNsampler$cholQ$solve(linpred))))

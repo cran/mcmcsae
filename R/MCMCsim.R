@@ -256,8 +256,8 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
   if (any(sapply(plot.trace, function(x) length(x$range)) > 1L)) stop("for plots only single elements of vector parameters may be specified")
 
   # remove components to trace or plot that are not in the sampler's output
-  trace.convergence <- Filter(function(x) x$name %in% names(test_draw), trace.convergence)
-  plot.trace <- Filter(function(x) x$name %in% names(test_draw), plot.trace)
+  trace.convergence <- Filter(function(x) any(x$name == names(test_draw)), trace.convergence)
+  plot.trace <- Filter(function(x) any(x$name == names(test_draw)), plot.trace)
   if (length(plot.trace)) {
     oldpar <- par(no.readonly=TRUE)
     on.exit(par(oldpar))
@@ -268,9 +268,8 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
     if (!all(v$range %in% seq_along(test_draw[[v$name]]))) stop("illegal range in trace.convergence for parameter ", v$name)
   for (v in plot.trace)
     if (!all(v$range %in% seq_along(test_draw[[v$name]]))) stop("illegal range in plot.trace for parameter ", v$name)
-  trace.convergence.names <- unlist(lapply(trace.convergence, function(v) if (length(test_draw[[v$name]]) == 1L) v$name else paste0(v$name, "[", v$range, "]")))
-  plot.trace.names <- unlist(lapply(plot.trace, function(v) if (length(test_draw[[v$name]]) == 1L) v$name else paste0(v$name, "[", v$range, "]")))
-
+  trace.convergence.names <- unlist(lapply(trace.convergence, function(v) if (length(test_draw[[v$name]]) == 1L) v$name else paste0(v$name, "[", v$range, "]")), use.names=FALSE)
+  plot.trace.names <- unlist(lapply(plot.trace, function(v) if (length(test_draw[[v$name]]) == 1L) v$name else paste0(v$name, "[", v$range, "]")), use.names=FALSE)
   if (missing(store.mean)) {  # set parameters whose mean is stored by default
     if (is.null(sampler$store_mean_default))
       store.mean <- NULL
@@ -283,9 +282,8 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
       store <- NULL
     else
       store <- sampler$store_default(from.prior)
-    if (store.all) {
-      store <- union(store, Filter(function(x) substring(x, nchar(x), nchar(x)) != "_" && !(x %in% store.mean), names(test_draw)))
-    }
+    if (store.all)
+      store <- union(store, Filter(function(x) substring(x, nchar(x), nchar(x)) != "_" && all(x != store.mean), names(test_draw)))
   }
   # always store derived quantities and 'diagnostic' parameters
   if (do.pred) store <- union(store, names(pred))
@@ -426,7 +424,7 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
       }  # END for (ch in chains)
       if (write.to.file)
         for (v in to.file)
-          writeBin(unlist(lapply(p, `[[`, v)), con=outfile[[v]], size=write.size)
+          writeBin(unlist(lapply(p, `[[`, v), use.names=FALSE), con=outfile[[v]], size=write.size)
     }  # END if (i %% thin == 0L)
 
     if (MH)
@@ -440,7 +438,7 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
     if (i %% 10L == 0L && verbose) cat("\riteration", i)
     if (i %% n.progress == 0L) {  # show progress
       if (length(trace.convergence) && (n.chain > 1L) && (index > 1L)) {
-        diagnostic <- unlist(lapply(trace.convergence, function(v) R_hat(get_from(out[[v$name]], v$range, draws=seq_len(index)))))
+        diagnostic <- unlist(lapply(trace.convergence, function(v) R_hat(get_from(out[[v$name]], v$range, draws=seq_len(index)))), use.names=FALSE)
         names(diagnostic) <- trace.convergence.names
         if (verbose) {
           cat("\n")
@@ -459,12 +457,12 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
           for (ch in chains) {
             if (add.to.plot) {
               if (i0 == 1L && ch == 1L)
-                plot(xvalues, yvalues[[ch]], type=plot.type, xlim=thin*c(1L, n.draw), ylim=range(unlist(yvalues)), xlab="iteration", ylab=plot.trace.names)
+                plot(xvalues, yvalues[[ch]], type=plot.type, xlim=thin*c(1L, n.draw), ylim=range(unlist(yvalues, use.names=FALSE)), xlab="iteration", ylab=plot.trace.names)
               else
                 lines(xvalues, yvalues[[ch]], type=plot.type, col=ch)
             } else {
               if (ch == 1L)
-                plot(xvalues, yvalues[[ch]], type=plot.type, ylim=range(unlist(yvalues)), xlab="iteration", ylab=plot.trace.names)
+                plot(xvalues, yvalues[[ch]], type=plot.type, ylim=range(unlist(yvalues, use.names=FALSE)), xlab="iteration", ylab=plot.trace.names)
               else
                 lines(xvalues, yvalues[[ch]], type=plot.type, col=ch)
             }
@@ -474,15 +472,14 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
           yvalues <- get_from(out[[plot.trace[[2L]]$name]], vars=plot.trace[[2L]]$range, draws=i0:index)
           for (ch in chains) {
             if (ch == 1L && (!add.to.plot || (add.to.plot && i0 == 1L)))
-              plot(xvalues[[ch]], yvalues[[ch]], type=plot.type, xlim=range(unlist(xvalues)), ylim=range(unlist(yvalues)), xlab=plot.trace.names[1L], ylab=plot.trace.names[2L])
+              plot(xvalues[[ch]], yvalues[[ch]], type=plot.type, xlim=range(unlist(xvalues, use.names=FALSE)), ylim=range(unlist(yvalues, use.names=FALSE)), xlab=plot.trace.names[1L], ylab=plot.trace.names[2L])
             else
               lines(xvalues[[ch]], yvalues[[ch]], type=plot.type, col=ch)
           }
         } else {  # pairs plot for >=3 variables
           plot.matrix <- matrix(NA_real_, n.chain * (index - i0 + 1L), length(plot.trace))
-          for (v in seq_along(plot.trace)) {
-            plot.matrix[, v] <- unlist(get_from(out[[plot.trace[[v]]$name]], vars=plot.trace[[v]]$range, draws=i0:index))
-          }
+          for (v in seq_along(plot.trace))
+            plot.matrix[, v] <- unlist(get_from(out[[plot.trace[[v]]$name]], vars=plot.trace[[v]]$range, draws=i0:index), use.names=FALSE)
           pairs(plot.matrix, labels=plot.trace.names, cex.labels=1, gap=0, pch=20L, col=rep_each(chains, index - i0 + 1L))
         }
         Sys.sleep(0)  # forces the plot to update
@@ -821,7 +818,7 @@ summary.dc <- function(object, probs=c(0.05, 0.5, 0.95), na.rm=FALSE, time=NULL,
       ind <- batch + (i - 1L) * batch.size
     sim <- get_from(object, vars=ind)
     out[ind, "n_eff"] <- n_eff(sim, ...)
-    if ("R_hat" %in% col_names) out[ind, "R_hat"] <- R_hat(sim)
+    if (any("R_hat" == col_names)) out[ind, "R_hat"] <- R_hat(sim)
     sim <- as.matrix.dc(sim, colnames=FALSE)
     out[ind, "Mean"] <- .colMeans(sim, nrow(sim), ncol(sim), na.rm=na.rm)
     out[ind, "SD"] <- colSds(sim, na.rm=na.rm)
@@ -868,7 +865,7 @@ summary.mcdraws <- function(object, vnames=NULL, probs=c(0.05, 0.5, 0.95), na.rm
       warn("parameter ", v, " not found")
       next
     }
-    if (is.null(object[["_cluster"]]) || "cl" %in% names(list(...))) {
+    if (is.null(object[["_cluster"]]) || any("cl" == names(list(...)))) {
       out[[v]] <- summary(object[[v]], probs, na.rm, time, abbr, batch.size=batch.size, ...)
     } else {
       # if a cluster is available, it is passed to n_eff (in which usually most time is spent)
@@ -1060,7 +1057,7 @@ nvars <- function(dc) dim(dc[[1L]])[2L]
 #' @param useFFT whether to use the Fast Fourier Transform algorithm. Default is \code{TRUE} as this is typically faster.
 #' @param lag.max the lag up to which autocorrelations are computed in case \code{useFFT=FALSE}.
 #' @param cl a cluster for parallel computation.
-#' @return In case of \code{R_hat} the split-Rhat convergence diagnostic for each
+#' @return In case of \code{R_hat} the split-R-hat convergence diagnostic for each
 #'  component of the vector parameter, and in case of \code{n_eff} the effective
 #'  number of independent samples for each component of the vector parameter.
 #' @references

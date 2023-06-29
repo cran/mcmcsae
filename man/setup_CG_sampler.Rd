@@ -4,16 +4,7 @@
 \alias{setup_CG_sampler}
 \title{Set up conjugate gradient sampler}
 \usage{
-setup_CG_sampler(
-  mbs,
-  X,
-  sampler,
-  max.it = NULL,
-  stop.criterion = NULL,
-  verbose = NULL,
-  preconditioner = c("GMRF", "GMRF2", "GMRF3", "identity"),
-  scale
-)
+setup_CG_sampler(mbs, X, sampler, control = CG_control())
 }
 \arguments{
 \item{mbs}{block component containing several model components.}
@@ -22,15 +13,8 @@ setup_CG_sampler(
 
 \item{sampler}{sampler object as created by \code{\link{create_sampler}}.}
 
-\item{max.it}{passed to \code{\link{CG}}.}
-
-\item{stop.criterion}{passed to \code{\link{CG}}.}
-
-\item{verbose}{passed to \code{\link{CG}}.}
-
-\item{preconditioner}{one of  "GMRF", "GMRF2", "GMRF3" and "identity".}
-
-\item{scale}{scale parameter for GMRF3 preconditioner.}
+\item{control}{a list of options for the conjugate gradient algorithm that can be passed
+using function \code{\link{CG_control}}.}
 }
 \value{
 An environment with precomputed quantities and functions for multiplication

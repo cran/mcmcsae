@@ -373,19 +373,19 @@ Eigen::VectorXd TMVN_HMC_C(
   while (true) {
     if (Rf_isMatrix(S)) {
       Eigen::Map<Eigen::MatrixXd> Sm = as<Eigen::Map<Eigen::MatrixXd> >(S);
-      Sv = Sm.transpose() * v;
+      Sv.noalias() = Sm.transpose() * v;
       if (zero_mu) {
-        Sx = Sm.transpose() * x;
+        Sx.noalias() = Sm.transpose() * x;
       } else {
-        Sx = Sm.transpose() * (x - mu);
+        Sx.noalias() = Sm.transpose() * (x - mu);
       }
     } else if (Rf_inherits(S, "dgCMatrix")) {
       Eigen::MappedSparseMatrix<double> Sm = as<Eigen::MappedSparseMatrix<double> >(S);
-      Sv = Sm.transpose() * v;
+      Sv.noalias() = Sm.transpose() * v;
       if (zero_mu) {
-        Sx = Sm.transpose() * x;
+        Sx.noalias() = Sm.transpose() * x;
       } else {
-        Sx = Sm.transpose() * (x - mu);
+        Sx.noalias() = Sm.transpose() * (x - mu);
       }
     } else {
       stop("unexpected matrix type");

@@ -76,7 +76,7 @@ combine_chains <- function(...) {
 }
 
 combine_chains_dc <- function(obj) {
-  out <- unlist(obj, recursive=FALSE)
+  out <- unlist(obj, recursive=FALSE, use.names=FALSE)
   if (!is.null(attr(obj[[1L]], "ppp"))) {
     if (length(attr(obj[[1L]], "ppp")) == 1L)
       attr(out, "ppp") <- mean(sapply(obj, attr, "ppp"))
@@ -101,7 +101,7 @@ split_chains <- function(obj, parts=NULL) {
   chs <- split(seq_len(n.chain), rep(seq_len(parts), chs))
   out <- vector(mode="list", parts)
   obj_class <- class(obj)[1L]
-  if (!(obj_class %in% c("mcdraws", "dc", "list"))) stop("unsupported class '", obj_class, "'")
+  if (all(obj_class != c("mcdraws", "dc", "list"))) stop("unsupported class '", obj_class, "'")
   for (k in seq_along(out)) {
     if (obj_class == "mcdraws") {
       out[[k]][["_info"]] <- obj[["_info"]]
@@ -215,7 +215,7 @@ split_iters <- function(obj, iters=NULL, parts=NULL) {
   its <- split(iters, rep(seq_len(parts), its))
   out <- vector(mode="list", parts)
   obj_class <- class(obj)[1L]
-  if (!(obj_class %in% c("dc", "mcdraws"))) stop("unsupported class '", obj_class, "'")
+  if (all(obj_class != c("dc", "mcdraws"))) stop("unsupported class '", obj_class, "'")
   for (k in seq_along(out)) {
     if (obj_class == "mcdraws") {
       out[[k]][["_info"]] <- obj[["_info"]]

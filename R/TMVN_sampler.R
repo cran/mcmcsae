@@ -269,7 +269,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     # NB cholQ will now refer to z2 subspace
     cholQ <- build_chol(crossprod_sym(Q2, Q))  # chol factor L
     mu_z2_given_z1 <- mu_z2 - cholQ$solve(crossprod_mv(Q2, (Q %m*v% (Q1 %m*v% (z1 - mu_z1)))))
-    if (method$method %in% c("softTMVN", "HMCZigZag")) {
+    if (any(method$method == c("softTMVN", "HMCZigZag"))) {
       Q <- crossprod_sym(Q2, Q)
     } else {
       rm(Q)
@@ -318,7 +318,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       cholQ <- build_chol(Q, perm)
     }
 
-    if (!method$method %in% c("softTMVN", "HMCZigZag")) rm(Q)
+    if (all(method$method != c("softTMVN", "HMCZigZag"))) rm(Q)
 
     if (!is.null(Xy)) {
       mu <- if (use.cholV) V %m*v% Xy else cholQ$solve(Xy)
@@ -328,7 +328,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       # currently tabMatrix disallowed because used as solve rhs below
       S <- economizeMatrix(S, sparse=if (class(cholQ$cholM)[1L] == "matrix") FALSE else NULL, allow.tabMatrix=FALSE)
     }
-    if (method$method %in% c("Gibbs", "HMCZigZag")) n2 <- n
+    if (any(method$method == c("Gibbs", "HMCZigZag"))) n2 <- n
 
     if (eq) {
       # update.Q, dense cholQ --> faster to have dense R (and S) as well
@@ -478,7 +478,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     useV <- method$useV
     if (.opts$PG.approx) {
       mPG <- as.integer(.opts$PG.approx.m)
-      if (!length(mPG) %in% c(1L, n)) stop("invalid value for option 'PG.approx.m'")
+      if (all(length(mPG) != c(1L, n))) stop("invalid value for option 'PG.approx.m'")
       rPolyaGamma <- function(b, c) CrPGapprox(ncS, b, c, mPG)
     } else {
       if (!requireNamespace("BayesLogit", quietly=TRUE)) stop("please install package 'BayesLogit' and try again")
