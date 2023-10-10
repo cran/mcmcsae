@@ -1,105 +1,239 @@
 
-# Q0: precision matrix of dimension q
-set_prior_precision <- function(Q0=NULL, q, sparse=NULL) {
-  if (is.null(Q0)) {
-    Q0 <- Cdiag(rep.int(0, q))  # default: noninformative, improper prior
-  } else {
-    if (is.vector(Q0)) {
-      if (length(Q0) == 1L) {
-        Q0 <- Cdiag(rep.int(Q0, q))
-      } else {
-        if (length(Q0) == q)
-          Q0 <- Cdiag(Q0)
-        else
-          stop("wrong input for precision matrix 'Q0'")
-      }
-    } else {
-      if (!identical(dim(Q0), c(q, q))) stop("wrong input for precision matrix 'Q0'")
-    }
-    Q0 <- economizeMatrix(Q0, symmetric=TRUE, sparse=sparse)
-  }
-  if (isUnitDiag(Q0)) Q0 <- expandUnitDiag(Q0)  # block sampler expects x-slot
-  Q0
-}
-
-#' Create an object containing information about a degenerate prior fixing a
-#' parameter to a fixed value
+#' Create an object representing a possibly multivariate normal prior distribution
 #'
 #' @export
-#' @param value value parameter of length 1 or \code{n}.
-#' @param n dimension, if known. For internal use only.
-#' @param post whether conditional posterior sampling function should be
-#'  created. For internal use only.
-#' @return An environment with information about the prior and possibly conditional
-#'  posterior distribution(s), to be used by other package functions.
-pr_fixed <- function(value=1, n=NULL, post=FALSE) {
-  if (!is.null(n)) {
-    n <- as.integer(n)
+#' @param mean scalar or vector mean parameter.
+#' @param precision scalar, vector or matrix precision parameter.
+#' @param labels optional character vector with coefficient labels. If specified,
+#'  it should have the same size of at least one of \code{mean} and \code{precision},
+#'  and in that case the normal prior with these parameters is assigned to these coefficients,
+#'  while any coefficients not present in labels will be assigned a non-informative
+#'  prior with mean 0 and precision 0.
+#' @return An environment representing the specified prior, for internal use.
+# TODO allow to not implicitly include a factor of 1/sigma_^2 in precision for gaussian model
+#      including this factor only has a computational advantage in case of gaussian variance sigma^2 Sigma0, where Sigma0 is fixed
+pr_normal <- function(mean=0, precision=0, labels=NULL) {
+  mean <- as.numeric(mean)
+  if (!is.null(labels) && all(length(mean) != c(1L, length(labels)))) stop("if 'labels' are specified, parameter 'mean' must have the same length, or be a scalar")
+  if (is.vector(precision)) {
+    if (!is.null(labels) && all(length(precision) != c(1L, length(labels)))) stop("if 'labels' are specified, the size of 'precision' must be compatible if it not a scalar")
+    if (any(precision < 0)) stop("parameter 'precision' must be nonnegative")
+    informative <- any(precision != 0)
+  } else if (is_a_matrix(precision)) {
+    if (!is.null(labels) && all(nrow(precision) != c(1L, length(labels)))) stop("if 'labels' are specified, the size of 'precision' must be compatible if it not a scalar")
+    precision <- economizeMatrix(precision, symmetric=TRUE, check=TRUE)
+    informative <- !is_zero_matrix(precision)
+    # TODO check for positive semi-definiteness
+  } else stop("unexpected precision parameter")
+  n <- NULL
+  rprior <- function(p) stop("please call method 'init' first")
+  sigma <- FALSE  # does the prior variance contain (implicitly) a scalar factor sigma_^2
+  init <- function(n=1L, coefnames=NULL, sparse=NULL, sigma=FALSE) {
+    n <<- as.integer(n)
+    if (is.null(labels)) {
+      if (all(length(mean) != c(1L, n))) stop("parameter 'mean' has wrong length")
+      if (all(NROW(precision) != c(1L, n))) stop("parameter 'precision' has wrong size")
+      if (is.vector(precision)) {
+        if (length(precision) == 1L)
+          precision <<- Cdiag(rep.int(precision, n))
+        else
+          precision <<- Cdiag(precision)
+      }
+    } else {
+      if (length(coefnames) != n) stop("'coefnames' must have length 'n'")
+      m <- match(labels, coefnames)
+      if (anyNA(m)) stop("non-matching labels: ", paste(labels[is.na(m)], collapse=", "))
+      temp <- rep.int(0, n)
+      temp[m] <- mean
+      mean <<- temp
+      if (is.vector(precision)) {
+        temp <- rep.int(0, n)
+        temp[m] <- precision
+        precision <- Cdiag(temp)
+      } else {
+        temp <- new("dsCMatrix", p=rep(0L, n + 1L), uplo="U", Dim=c(n, n))
+        temp[m, m] <- precision
+        precision <- temp
+      }
+    }
+    # sparse: block sampler expects sparse matrix with x-slot
+    precision <<- economizeMatrix(precision, sparse=sparse, symmetric=TRUE)
+    if (isTRUE(sparse) && isUnitDiag(precision)) precision <<- expandUnitDiag(precision)
+    sigma <<- sigma
+    if (sigma) {
+      # combined conjugate prior for ordinary gaussian regression --> sigma^2 factor in coefficients' prior variance
+      rprior <<- function(p) mean + drawMVN_Q(precision, sd=p[["sigma_"]])
+    } else
+      rprior <<- function(p) mean + drawMVN_Q(precision)
+  }
+  log_prior_0 <- NULL
+  log_prior <- function(p) NULL
+  setup_logprior <- function(name) {
+    log_prior_0 <<- -0.5 * n * log(2*pi)
+    if (informative) {
+      d <- diag(suppressWarnings(chol(precision, pivot=TRUE)))
+      log_prior_0 <<- log_prior_0 + sum(log(d[d > 0]))
+    }
+    log_prior <<- function(p) {}
+    log_prior <<- add(log_prior, bquote(delta.beta <- p[[.(name)]] - mean))
+    if (sigma) {
+      log_prior <<- add(log_prior, quote(sigma <- p[["sigma_"]]))
+      log_prior <<- add(log_prior, quote(- n * log(sigma) - 0.5 * dotprodC(delta.beta, precision %m*v% delta.beta) / sigma^2))
+    } else
+      log_prior <<- add(log_prior, quote(- 0.5 * dotprodC(delta.beta, precision %m*v% delta.beta)))
+  }
+  type <- "normal"
+  environment()
+}
+
+#' Create an object representing a Multivariate Log inverse Gamma (MLiG) prior distribution
+#'
+#' @export
+#' @param mean scalar or vector parameter for the mean in the large
+#'  \code{a} limit, when the distribution approaches a normal distribution. 
+#' @param precision scalar or vector parameter for the precision in the
+#'  large \code{a} limit, when the distribution approaches a normal
+#'  distribution.
+#' @param labels optional character vector with coefficient labels. If specified,
+#'  it should have the same length of at least one of \code{mean} and \code{precision},
+#'  and in that case the MLiG prior with these parameters is assigned to these coefficients,
+#'  while any coefficients not present in labels will be assigned a non-informative
+#'  prior with mean 0 and precision 0.
+#' @param a scalar parameter that controls how close the prior is to independent
+#'  normal priors with \code{mean} and \code{precision} parameters. The larger
+#'  this value (default is 1000), the closer.
+#' @return An environment representing the specified prior, for internal use.
+#' @references
+#'  J.R. Bradley, S.H. Holan and C.K. Wikle (2018).
+#'    Computationally efficient multivariate spatio-temporal models for
+#'    high-dimensional count-valued data (with discussion).
+#'    Bayesian Analysis 13(1), 253-310.
+pr_MLiG <- function(mean=0, precision=0, labels=NULL, a=1000) {
+  if (length(a) != 1L || a <= 0) stop("parameter 'a' must be a positive scalar")
+  if (any(precision < 0)) stop("parameter 'precision' must be nonnegative")
+  informative <- any(precision > 0)
+  n <- NULL
+  rprior <- function() stop("please call method 'init' first")
+  init <- function(n=1L, coefnames) {
+    n <<- as.integer(n)
+    if (is.null(labels)) {
+      if (all(length(mean) != c(1L, n))) stop("parameter 'mean' has wrong length")
+      if (all(length(precision) != c(1L, n))) stop("parameter 'precision' has wrong length")
+    } else {
+      if (all(length(mean) != c(1L, length(labels)))) stop("parameter 'mean' has wrong length")
+      if (all(length(precision) != c(1L, length(labels)))) stop("parameter 'precision' has wrong length")
+      m <- match(labels, coefnames)
+      if (anyNA(m)) stop("non-matching coefficient names: ", paste(labels[is.na(m)], collapse=", "))
+      temp <- rep.int(0, n)
+      temp[m] <- mean
+      mean <<- temp
+      temp <- rep.int(0, n)
+      temp[m] <- precision
+      precision <<- temp
+    }
+    rprior <<- function() mean + sqrt(a/precision) * rMLiG(n, a, a)
+  }
+  type <- "MLiG"
+  environment()
+}
+
+#' Create an object representing a degenerate prior fixing a
+#' parameter (vector) to a fixed value
+#'
+#' @export
+#' @param value scalar or vector value parameter.
+#' @return An environment representing the specified prior, for internal use.
+pr_fixed <- function(value=1) {
+  n <- NULL
+  rprior <- function() stop("please call method 'init' first")
+  #draw <- function() stop("please call method 'init' first")
+  #init <- function(n=1L, post=FALSE) {
+  init <- function(n=1L) {
+    n <<- as.integer(n)
     if (all(length(value) != c(1L, n))) stop("value parameter has wrong length")
-    rprior <- function() value
-    if (post) draw <- function() value
+    if (n > length(value)) value <- rep.int(value, n)
+    rprior <<- function() value
+    #if (post) draw <<- function() value
   }
   type <- "fixed"
   environment()
 }
 
-#' Create an object containing information about exponential prior distributions
+#' Create an object representing exponential prior distributions
 #'
 #' @export
-#' @param scale scale parameter of length 1 or \code{n}.
-#' @param n dimension, if known. For internal use only.
-#' @param post whether conditional posterior sampling function should be
-#'  created. For internal use only.
-#' @return An environment with information about the prior and possibly conditional
-#'  posterior distribution(s), to be used by other package functions.
+#' @param scale scalar or vector scale parameter.
+#' @return An environment representing the specified prior, for internal use.
 # TODO sample precision instead of variance parameters; the default value
 #      for p then leads to inverse Gaussian posterior, which may be faster
 #      to sample from
-pr_exp <- function(scale=1, n=NULL, post=FALSE) {
+pr_exp <- function(scale=1) {
   if (!all(scale > 0)) stop("scale parameter must be positive")
-  if (!is.null(n)) {
-    n <- as.integer(n)
+  n <- NULL
+  draw <- NULL
+  rprior <- function() stop("please call method 'init' first")
+  init <- function(n=1L, post=FALSE) {
+    n <<- as.integer(n)
     if (all(length(scale) != c(1L, n))) stop("scale parameter has wrong length")
-    rprior <- function() scale * rexp(n)
+    rprior <<- function() scale * rexp(n)
     if (post) {
       # TODO set a=2/scale here, and default p=-1/2
       # b is typically updated
-      draw <- function(p, a, b) Crgig(n, p, a, b)
+      draw <<- function(p, a, b) Crgig(n, p, a, b)
     }
   }
   type <- "exp"
   environment()
 }
 
-#' Create an object containing information about Generalized Inverse Gaussian (GIG) prior distributions
+#' Create an object representing gamma prior distributions
 #'
 #' @export
-#' @param a parameter of length 1 or \code{n}.
-#' @param b parameter of length 1 or \code{n}.
-#' @param p parameter of length 1 or \code{n}.
-#' @param n dimension, if known. For internal use only.
-#' @param post whether conditional posterior sampling function should be
-#'  created. For internal use only.
-#' @return An environment with information about the prior and possibly conditional
-#'  posterior distribution(s), to be used by other package functions.
-pr_gig <- function(a, b, p, n=NULL, post=FALSE) {
+#' @param shape scalar or vector shape parameter.
+#' @param rate scalar or vector rate, i.e. inverse scale, parameter.
+#' @return An environment representing the specified prior, for internal use.
+# TODO pr_exp as special case
+pr_gamma <- function(shape=1, rate=1) {
+  if (!all(shape > 0 & rate > 0)) stop("shape and rate parameters must be positive")
+  n <- NULL
+  init <- function(n=1L) {
+    n <<- as.integer(n)
+    if (all(length(shape) != c(1L, n))) stop("scale parameter has wrong length")
+    if (all(length(rate) != c(1L, n))) stop("scale parameter has wrong length")
+  }
+  rprior <- function() rgamma(n, shape, rate)
+  type <- "gamma"
+  environment()
+}
+
+#' Create an object representing Generalized Inverse Gaussian (GIG) prior distributions
+#'
+#' @export
+#' @param a scalar or vector parameter.
+#' @param b scalar or vector parameter.
+#' @param p scalar or vector parameter.
+#' @return An environment representing the specified prior, for internal use.
+pr_gig <- function(a, b, p) {
   if (any(a < 0)) stop("parameter 'a' must be nonnegative")
   if (any(b < 0)) stop("parameter 'b' must be nonnegative")
   if (any(a[p >= 0] == 0)) stop("parameter 'a' should not be 0 when p >= 0")
   if (any(b[p <= 0] == 0)) stop("parameter 'b' should not be 0 when p <= 0")
-  if (!is.null(n)) {
-    n <- as.integer(n)
+  n <- NULL
+  draw <- NULL
+  rprior <- function() stop("please call method 'init' first")
+  init <- function(n=1L, post=FALSE) {
+    n <<- as.integer(n)
     if (all(length(a) != c(1L, n))) stop("parameter 'a' has wrong length")
     if (all(length(b) != c(1L, n))) stop("parameter 'b' has wrong length")
     if (all(length(p) != c(1L, n))) stop("parameter 'p' has wrong length")
-    rprior <- function() Crgig(n, p, a, b)
-    if (post) draw <- function(p, a, b) Crgig(n, p, a, b)
+    rprior <<- function() Crgig(n, p, a, b)
+    if (post) draw <<- function(p, a, b) Crgig(n, p, a, b)
   }
   type <- "gig"
   environment()
 }
 
-#' Create an object containing information about inverse chi-squared priors
+#' Create an object representing inverse chi-squared priors
 #' with possibly modeled degrees of freedom and scale parameters
 #'
 #' @export
@@ -129,24 +263,12 @@ pr_gig <- function(a, b, p, n=NULL, post=FALSE) {
 #'    \item{common}{whether the modeled scale parameter of the inverse chi-squared
 #'      distribution is (a scalar parameter) common to all \code{n} parameters.}
 #'  }
-#' @param n dimension, if known. For internal use only.
-#' @param post whether conditional posterior sampling function should be
-#'  created. For internal use only.
-#' @return An environment with information about the prior and possibly conditional
-#'  posterior distribution(s), to be used by other package functions.
+#' @return An environment representing the specified prior, for internal use.
 # TODO sample precisions instead of variances
-pr_invchisq <- function(df=1, scale=1, n=NULL, post=FALSE) {
+pr_invchisq <- function(df=1, scale=1) {
   if (is.character(df) && any(df == c("modeled", "modelled"))) df <- list()
   if (is.character(scale) && any(scale == c("modeled", "modelled"))) scale <- list()
-  if (!is.null(n)) {
-    n <- as.integer(n)
-    rprior <- function() {}
-    if (post) {
-      # function draw to sample from full conditional posterior
-      # assumes the invchisq prior is for variance parameters of a gaussian distribution
-      draw <- function(df.data, SSR) {}
-    }
-  }
+  n <- rprior <- draw <- NULL
   if (is.list(df)) {
     if (is.null(df$alpha0)) df$alpha0 <- 2  # default in prior Gamma(alpha0, beta0)
     if (is.null(df$beta0)) df$beta0 <- 0.1  # default in prior Gamma(alpha0, beta0)
@@ -154,82 +276,89 @@ pr_invchisq <- function(df=1, scale=1, n=NULL, post=FALSE) {
     if (is.null(df$tau)) df$tau <- 1  # (starting) scale of MH update
     if (is.null(df$proposal)) df$proposal <- "RW"
     if (is.null(df$adapt)) df$adapt <- TRUE
-    if (!is.null(n)) {
-      rprior_df <- function() rgamma(1L, df$alpha0, df$beta0)
-      formals(rprior) <- c(alist(df=), formals(rprior))  # different signature without check NOTE
-      if (post) {
-        draw_df <- function(df.current, Q.current) {}  # Q.current is current precision parameter (vector)
-        switch(df$proposal,
-          RW = draw_df <- add(draw_df, bquote(draw_df_MH_RW(.(as.numeric(n)), df.current, Q.current, df))),
-          mala = draw_df <- add(draw_df, bquote(draw_df_MH_mala(.(as.numeric(n)), df.current, Q.current, df)))
-        )
-        formals(draw) <- c(alist(df=), formals(draw))
-      }
-    }
-  } else {
-    if (!is.null(n)) {
-      if (all(length(df) != c(1L, n))) stop("degrees of freedom parameter has wrong length")
-      # do not enforce df > 0 to allow improper prior for data scale variance
-    }
+    rprior_df <- draw_df <- NULL
   }
   if (is.list(scale)) {
     defaults <- list(df=1, scale=1, common=FALSE)
     if (!all(names(scale) %in% names(defaults))) stop("invalid 'scale' options list")
     scale <- modifyList(defaults, scale)
     rm(defaults)
-    if (!is.null(n)) {
+  }
+  if (is.list(scale) || (!is.list(scale) && !is.list(df))) psi0 <- NULL
+  init <- function(n=1L, post=FALSE) {
+    n <<- as.integer(n)
+    rprior <<- function() {}
+    if (post) {
+      # function draw to sample from full conditional posterior
+      # assumes the invchisq prior is for variance parameters of a gaussian distribution
+      draw <<- function(df.data, SSR) {}
+    }
+    if (is.list(df)) {
+      rprior_df <<- function() rgamma(1L, df$alpha0, df$beta0)
+      formals(rprior) <<- c(alist(df=), formals(rprior))  # different signature without check NOTE
+      if (post) {
+        draw_df <<- function(df.current, Q.current) {}  # Q.current is current precision parameter (vector)
+        switch(df$proposal,
+          RW = draw_df <<- add(draw_df, bquote(draw_df_MH_RW(.(as.numeric(n)), df.current, Q.current, df))),
+          mala = draw_df <<- add(draw_df, bquote(draw_df_MH_mala(.(as.numeric(n)), df.current, Q.current, df)))
+        )
+        formals(draw) <<- c(alist(df=), formals(draw))
+      }
+    } else {
+      if (all(length(df) != c(1L, n))) stop("degrees of freedom parameter has wrong length")
+      # do not enforce df > 0 to allow improper prior for data scale variance
+    }
+    if (is.list(scale)) {
       if (all(length(scale$df) != c(1L, n))) stop("degrees of freedom parameter has wrong length")
       if (all(length(scale$scale) != c(1L, n))) stop("scale parameter has wrong length")
-      if (scale$common && n == 1L) scale$common <- FALSE
-      psi0 <- scale$df / scale$scale
+      if (scale$common && n == 1L) scale$common <<- FALSE
+      psi0 <<- scale$df / scale$scale
       if (scale$common) {
         if (length(scale$df) != 1L || length(scale$scale) != 1L) stop("scalar 'df' and 'scale' expected in common scale model")
-        rprior <- add(rprior, quote(scale <- rchisq_scaled(1L, scale$df, psi=psi0)))
-        rprior <- add(rprior, bquote(1 / rchisq_scaled(.(n), df, scale)))
+        rprior <<- add(rprior, quote(scale <- rchisq_scaled(1L, scale$df, psi=psi0)))
+        rprior <<- add(rprior, bquote(1 / rchisq_scaled(.(n), df, scale)))
       } else {
-        rprior <- add(rprior, bquote(draw_betaprime(.(n), 0.5*scale$df, 0.5*df, df/psi0)))
+        rprior <<- add(rprior, bquote(draw_betaprime(.(n), 0.5*scale$df, 0.5*df, df/psi0)))
       }
       if (post) {
-        formals(draw) <- c(formals(draw), alist(Q=))
+        formals(draw) <<- c(formals(draw), alist(Q=))
         # draw 1/kappa from its full conditional posterior
         if (scale$common) {
           if (is.list(df) || length(df) == 1L)
-            draw <- add(draw, bquote(kappa_inv <- rchisq_scaled(1L, .(n) * df + scale$df, psi = psi0 + sum(df * Q))))
+            draw <<- add(draw, bquote(kappa_inv <- rchisq_scaled(1L, .(n) * df + scale$df, psi = psi0 + sum(df * Q))))
           else
-            draw <- add(draw, quote(kappa_inv <- rchisq_scaled(1L, sum(df) + scale$df, psi = psi0 + sum(df * Q))))
+            draw <<- add(draw, quote(kappa_inv <- rchisq_scaled(1L, sum(df) + scale$df, psi = psi0 + sum(df * Q))))
         } else {
-          draw <- add(draw, bquote(kappa_inv <- rchisq_scaled(.(n), df + scale$df, psi = psi0 + df * Q)))
+          draw <<- add(draw, bquote(kappa_inv <- rchisq_scaled(.(n), df + scale$df, psi = psi0 + df * Q)))
         }
-        draw <- add(draw, quote(psi <- df * kappa_inv))
+        draw <<- add(draw, quote(psi <- df * kappa_inv))
       }
-    }
-  } else {
-    if (!is.null(n)) {
+    } else {
       if (all(length(scale) != c(1L, n))) stop("scale parameter has wrong length")
       if (is.list(df)) {
-        rprior <- add(rprior, bquote(1 / rchisq_scaled(.(n), df, scale)))
+        rprior <<- add(rprior, bquote(1 / rchisq_scaled(.(n), df, scale)))
       } else {
-        psi0 <- df * scale
-        rprior <- add(rprior, bquote(1 / rchisq_scaled(.(n), df, psi=psi0)))
+        psi0 <<- df * scale
+        rprior <<- add(rprior, bquote(1 / rchisq_scaled(.(n), df, psi=psi0)))
       }
       if (post) {
-        draw <- add(draw, quote(psi <- df * scale))
+        draw <<- add(draw, quote(psi <- df * scale))
       }
     }
-  }
-  if (!is.null(n) && post) {
-    draw <- add(draw, bquote(1 / rchisq_scaled(.(n), df + df.data, psi=psi + SSR)))
+    if (post) {
+      draw <<- add(draw, bquote(1 / rchisq_scaled(.(n), df + df.data, psi=psi + SSR)))
+    }
   }
   type <- "invchisq"
   environment()
 }
 
-#' Create an object containing information about an inverse Wishart prior,
+#' Create an object representing an inverse Wishart prior,
 #' possibly with modeled scale matrix
 #'
 #' @export
 #' @param df Degrees of freedom parameter. This should be a scalar numeric value.
-#'  The default value is the dimension (\code{n}) plus one.
+#'  Default value is the dimension plus one.
 #' @param scale Either a (known) scale matrix, or
 #'  \code{scale="modeled"} or \code{scale="modelled"}, which puts default
 #'  chi-squared priors on the diagonal elements of the inverse Wishart scale matrix.
@@ -241,43 +370,53 @@ pr_invchisq <- function(df=1, scale=1, n=NULL, post=FALSE) {
 #'    \item{common}{whether the modeled scale parameter of the inverse chi-squared
 #'      distribution is (a scalar parameter) common to all \code{n} diagonal elements.}
 #'  }
-#' @param n dimension, if known. For internal use only.
-#' @return An environment with information about the prior distribution used,
-#'  to be used by other package functions.
+#' @return An environment representing the specified prior, for internal use.
 #' @references
 #'  A. Huang and M.P. Wand (2013).
 #'    Simple marginally noninformative prior
 #'    distributions for covariance matrices.
 #'    Bayesian Analysis 8, 439-452.
-pr_invwishart <- function(df=NULL, scale=NULL, n=NULL) {
-  if (is.null(n)) {
-    if (is_a_matrix(scale)) n <- dim(scale)[1L]
+pr_invwishart <- function(df=NULL, scale=NULL) {
+  if (is_a_matrix(scale)) {
+    n <- dim(scale)[1L]
+  } else {
+    n <- NULL
   }
-  if (!is.null(n) && n == 1L) stop("pr_invwishart does not support scalar variance")
   if (is.null(df)) {
     if (!is.null(n)) df <- n + 1  # default number of degrees of freedom
   } else {
     if (length(df) != 1L) stop("degrees of freedom parameter for inverse Wishart must be scalar")
     # to allow improper priors, do not enforce df > n - 1
   }
-  if (is.null(scale)) {
-    if (!is.null(n)) scale <- diag(n)
-  } else {
+  if (!is.null(scale)) {
     if (is.character(scale) && any(scale == c("modeled", "modelled"))) scale <- list()
     if (is.list(scale)) {  # Huang-Wand prior
       if (is.null(scale$df)) scale$df <- 1
       if (is.null(scale$scale)) scale$scale <- 1
       if (is.null(scale$common)) scale$common <- FALSE  # by default (HW prior)
-      if (!is.null(n)) {
+    }
+  }
+  init <- function(n=2L) {
+    n <<- as.integer(n)
+    if (n <= 1L) stop("invalid argument; n must be larger than 1")
+    if (is.null(df)) {
+      df <<- n + 1  # default number of degrees of freedom
+    }
+    if (is.null(scale)) {
+      scale <<- diag(n)
+    } else {
+      if (is.list(scale)) {  # Huang-Wand prior
         if (all(length(scale$df) != c(1L, n))) stop("degrees of freedom parameter has wrong length")
         if (all(length(scale$scale) != c(1L, n))) stop("scale parameter has wrong length")
         if (scale$common) {
           if (length(scale$df) != 1L || length(scale$scale) != 1L) stop("scalar 'df' and 'scale' expected in common scale model")
         }
+      } else {
+        if (!identical(dim(scale), c(n, n))) stop("incompatible scale matrix")
       }
-    } else {
-      if (!is.null(n) && !identical(dim(scale), c(n, n))) stop("incompatible scale matrix")
     }
   }
-  list(type="invwishart", df=df, scale=scale)
+  type <- "invwishart"
+  environment()
 }
+

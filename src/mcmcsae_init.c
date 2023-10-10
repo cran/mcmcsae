@@ -13,7 +13,7 @@ extern SEXP _mcmcsae_add_diagC(void *, void *);
 extern SEXP _mcmcsae_add_vector(void *, void *);
 extern SEXP _mcmcsae_Cbacksolve(void *, void *);
 extern SEXP _mcmcsae_CbacksolveM(void *, void *);
-extern SEXP _mcmcsae_cCHM_dsC_Cholesky(void *, void *, void *, void *, void *, void *);
+extern SEXP _mcmcsae_cCHM_dsC_Cholesky(void *, void *, void *, void *, void *);
 extern SEXP _mcmcsae_cCHM_update_inplace(void *, void *, void *);
 extern SEXP _mcmcsae_cCHMf_solve(void *, void *, void *);
 extern SEXP _mcmcsae_cCHMf_solve_matrix(void *, void *, void *);
@@ -89,7 +89,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_mcmcsae_add_vector",                            (DL_FUNC) &_mcmcsae_add_vector,                             2},
     {"_mcmcsae_Cbacksolve",                            (DL_FUNC) &_mcmcsae_Cbacksolve,                             2},
     {"_mcmcsae_CbacksolveM",                           (DL_FUNC) &_mcmcsae_CbacksolveM,                            2},
-    {"_mcmcsae_cCHM_dsC_Cholesky",                     (DL_FUNC) &_mcmcsae_cCHM_dsC_Cholesky,                      6},
+    {"_mcmcsae_cCHM_dsC_Cholesky",                     (DL_FUNC) &_mcmcsae_cCHM_dsC_Cholesky,                      5},
     {"_mcmcsae_cCHM_update_inplace",                   (DL_FUNC) &_mcmcsae_cCHM_update_inplace,                    3},
     {"_mcmcsae_cCHMf_solve",                           (DL_FUNC) &_mcmcsae_cCHMf_solve,                            3},
     {"_mcmcsae_cCHMf_solve_matrix",                    (DL_FUNC) &_mcmcsae_cCHMf_solve_matrix,                     3},

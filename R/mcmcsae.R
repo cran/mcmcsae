@@ -27,18 +27,20 @@ NULL
 
 # other namespace imports
 #' @importFrom Matrix .updateCHMfactor bandSparse bdiag coerce diag Diagonal
-#'   drop0 invPerm isDiagonal KhatriRao Matrix nnzero rsparsematrix sparseMatrix
-#' @importClassesFrom Matrix CHMfactor dCHMsimpl ddiMatrix CsparseMatrix dgCMatrix dsCMatrix
-#'   generalMatrix sparseMatrix
+#'   drop0 forceSymmetric invPerm isDiagonal KhatriRao Matrix nnzero
+#'   rsparsematrix sparseMatrix
+#' @importClassesFrom Matrix CHMfactor dCHMsimpl ddiMatrix CsparseMatrix
+#'   dgCMatrix dsCMatrix generalMatrix sparseMatrix
 #' @importMethodsFrom Matrix %*% as.matrix as.vector Cholesky colSums crossprod
-#'   determinant diag rowSums solve t tcrossprod unname
+#'   determinant diag isSymmetric rowSums solve t tcrossprod unname
 ## do not import which() S4 generic from Matrix package as it slows down normal use of which
 ## @rawNamespace import(Matrix, except = which)
 #' @import GIGrvg
-#' @importFrom matrixStats colLogSumExps colQuantiles colSds colVars rowCumsums rowVars
+#' @importFrom matrixStats colLogSumExps colQuantiles colSds colVars rowCumsums
+#'   rowVars
 #' @importFrom graphics abline axis legend lines matplot pairs par plot
 #'   plot.new points segments
-#' @importFrom methods as new setMethod show
+#' @importFrom methods as cbind2 new rbind2 setMethod show
 #' @importFrom stats acf as.formula density fitted make.link mvfft optim
 #'   pnorm predict rbeta rbinom rchisq residuals rexp rgamma rnbinom rnorm
 #'   rpois runif rWishart sd setNames terms update.formula var weights

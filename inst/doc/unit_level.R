@@ -1,13 +1,13 @@
-## ---- echo=FALSE----------------------------------------------------------------------------------
+## ----echo=FALSE-----------------------------------------------------------------------------------
 options(width=100)  # width of output
 
-## ---- message=FALSE-------------------------------------------------------------------------------
+## ----message=FALSE--------------------------------------------------------------------------------
 library(survey)
 data(api)
 apipop$cname <- as.factor(apipop$cname)
 apisrs$cname <- factor(apisrs$cname, levels=levels(apipop$cname))
 
-## ---- message=FALSE-------------------------------------------------------------------------------
+## ----message=FALSE--------------------------------------------------------------------------------
 library(mcmcsae)
 mod <- api00 ~ 
   reg(~ ell + meals + stype + hsg + col.grad + grad.sch, name="beta") +
@@ -16,7 +16,7 @@ sampler <- create_sampler(mod, data=apisrs)
 sim <- MCMCsim(sampler, store.all=TRUE, verbose=FALSE)
 (summary(sim))
 
-## ---- fig.width=7, fig.height=7, fig.align="center"-----------------------------------------------
+## ----fig.width=7, fig.height=7, fig.align="center"------------------------------------------------
 N <- table(apipop$cname)
 samplesums <- tapply(apisrs$api00, apisrs$cname, sum)
 samplesums[is.na(samplesums)] <- 0  # substitute 0 for out-of-sample areas
@@ -34,7 +34,7 @@ sampler <- create_sampler(update(mod, target.met ~ .), family="binomial", data=a
 sim <- MCMCsim(sampler, store.all=TRUE, verbose=FALSE)
 summary(sim)
 
-## ---- fig.width=7, fig.height=7, fig.align="center"-----------------------------------------------
+## ----fig.width=7, fig.height=7, fig.align="center"------------------------------------------------
 samplesums <- tapply(apisrs$target.met, apisrs$cname, sum)
 samplesums[is.na(samplesums)] <- 0  # substitute 0 for out-of-sample areas
 res <- predict(sim, newdata=apipop, labels=names(N),

@@ -15,7 +15,7 @@ drawMVN_cholQ <- function(ch, xy=NULL, sd=1) {
 }
 
 drawMVN_Q <- function(M, sd=1, perm=FALSE)
-  drawMVN_cholQ(build_chol(M, perm), sd=sd)
+  drawMVN_cholQ(build_chol(M, control=chol_control(perm=perm)), sd=sd)
 
 # q: dimension of M
 # M: (symmetric) matrix / dsCMatrix
@@ -71,4 +71,21 @@ binomial_coef <- function(n, y, log=TRUE) {
 negbinomial_coef <- function(r, y, log=TRUE) {
   bc <- lgamma(y + r) - lgamma(y + 1) - lgamma(r)
   if (log) bc else exp(bc)
+}
+
+#' Draw a sample from a Multivariate-Log-inverse-Gamma distribution
+#'
+#' @noRd
+#' @param m dimension.
+#' @param alpa shape (vector) parameter.
+#' @param kappa another (vector) parameter.
+#' @return a draw from the MLiG distribution.
+rMLiG <- function(m, alpha, kappa) {
+  if (any(alpha < 0.1)) {
+    # prevent underflow, https://stats.stackexchange.com/questions/7969/how-to-quickly-sample-x-if-expx-gamma
+    # TODO only for those components with alpha < 0.1
+    # NB kappa can still underflow to zero causing unbounded results
+    -(log(rgamma(m, shape = alpha + 1, rate = kappa)) + log(runif(m))/alpha)
+  } else
+    -log(rgamma(m, shape = alpha, rate = kappa))
 }

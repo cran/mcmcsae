@@ -5,10 +5,13 @@
 #' \code{formula} argument to \code{\link{create_sampler}} or
 #' \code{\link{generate_data}}. It creates an additive regression term in the
 #' model's linear predictor. By default, the prior for the regression
-#' coefficients is improper uniform. If \code{b0} or \code{Q0} are specified
-#' the prior becomes normal with mean \code{b0} (default 0) and variance
-#' (matrix) \code{sigma_^2 Q0^-1} where \code{sigma_^2} is the overall scale
-#' parameter of the model, if any.
+#' coefficients is improper uniform. A proper normal prior can be set up
+#' using function \code{\link{pr_normal}}, and passed to argument \code{prior}.
+#' It should be noted that \code{\link{pr_normal}} expects a precision matrix
+#' as input for its second argument, and that the prior variance (matrix) is
+#' taken to be the inverse of this precision matrix, where in case the
+#' model's family is \code{"gaussian"} this matrix is additionally
+#' multiplied by the residual scalar variance parameter \code{sigma_^2}.
 #'
 #' @examples
 #' \donttest{
@@ -22,14 +25,14 @@
 #' summary(sim)
 #' # (weakly) informative normal priors on regression coefficients
 #' sampler <- create_sampler(Sepal.Length ~
-#'     reg(~ Petal.Length + Species, Q0=1e-2, name="beta"),
+#'     reg(~ Petal.Length + Species, prior=pr_normal(precision=1e-2), name="beta"),
 #'   data=iris
 #' )
 #' sim <- MCMCsim(sampler, burnin=100, n.iter=400)
 #' summary(sim)
 #' # binary regression
 #' sampler <- create_sampler(Species == "setosa" ~
-#'     reg(~ Sepal.Length, Q=0.1, name="beta"),
+#'     reg(~ Sepal.Length, prior=pr_normal(precision=0.1), name="beta"),
 #'   family="binomial", data=iris)
 #' sim <- MCMCsim(sampler, burnin=100, n.iter=400)
 #' summary(sim)
@@ -63,18 +66,24 @@
 #' @param X a (possibly sparse) design matrix can be specified directly, as an
 #'  alternative to the creation of one based on \code{formula}. If \code{X} is
 #'  specified \code{formula} is ignored.
+#' @param prior prior specification for the regression coefficients. Supported
+#'  priors can be specified using functions \code{\link{pr_normal}},
+#'  \code{\link{pr_fixed}}, \code{\link{pr_MLiG}}. The latter prior is only
+#'  available in conjunction with a gamma family sampling distribution.
 #' @param Q0 prior precision matrix for the regression effects. The default is a
 #'  zero matrix corresponding to a noninformative improper prior.
 #'  It can be specified as a scalar value, as a numeric vector of appropriate
-#'  length, or as a matrix object.
+#'  length, or as a matrix object. DEPRECATED, please use argument \code{prior}
+#'  instead, i.e. \code{prior = pr_normal(mean = b0.value, precision = Q0.value)}.
 #' @param b0 prior mean for the regression effect. Defaults to a zero vector.
 #'  It can be specified as a scalar value or as a numeric vector of
-#'  appropriate length.
+#'  appropriate length. DEPRECATED, please use argument \code{prior}
+#'  instead, i.e. \code{prior = pr_normal(mean = b0.value, precision = Q0.value)}.
 #' @param R optional constraint matrix for equality restrictions R'x = r where
 #'  \code{x} is the vector of regression effects.
 #' @param r right hand side for the equality constraints.
 #' @param S optional constraint matrix for inequality constraints S'x >= s where
-#'  x is the vector of regression effects.
+#'  \code{x} is the vector of regression effects.
 #' @param s right hand side for the inequality constraints.
 #' @param lower as an alternative to \code{s}, \code{lower} and \code{upper} may be specified
 #'  for two-sided constraints lower <= S'x <= upper.
@@ -83,19 +92,17 @@
 #' @param name the name of the model component. This name is used in the output of the
 #'  MCMC simulation function \code{\link{MCMCsim}}. By default the name will be 'reg'
 #'  with the number of the model term attached.
-#' @param perm whether permutation should be used in the Cholesky decomposition used for
-#'  updating the model component's coefficient. Default is based on a simple heuristic.
 #' @param debug if \code{TRUE} a breakpoint is set at the beginning of the posterior
 #'  draw function associated with this model component. Mainly intended for developers.
-#' @param e for internal use only.
 #' @return an object with precomputed quantities and functions for sampling from
 #'  prior or conditional posterior distributions for this model component. Intended
 #'  for internal use by other package functions.
 reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
-                Q0=NULL, b0=NULL, R=NULL, r=NULL, S=NULL, s=NULL, lower=NULL, upper=NULL,
-                name="", perm=NULL,
-                debug=FALSE, e=parent.frame()) {
+                prior=NULL, Q0=NULL, b0=NULL,
+                R=NULL, r=NULL, S=NULL, s=NULL, lower=NULL, upper=NULL,
+                name="", debug=FALSE) {
 
+  e <- sys.frame(-2L)
   type <- "reg"
   if (name == "") stop("missing model component name")
 
@@ -113,7 +120,7 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
     }
     if (remove.redundant) X <- remove_redundancy(X)
   }
-  X <- economizeMatrix(X, sparse=sparse, strip.names=FALSE)
+  X <- economizeMatrix(X, sparse=sparse, strip.names=FALSE, check=TRUE)
 
   if (nrow(X) != e$n) stop("design matrix with incompatible number of rows")
   e$coef.names[[name]] <- colnames(X)
@@ -121,31 +128,68 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
   q <- ncol(X)
   in_block <- any(name == unlist(e$block, use.names=FALSE))
 
-  Q0 <- set_prior_precision(Q0, q, sparse=if (in_block) TRUE else NULL)  # mc_block uses x-slot of precision matrix
-  informative.prior <- !is_zero_matrix(Q0)
-  if (!informative.prior || is.null(b0) || all(b0 == 0)) {
-    b0 <- 0
-    Q0b0 <- 0
-    zero.mean <- TRUE
-  } else {
-    if (in_block) stop("not yet implemented: block sampling with non-zero prior mean")
-    if (length(b0) == 1L) {
-      Q0b0 <- Q0 %m*v% rep.int(as.numeric(b0), q)
-    } else {
-      if (length(b0) == q)
-        Q0b0 <- Q0 %m*v% as.numeric(b0)
+  if (!is.null(b0) || !is.null(Q0)) {
+    warn("arguments 'b0' and 'Q0' are deprecated; please use argument 'prior' instead")
+    if (is.null(prior)) {
+      if (e$family$family == "gamma")
+        prior <- pr_MLiG(mean = if (is.null(b0)) 0 else b0, precision = if (is.null(Q0)) 0 else Q0)
       else
-        stop("wrong input for prior mean 'b0' in model component", name)
+        prior <- pr_normal(mean = if (is.null(b0)) 0 else b0, precision = if (is.null(Q0)) 0 else Q0)
     }
-    zero.mean <- FALSE
+  } else {
+    if (is.null(prior)) {
+      if (e$family$family == "gamma")
+        prior <- pr_MLiG(mean=0, precision=0)
+      else
+        prior <- pr_normal(mean=0, precision=0)
+    }
   }
 
-  if (!zero.mean && e$compute.weights) stop("weights cannot be computed if some coefficients have non-zero prior means")
-  log_prior_0 <- -0.5 * q * log(2*pi)
-  if (informative.prior) {
-    d <- diag(suppressWarnings(chol(Q0, pivot=TRUE)))
-    log_prior_0 <- log_prior_0 + sum(log(d[d > 0]))
-    rm(d)
+  switch(prior$type,
+    fixed = {
+      prior$init(q)
+      informative.prior <- TRUE
+      zero.mean <- all(prior$value == 0)
+      rprior <- function(p) prior$rprior()
+    },
+    normal = {
+      prior$init(q, e$coef.names[[name]], sparse=if (in_block) TRUE else NULL, sigma=!e$sigma.fixed)
+      informative.prior <- prior$informative
+      if (e$family$family == "gamma" && informative.prior) stop("gamma family sampling distribution: please use 'pr_MLiG' to specify a (conjugate) prior")
+      Q0 <- prior$precision
+      zero.mean <- !informative.prior || all(prior$mean == 0)
+      if (zero.mean) {
+        prior$mean <- 0
+        Q0b0 <- 0
+      } else {
+        if (in_block) stop("not yet implemented: block sampling with non-zero prior mean")
+        b0 <- if (length(prior$mean) == 1L) rep.int(prior$mean, q) else prior$mean
+        Q0b0 <- Q0 %m*v% b0
+      }
+      rprior <- function(p) prior$rprior(p)
+      # TODO TMVN prior
+    },
+    MLiG = {
+      if (e$family$family != "gamma") stop("MLiG prior only available in combination with gamma family sampling distribution")
+      if (!is.null(R) || !is.null(S)) stop("constraints not supported in combination with MLiG prior")
+      prior$init(q, e$coef.names[[name]])
+      informative.prior <- prior$informative
+      zero.mean <- all(prior$mean == 0)
+      rprior <- function(p) prior$rprior()
+      if (in_block) {  # block sampler sparse Q0 for template
+        if (length(prior$precision) == 1L)
+          Q0 <- if (prior$precision == 1) CdiagU(q) else Cdiag(rep.int(prior$precision, q))
+        else
+          Q0 <- Cdiag(prior$precision)
+      }
+    },
+    stop("'", prior$type, "' is not a supported prior for regression coefficients '", name, "'")
+  )
+
+  if (e$compute.weights) {
+    # TODO see if following restriction can be relaxed
+    if (prior$type != "normal") stop("weights computation not supported if priors of type ", prior$type, " are used")
+    if (!zero.mean) stop("weights cannot be computed if some coefficients have non-zero prior means")
   }
 
   linpred <- function(p) X %m*v% p[[name]]
@@ -154,8 +198,10 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
   #   carry the exact same levels as those in the training data
   make_predict <- function(newdata=NULL, Xnew, verbose=TRUE) {
     if (is.null(newdata)) {
-      Xnew <- economizeMatrix(Xnew, strip.names=TRUE)
-      if (ncol(Xnew) != q) stop("wrong number of columns for Xnew matrix of component ", name)
+      if (missing(Xnew)) stop("one of 'newdata' and 'Xnew' should be supplied")
+      if (is.null(colnames(Xnew))) {
+        if (ncol(Xnew) != q) stop("wrong number of columns for Xnew matrix of component ", name)
+      }
     } else {
       nnew <- nrow(newdata)
       if (e$family$family == "multinomial") {
@@ -169,30 +215,21 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
       } else {
         Xnew <- model_matrix(formula, newdata, sparse=sparse)
       }
-      if (anyNA(match(colnames(Xnew), e$coef.names[[name]]))) {
-        # one option would be to sample the 'new' coefficients from their prior, but what prior?
-        stop("regression component '", name, "': some categories in 'newdata' do not match effect labels", immediate.=TRUE)
-      }
-      if (remove.redundant) {
-        # TODO check that any columns removed are redundant
-        Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
-      } else {
-        if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
-        if (!identical(colnames(Xnew), e$coef.names[[name]])) {
-          Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
-        }
-      }
-      Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE)
     }
+    if (remove.redundant && !is.null(colnames(Xnew))) {
+      # TODO check that any columns removed are redundant
+      Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
+    } else {
+      if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
+      if (!is.null(colnames(Xnew)) && !identical(colnames(Xnew), e$coef.names[[name]]))
+        Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
+    }
+    Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE, check=TRUE)
     rm(newdata, verbose)
     function(p) Xnew %m*v% p[[name]]
   }
 
-  rprior <- function(p) {}
-  rprior <- add(rprior, bquote(b0 + drawMVN_Q(Q0, sd=.(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])))))
-  # TODO TMVN prior
-
-  if (!in_block && !e$prior.only) {
+  if (!in_block && !e$prior.only && prior$type != "fixed") {
 
     draw <- function(p) {}
     if (debug) draw <- add(draw, quote(browser()))
@@ -205,7 +242,7 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
       else
         draw <- add(draw, bquote(mv_update(p[["e_"]], plus=FALSE, X, p[[.(name)]])))
     }
-    if (e$single.block && e$family$link != "probit" &&
+    if (e$single.block && e$family$link != "probit" && e$family$family != "gamma" &&
         (!e$modeled.Q || (e$family$family != "gaussian" && !e$use.offset && !e$modeled.r))) {
       # single regression component, no variance modeling, Xy fixed
       if (e$family$family == "gaussian")
@@ -213,7 +250,44 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
       else
         Xy <- crossprod_mv(X, e$Q_e(e$y_eff())) + Q0b0
     } else {  # Xy updated in each iteration
-      if (all(Q0b0 == 0))
+      if (e$family$family == "gamma") {
+        if (e$family$alpha.fixed) {
+          alpha <- e$family$get_shape()
+          if (e$single.block)
+            kappa <- alpha * e$y
+          else {
+            kappa0 <- alpha * e$y
+            draw <- add(draw, quote(kappa <- kappa0 * exp(-p[["e_"]])))
+          }
+        } else {
+          draw <- add(draw, quote(alpha <- e$family$get_shape(p)))
+          if (e$single.block)
+            draw <- add(draw, quote(kappa <- alpha * e$y))
+          else
+            draw <- add(draw, quote(kappa <- alpha * e$y * exp(-p[["e_"]])))
+        }
+        if (informative.prior) {
+          alpha.ext <- kappa.ext <- c(rep.int(0, e$n), rep.int(prior$a, q))
+          range.n <- seq_len(e$n)
+          if (e$family$alpha.fixed)
+            alpha.ext[range.n] <- e$family$get_shape()
+          else
+            draw <- add(draw, quote(alpha.ext[range.n] <- alpha))
+          if (!zero.mean)
+            kappa.ext[(e$n + 1L):length(kappa.ext)] <- prior$a * exp((1/sqrt(prior$a)) * sqrt(prior$precision) * prior$mean)
+          if (e$single.block && e$family$alpha.fixed) {
+            kappa.ext[range.n] <- kappa
+            rm(range.n)
+          } else
+            draw <- add(draw, quote(kappa.ext[range.n] <- kappa))
+          draw <- add(draw, bquote(z <- rMLiG(.(e$n + q), alpha=alpha.ext, kappa=kappa.ext)))
+          H <- economizeMatrix(rbind(X, Cdiag((1/sqrt(prior$a)) * sqrt(prior$precision))))
+        } else {
+          draw <- add(draw, bquote(z <- rMLiG(.(e$n), alpha=alpha, kappa=kappa)))
+          H <- X
+        }
+        draw <- add(draw, quote(Hz <- crossprod_mv(H, z)))
+      } else if (all(Q0b0 == 0))
         draw <- add(draw, quote(Xy <- crossprod_mv(X, e$Q_e(p))))
       else
         draw <- add(draw, quote(Xy <- crossprod_mv(X, e$Q_e(p)) + Q0b0))
@@ -229,22 +303,27 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
         mat_sum <- make_mat_sum(M0=Q0, M1=crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e$n, 0.9, 1.1)), e$Q0)))
         MVNsampler <- create_TMVN_sampler(
           Q=mat_sum(crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e$n, 0.9, 1.1)), e$Q0))),
-          update.Q=TRUE, name=name, R=R, r=r, S=S, s=s, lower=lower, upper=upper
+          update.Q=TRUE, name=name, R=R, r=r, S=S, s=s, lower=lower, upper=upper,
+          chol.control=e$control$chol.control
         )
         draw <- add(draw, bquote(p <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])), Q=mat_sum(XX), Xy=Xy)))
       } else {
         MVNsampler <- create_TMVN_sampler(
           Q=crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e$n, 0.9, 1.1)), e$Q0)),
-          update.Q=TRUE, name=name, R=R, r=r, S=S, s=s, lower=lower, upper=upper
+          update.Q=TRUE, name=name, R=R, r=r, S=S, s=s, lower=lower, upper=upper,
+          chol.control=e$control$chol.control
         )
         draw <- add(draw, bquote(p <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])), Q=XX, Xy=Xy)))
       }
     } else {  # precision matrix XX + Q0 not updated
-      if (e$single.block && e$family$link != "probit") {
+      if (e$family$family == "gamma") {
+        cholHH <- build_chol(crossprod_sym(H, CdiagU(q)))
+        draw <- add(draw, bquote(p[[.(name)]] <- cholHH$solve(Hz)))
+      } else if (e$single.block && e$family$link != "probit") {
         MVNsampler <- create_TMVN_sampler(
           Q=crossprod_sym(X, e$Q0) + Q0, Xy=Xy,
-          R=R, r=r, S=S, s=s, lower=lower, upper=upper, perm=perm,
-          name=name
+          R=R, r=r, S=S, s=s, lower=lower, upper=upper,
+          name=name, chol.control=e$control$chol.control
         )
         draw <- add(draw, bquote(p[[.(name)]] <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])))[[.(name)]]))
         rm(Xy)
@@ -252,8 +331,8 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
         MVNsampler <- create_TMVN_sampler(
           Q=crossprod_sym(X, e$Q0) + Q0,
           update.mu=TRUE,
-          R=R, r=r, S=S, s=s, lower=lower, upper=upper, perm=perm,
-          name=name
+          R=R, r=r, S=S, s=s, lower=lower, upper=upper,
+          name=name, chol.control=e$control$chol.control
         )
         draw <- add(draw, bquote(p[[.(name)]] <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])), Xy=Xy)[[.(name)]]))
       }
@@ -268,32 +347,63 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
     }
     draw <- add(draw, quote(p))
 
-    start <- function(p) MVNsampler$start(p)
-  }  # END if (!in_block)
+    if(e$family$family == "gamma")
+      start <- function(p) {
+        if (is.null(p[[name]]))
+          p[[name]] <- rnorm(q)
+        else {
+          p[[name]] <- as.numeric(p[[name]])
+          if (length(p[[name]]) != q) stop("start value for '", name, "' has wrong length")
+        }
+        p
+      }
+    else
+      start <- function(p) MVNsampler$start(p)
+  } else if (!e$prior.only && prior$type == "fixed") {
+    if (in_block) stop("'pr_fixed' not supported for components in a Gibbs block")
+    draw <- function(p) {
+      if (debug) browser()
+      p[[name]] <- prior$rprior()
+      p
+    }
+    start <- function(p) {
+      if (is.null(p[[name]]))
+        p[[name]] <- prior$rprior()
+      else {
+        p[[name]] <- as.numeric(p[[name]])
+        if (length(p[[name]]) != q) stop("start value for '", name, "' has wrong length")
+      }
+      if (e$single.block) {
+        # compute residuals here once and for all
+        p[["e_"]] <- e$compute_e(p)
+      }
+      p
+    }
+  }
 
   if (!in_block || is.null(S)) rm(R, r, S, s, lower, upper)
 
   environment()
 }
 
-# experimental: display the reg component's prior
-show_reg <- function(mc) {
-  mod_str <- paste(mc$name, "~")
-  mod_str <- paste(mod_str,
-    if (mc$informative.prior) {
-      if (mc$e$sigma.fixed) {
-        "N(b0, Q0^-1)"
-      } else {
-        "N(b0, sigma_^2 Q0^-1)"
-      }
-    } else {
-      "1"
-    }
-  )
-  if (!is.null(mc$MVNsampler)) {
-    # TODO MVNsampler currently only used for posterior sampling
-    if (mc$MVNsampler$eq) mod_str <- paste0(mod_str, ",  R'", mc$name, " = r")
-    if (mc$MVNsampler$ineq) mod_str <- paste0(mod_str, ",  S'", mc$name, " >= s")
-  }
-  cat(mod_str, "\n")
-}
+# # experimental: display the reg component's prior
+# show_reg <- function(mc) {
+#   mod_str <- paste(mc$name, "~")
+#   mod_str <- paste(mod_str,
+#     if (mc$informative.prior) {
+#       if (mc$e$sigma.fixed) {
+#         "N(b0, Q0^-1)"
+#       } else {
+#         "N(b0, sigma_^2 Q0^-1)"
+#       }
+#     } else {
+#       "1"
+#     }
+#   )
+#   if (!is.null(mc$MVNsampler)) {
+#     # TODO MVNsampler currently only used for posterior sampling
+#     if (mc$MVNsampler$eq) mod_str <- paste0(mod_str, ",  R'", mc$name, " = r")
+#     if (mc$MVNsampler$ineq) mod_str <- paste0(mod_str, ",  S'", mc$name, " >= s")
+#   }
+#   cat(mod_str, "\n")
+# }

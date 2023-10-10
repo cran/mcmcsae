@@ -32,7 +32,7 @@ Select a subset of chains, samples and parameters from a draws component (dc) ob
 \examples{
 n <- 300
 dat <- data.frame(x=runif(n), f=as.factor(sample(1:7, n, replace=TRUE)))
-gd <- generate_data(~ reg(~ x + f, Q0=1, name="beta"), data=dat)
+gd <- generate_data(~ reg(~ x + f, prior=pr_normal(precision=1), name="beta"), data=dat)
 dat$y <- gd$y
 sampler <- create_sampler(y ~ reg(~ x + f, name="beta"), data=dat)
 sim <- MCMCsim(sampler)

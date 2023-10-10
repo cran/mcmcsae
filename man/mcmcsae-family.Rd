@@ -7,6 +7,7 @@
 \alias{f_negbinomial}
 \alias{f_poisson}
 \alias{f_multinomial}
+\alias{f_gamma}
 \title{Functions for specifying a sampling distribution and link function}
 \usage{
 f_gaussian(link = "identity")
@@ -18,6 +19,13 @@ f_negbinomial(link = "logit")
 f_poisson(link = "log")
 
 f_multinomial(link = "logit", K = NULL)
+
+f_gamma(
+  link = "log",
+  shape.vec = ~1,
+  shape.prior = pr_fixed(1),
+  shape.MH.type = c("RW", "gamma")
+)
 }
 \arguments{
 \item{link}{the name of a link function. Currently the only allowed link functions are:
@@ -25,6 +33,21 @@ f_multinomial(link = "logit", K = NULL)
 for binomial distributions and \code{"log"} for negative binomial sampling distributions.}
 
 \item{K}{number of categories for multinomial model; this must be specified for prior predictive sampling.}
+
+\item{shape.vec}{optional formula specification of unequal shape parameter for gamma family}
+
+\item{shape.prior}{prior for gamma shape parameter. Supported prior distributions:
+\code{\link{pr_fixed}} with a default value of 1, \code{\link{pr_exp}} and
+\code{\link{pr_gamma}}. The current default is that of a fixed shape
+equal to 1, i.e. \code{pr_fixed(value=1)}.}
+
+\item{shape.MH.type}{the type of Metropolis-Hastings algorithm employed
+in case the shape parameter is to be inferred. The two choices currently
+supported are "RW" for a random walk proposal on the log-shape scale
+and "gamma" for an approximating gamma proposal, found using an iterative
+algorithm. In the latter case, a Metropolis-Hastings accept-reject step is
+currently omitted, so the sampling algorithm is an approximate one,
+though one that is usually quite accurate and efficient.}
 }
 \value{
 A family object.
@@ -33,4 +56,9 @@ A family object.
 These functions are intended for use in the \code{family} argument of \code{\link{create_sampler}}.
 In future versions these functions may gain additional arguments, but currently the corresponding
 functions \code{gaussian} and \code{binomial} can be used as well.
+}
+\references{
+J.W. Miller (2019).
+   Fast and Accurate Approximation of the Full Conditional for Gamma Shape Parameters.
+   Journal of Computational and Graphical Statistics 28(2), 476-480.
 }

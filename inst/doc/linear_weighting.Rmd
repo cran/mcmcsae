@@ -145,7 +145,7 @@ prior distribution and inferred from the data.
 sampler <- create_sampler(model, formula.V=~vfac(prior=pr_invchisq(df="modeled")),
                           linpred=list(reg1=matrix(XpopR/N, nrow=1)),
                           data=apisrs, compute.weights=TRUE)
-sim <- MCMCsim(sampler, n.iter=5000, burnin=1000, verbose=FALSE)
+sim <- MCMCsim(sampler, burnin=1000, n.iter=5000, thin=2, verbose=FALSE)
 (summ <- summary(sim))
 plot(sim, "vfac1_df")
 acceptance_rates(sim)

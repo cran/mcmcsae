@@ -7,7 +7,7 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   debug <- any(sapply(mcs, `[[`, "debug"))
   vec_list <- list()
 
-  if (.opts$auto.order.block) {
+  if (e$control$auto.order.block) {
     # order the components such that sparse matrices come first; may help find a better Cholesky permutation
     o <- unname(which(vapply(mcs, function(m) isDiagonal(m$X), TRUE)))  # start with diagonal matrices
     if (length(o))
@@ -120,24 +120,31 @@ create_mc_block <- function(mcs, e=parent.frame()) {
       S <- NULL
     }
 
-    sparse_template(environment(), update.XX=e$modeled.Q || any(sapply(mcs, `[[`, "type") == "mec"),
+    if (e$family$family == "gamma") {
+      if (!e$control$add.outer.R || is.null(R)) {
+        mat_sum <- make_mat_sum(M0=XX, M1=QT)
+        XX_Q <- mat_sum(QT)
+        cholQ <- build_chol(XX_Q)
+      } else {
+        stop("TBI: blocked sampler for gamma family with constraints")
+      }
+    } else {
+      sparse_template(environment(), update.XX=e$modeled.Q || any(sapply(mcs, `[[`, "type") == "mec"),
                     add.outer.R=e$control$add.outer.R, prior.only=e$prior.only)
-
+    }
   } else {
     # TODO check that the only constraints are GMRF equality constraints
     S <- NULL
-    #CG_sampler <- do.call(setup_CG_sampler, c(list(mbs=mcs, X=X, sampler=e), e$control$CG))
     CG_sampler <- setup_CG_sampler(mbs=mcs, X=X, sampler=e, control = e$control$CG)
   }
 
   if (e$compute.weights) {
     # form the q_all x m matrix corresponding to the linear predictor as represented componentwise in linpred
     # TODO do we really need to store both X and t(X) in this case?
-    if (is.null(e$linpred)) {
-      linpred <- economizeMatrix(t(X), strip.names=FALSE)
-    } else {
-      linpred <- economizeMatrix(t(do.call(cbind, lapply(e$linpred[names(vec_list)], function(x) environment(x)$Xnew))), allow.tabMatrix=FALSE)
-    }
+    linpred <- if (is.null(e$linpred))
+      economizeMatrix(t(X), strip.names=FALSE)
+    else
+      economizeMatrix(t(do.call(cbind, lapply(e$linpred[names(vec_list)], function(x) environment(x)$Xnew))), allow.tabMatrix=FALSE)
   }
 
   if (e$prior.only) return(environment())
@@ -146,7 +153,9 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   draw <- function(p) {}
   if (debug) draw <- add(draw, quote(browser()))
   if (e$single.block) {
-    draw <- add(draw, quote(p$e_ <- e$y_eff()))
+    if (e$e.is.res || e$use.offset || e$family$family == "poisson")
+      draw <- add(draw, quote(p$e_ <- e$y_eff()))
+    # otherwise p$e_ = e$y_eff() = 0
   } else {
     for (m in seq_along(mcs)) {
       # residuals could also be computed using the block mb$X,
@@ -161,53 +170,98 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   draw <- add(draw, bquote(tau <- .(if (e$sigma.fixed) 1 else quote(1 / p[["sigma_"]]^2))))
   # update the block-diagonal joint precision matrix
   draw <- add(draw, quote(attr(QT, "x") <- get_Qvector(p, tau)))
-  if (!is.null(S)) {  # need to reconstruct coef_ as input to TMVN sampler
-    # TODO store coef_ component and only replace the subcomponents with PX
-    #      and check whether this works in case of gen component with gl=TRUE
-    draw <- add(draw, quote(
-      for (mc in mcs) p[["coef_"]][vec_list[[mc$name]]] <- p[[mc$name]]
-    ))
-  }
-  # update mec component columns of X
-  # TODO more efficient update of only those elements that can change (for dgC or matrix X)
-  for (mc in mcs)
-    if (mc$type == "mec")
-      draw <- add(draw, bquote(X[, vec_list[[.(mc$name)]]] <- p[[.(mc$name_X)]]))
-  if (e$single.block && !e$modeled.Q && !any(sapply(mcs, `[[`, "type") == "mec") && e$family$link != "probit")
-    Xy <- crossprod_mv(X, e$Q0 %m*v% e$y_eff())
-  else
-    draw <- add(draw, quote(Xy <- crossprod_mv(X, e$Q_e(p))))
-  if (is.null(e$control$CG)) {
-    if (e$modeled.Q) {
-      if (e$Q0.type == "symm")
-        draw <- add(draw, quote(XX <- crossprod_sym(X, p[["QM_"]])))
+  
+  if (e$family$family == "gamma") {
+    # TODO if only reg components cholQ is fixed
+    draw <- add(draw, quote(cholQ$update(mat_sum(QT))))
+    # compute alpha and kappa
+    if (e$family$alpha.fixed) {
+      alpha <- e$family$get_shape()
+      if (e$single.block)
+        kappa <- alpha * e$y
       else {
-        cps_template <- NULL
-        if (inherits(X, "dgCMatrix")) {
-          tryCatch(
-            cps_template <- sparse_crossprod_sym_template(X),
-            error = function(e) {
-              # template too large
-              NULL
-            }
-          )
-        }
-        if (is.null(cps_template)) {
-          draw <- add(draw, quote(XX <- crossprod_sym(X, p[["Q_"]])))
-        } else {
-          draw <- add(draw, quote(XX <- cps_template(p[["Q_"]])))
-        }
+        kappa0 <- alpha * e$y
+        draw <- add(draw, quote(kappa <- kappa0 * exp(-p[["e_"]])))
       }
-    } else if (any(sapply(mcs, `[[`, "type") == "mec")) {
-      draw <- add(draw, quote(XX <- crossprod_sym(X, e$Q0)))
+    } else {
+      draw <- add(draw, quote(alpha <- e$family$get_shape(p)))
+      if (e$single.block)
+        draw <- add(draw, quote(kappa <- alpha * e$y))
+      else
+        draw <- add(draw, quote(kappa <- alpha * e$y * exp(-p[["e_"]])))
     }
-    draw <- add(draw, quote(Qlist <- update(XX, QT, 1, 1/tau)))
-    draw <- add(draw, bquote(coef <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])), Q=Qlist$Q, Imult=Qlist$Imult, Xy=Xy)[[.(name)]]))
+    draw <- add(draw, quote(z <- rMLiG(e$n, alpha, kappa)))
+    draw <- add(draw, quote(Hz <- crossprod_mv(X, z)))
+    # contributions from mcs
+    draw <- add(draw, quote(
+      for (m in seq_along(mcs)) {
+        if (m == 1L) ind <- 1L
+        mc <- mcs[[m]]
+        if (mc$type == "reg") {
+          if (mc$informative.prior) {
+            if (mc$zero.mean)
+              z <- rMLiG(mc$q, rep.int(mc$prior$a, mc$q), rep.int(mc$prior$a, mc$q))
+            else
+              z <- rMLiG(mc$q, rep.int(mc$prior$a, mc$q), mc$prior$a * exp((1/sqrt(mc$prior$a)) * sqrt(mc$prior$precision) * mc$prior$mean))
+            Hz[ind:(ind + mc$q - 1L)] <- Hz[ind:(ind + mc$q - 1L)] + sqrt(mc$prior$precision) * z
+          }
+        } else {
+          stop("TBI: blocked sampler for gamma sampling distribution with other than reg components")
+        }
+        ind <- ind + mc$q
+      }
+    ))
+    draw <- add(draw, quote(coef <- cholQ$solve(Hz)))
   } else {
-    draw <- add(draw, quote(CGstart <- vector("numeric", ncol(X))))
-    draw <- add(draw, quote(for (mc in mcs) CGstart[vec_list[[mc$name]]] <- p[[mc$name]]))
-    draw <- add(draw, quote(coef <- CG_sampler$draw(p, Xy, X, QT, e, start=CGstart)))
+    if (!is.null(S)) {  # need to reconstruct coef_ as input to TMVN sampler
+      # TODO store coef_ component and only replace the subcomponents with PX
+      #      and check whether this works in case of gen component with gl=TRUE
+      draw <- add(draw, quote(
+        for (mc in mcs) p[["coef_"]][vec_list[[mc$name]]] <- p[[mc$name]]
+      ))
+    }
+    # update mec component columns of X
+    # TODO more efficient update of only those elements that can change (for dgC or matrix X)
+    for (mc in mcs)
+      if (mc$type == "mec")
+        draw <- add(draw, bquote(X[, vec_list[[.(mc$name)]]] <- p[[.(mc$name_X)]]))
+    if (e$single.block && !e$modeled.Q && !any(sapply(mcs, `[[`, "type") == "mec") && e$family$link != "probit")
+      Xy <- crossprod_mv(X, e$Q0 %m*v% e$y_eff())
+    else
+      draw <- add(draw, quote(Xy <- crossprod_mv(X, e$Q_e(p))))
+    if (is.null(e$control$CG)) {
+      if (e$modeled.Q) {
+        if (e$Q0.type == "symm")
+          draw <- add(draw, quote(XX <- crossprod_sym(X, p[["QM_"]])))
+        else {
+          cps_template <- NULL
+          if (inherits(X, "dgCMatrix")) {
+            tryCatch(
+              cps_template <- sparse_crossprod_sym_template(X, e$control$max.size.cps.template),
+              error = function(e) {
+                # template too large
+                NULL
+              }
+            )
+          }
+          if (is.null(cps_template)) {
+            draw <- add(draw, quote(XX <- crossprod_sym(X, p[["Q_"]])))
+          } else {
+            draw <- add(draw, quote(XX <- cps_template(p[["Q_"]])))
+          }
+        }
+      } else if (any(sapply(mcs, `[[`, "type") == "mec")) {
+        draw <- add(draw, quote(XX <- crossprod_sym(X, e$Q0)))
+      }
+      draw <- add(draw, quote(Qlist <- update(XX, QT, 1, 1/tau)))
+      draw <- add(draw, bquote(coef <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])), Q=Qlist$Q, Imult=Qlist$Imult, Xy=Xy)[[.(name)]]))
+    } else {
+      draw <- add(draw, quote(CGstart <- vector("numeric", ncol(X))))
+      draw <- add(draw, quote(for (mc in mcs) CGstart[vec_list[[mc$name]]] <- p[[mc$name]]))
+      draw <- add(draw, quote(coef <- CG_sampler$draw(p, Xy, X, QT, e, start=CGstart)))
+    }
   }
+
   # split coef and assign to the separate coefficient batches
   for (m in seq_along(mcs)) {
     if (mcs[[m]]$type == "gen" && mcs[[m]]$gl) {
@@ -220,7 +274,13 @@ create_mc_block <- function(mcs, e=parent.frame()) {
     if (e$e.is.res) {
       draw <- add(draw, bquote(mv_update(p[["e_"]], plus=FALSE, mcs[[.(m)]][["X"]], p[[.(mcs[[m]]$name)]])))
     } else {
-      draw <- add(draw, bquote(p$e_ <- p[["e_"]] + mcs[[.(m)]]$linpred(p)))
+      if (m == 1L && e$single.block && !e$use.offset && e$family$family != "poisson") {
+        # in this case p$e_ = e$y_eff() = 0
+        draw <- add(draw, quote(p$e_ <- mcs[[1L]]$linpred(p)))
+      } else {
+        #draw <- add(draw, bquote(p$e_ <- p[["e_"]] + mcs[[.(m)]]$linpred(p)))
+        draw <- add(draw, bquote(mv_update(p[["e_"]], plus=TRUE, mcs[[.(m)]][["X"]], p[[.(mcs[[m]]$name)]])))
+      }
     }
   }
   if (e$compute.weights) {
@@ -242,7 +302,11 @@ create_mc_block <- function(mcs, e=parent.frame()) {
 
   start <- function(p) {}
   if (is.null(e$control$CG)) {
-    start <- add(start, bquote(coef <- MVNsampler$start(p, e$scale_sigma)[[.(name)]]))
+    if (e$family$family == "gamma") {
+      start <- add(start, bquote(coef <- Crnorm(.(ncol(X)))))
+    } else {
+      start <- add(start, bquote(coef <- MVNsampler$start(p, e$scale_sigma)[[.(name)]]))
+    }
     start <- add(start, quote(
       for (mc in mcs) {
         if (mc$type == "gen" && mc$gl) {

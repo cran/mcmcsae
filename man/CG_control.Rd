@@ -9,6 +9,7 @@ CG_control(
   stop.criterion = NULL,
   preconditioner = c("GMRF", "GMRF2", "GMRF3", "identity"),
   scale = 1,
+  chol.control = chol_control(),
   verbose = FALSE
 )
 }
@@ -20,6 +21,8 @@ CG_control(
 \item{preconditioner}{one of  "GMRF", "GMRF2", "GMRF3" and "identity".}
 
 \item{scale}{scale parameter; only used by the "GMRF3" preconditioner.}
+
+\item{chol.control}{options for Cholesky decomposition, see \code{\link{chol_control}}.}
 
 \item{verbose}{whether diagnostic information about the CG sampler is shown.}
 }

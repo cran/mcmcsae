@@ -118,14 +118,15 @@ NumericVector Crgig(const int n, const NumericVector & p, const NumericVector & 
   const int np=p.size();
   const int na=a.size();
   const int nb=b.size();
-  double pi,ai,bi;
+  //double pi,ai,bi;
   GetRNGstate();
   for (int i = 0; i < n; ++i) {
+    /*
+    NB issue has been solved in GiGrvg 0.7
     // edge case issue in GIGrvg; for now we deal with these (gamma/invgamma) cases ourselves
     pi = np == 1 ? p[0] : p[i];
     ai = na == 1 ? a[0] : a[i];
     bi = nb == 1 ? b[0] : b[i];
-    // parameter translation: lambda=p, chi=b, psi=a
     if (ai < EPS || bi < EPS) {
       if (pi > 0.0) {
         out[i] = R::rgamma(pi, 2.0/ai);
@@ -135,11 +136,13 @@ NumericVector Crgig(const int n, const NumericVector & p, const NumericVector & 
     } else {
       out[i] = do_rgig1(pi, bi, ai);
     }
-    //out[i] = do_rgig1(
-    //  np == 1 ? p[0] : p[i],
-    //  nb == 1 ? b[0] : b[i],
-    //  na == 1 ? a[0] : a[i]
-    //);
+    */
+    // parameter translation: lambda=p, chi=b, psi=a
+    out[i] = do_rgig1(
+      np == 1 ? p[0] : p[i],
+      nb == 1 ? b[0] : b[i],
+      na == 1 ? a[0] : a[i]
+    );
   }
   PutRNGstate();
   return out;

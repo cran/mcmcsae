@@ -55,7 +55,7 @@
 #     \item{sparse}{UNDOCUMENTED}
 #'  }
 #' @param GMRFmats list of incidence/precision/constraint matrices. This can be specified
-#'  as an alternative to \code{factor}. It should be a list such as is usually returned
+#'  as an alternative to \code{factor}. It should be a list such as that returned
 #'  by \code{\link{compute_GMRF_matrices}}. Can be used together with argument \code{X}
 #'  as a flexible alternative to \code{formula} and \code{factor}.
 #' @param priorA prior distribution for scale factors at the variance scale associated with \code{QA}.
@@ -104,11 +104,8 @@
 #'  function \code{\link{MCMCsim}}. By default the name will be 'gen' with the number of the model term attached.
 #' @param sparse whether the model matrix associated with \code{formula} should be sparse.
 #'  The default is based on a simple heuristic based on storage size.
-#' @param perm whether permutation should be used in the Cholesky decomposition used for updating
-#'  the model component's coefficient vector. Default is based on a simple heuristic.
 #' @param debug if \code{TRUE} a breakpoint is set at the beginning of the posterior
 #'  draw function associated with this model component. Mainly intended for developers.
-#' @param e for internal use only.
 #' @return An object with precomputed quantities and functions for sampling from
 #'  prior or conditional posterior distributions for this model component. Intended
 #'  for internal use by other package functions.
@@ -153,9 +150,9 @@ gen <- function(formula = ~ 1, factor=NULL,
                 R0=NULL, RA=NULL, constr=NULL,
                 S0=NULL, SA=NULL,
                 formula.gl=NULL,
-                name="", sparse=NULL, perm=NULL,
-                debug=FALSE, e=parent.frame()) {
+                name="", sparse=NULL, debug=FALSE) {
 
+  e <- sys.frame(-2L)
   type <- "gen"  # for generic (random effects)
   if (name == "") stop("missing model component name")
 
@@ -216,7 +213,7 @@ gen <- function(formula = ~ 1, factor=NULL,
   }
   if (nrow(X) != e$n) stop("design matrix with incompatible number of rows")
   e$coef.names[[name]] <- colnames(X)
-  X <- economizeMatrix(X, strip.names=TRUE)
+  X <- economizeMatrix(X, strip.names=TRUE, check=TRUE)
   q <- ncol(X)
   in_block <- any(name == unlist(e$block, use.names=FALSE))
 
@@ -246,9 +243,9 @@ gen <- function(formula = ~ 1, factor=NULL,
     DA <- GMRFmats$D
     l <- ncol(DA)
     if (is.null(priorA))
-      QA <- economizeMatrix(crossprod(DA), sparse=if (in_block) TRUE else NULL, symmetric=TRUE)
+      QA <- economizeMatrix(crossprod(DA), sparse=if (in_block) TRUE else NULL, symmetric=TRUE, check=TRUE)
   } else {  # compute precision matrix QA only
-    QA <- economizeMatrix(GMRFmats$Q, sparse=if (in_block) TRUE else NULL, symmetric=TRUE)
+    QA <- economizeMatrix(GMRFmats$Q, sparse=if (in_block) TRUE else NULL, symmetric=TRUE, check=TRUE)
     l <- nrow(QA)
   }
   if (q %% l != 0L) stop("incompatible dimensions of design and precision matrices")
@@ -260,10 +257,10 @@ gen <- function(formula = ~ 1, factor=NULL,
     if (Leroux_type != "none") stop("not implemented: scaled Leroux type correlation")
     switch(priorA$type,
       invchisq = {
-        priorA <- pr_invchisq(priorA$df, priorA$scale, lD, !e$prior.only)
+        priorA$init(lD, !e$prior.only)
         df.data.omega <- q0  # TODO is this always the correct value?
       },
-      exp = priorA <- pr_exp(priorA$scale, lD, !e$prior.only)
+      exp = priorA$init(lD, !e$prior.only)
     )
   }
 
@@ -307,7 +304,7 @@ gen <- function(formula = ~ 1, factor=NULL,
         if (length(PX$Q0) == 1L) PX$Q0 <- rep.int(PX$Q0, q0)
         PX$Q0 <- Cdiag(PX$Q0)
       }
-      PX$Q0 <- economizeMatrix(PX$Q0, sparse=PX$sparse, symmetric=TRUE)
+      PX$Q0 <- economizeMatrix(PX$Q0, sparse=PX$sparse, symmetric=TRUE, check=TRUE)
       base_tcrossprod <- base::tcrossprod  # faster access (Matrix promotes tcrossprod to S4 generic)
     }
     if (length(PX$mu0) != PX$dim) stop("wrong length for 'PX$mu0'")
@@ -343,7 +340,7 @@ gen <- function(formula = ~ 1, factor=NULL,
   } else {
     if (nrow(RA) != l) stop("incompatible matrix RA")
     if (!is.null(GMRFmats$R)) {
-      RA <- economizeMatrix(cbind(RA, GMRFmats$R), allow.tabMatrix=FALSE)
+      RA <- economizeMatrix(cbind(RA, GMRFmats$R), allow.tabMatrix=FALSE, check=TRUE)
       RA <- remove_redundancy(RA)  # combination of user-supplied and IGMRF constraints may contain redundant columns
     }
   }
@@ -356,7 +353,7 @@ gen <- function(formula = ~ 1, factor=NULL,
   )
   if (!is.null(R)) {
     # tabMatrix doesn't work yet because of lack of solve method
-    R <- economizeMatrix(R, allow.tabMatrix=FALSE)
+    R <- economizeMatrix(R, allow.tabMatrix=FALSE, check=TRUE)
   }
   if (!is.null(R0) && !is.null(RA)) R <- remove_redundancy(R)
   rm(R0, GMRFmats)
@@ -381,23 +378,23 @@ gen <- function(formula = ~ 1, factor=NULL,
   if (all(prior$type != if (var == "unstructured") "invwishart" else c("invchisq", "exp"))) stop("unsupported prior")
   if (is.list(prior$df)) stop("not supported: modeled df for random effect variance prior")
   switch(prior$type,
-    invwishart = prior <- pr_invwishart(prior$df, prior$scale, q0),
+    invwishart = prior$init(q0),
     invchisq = {
       if (var == "scalar") {
-        prior <- pr_invchisq(prior$df, prior$scale, 1L, !e$prior.only)
+        prior$init(1L, !e$prior.only)
         df.data <- if (is.null(R)) q else q - ncol(R)
       } else {  # var "diagonal"
-        prior <- pr_invchisq(prior$df, prior$scale, q0, !e$prior.only)
+        prior$init(q0, !e$prior.only)
         # df based on number of unconstrained coefficients
         df.data <- if (is.null(RA)) l else l - ncol(RA)
       }
     },
     exp = {
       if (var == "scalar") {
-        prior <- pr_exp(prior$scale, 1L, !e$prior.only)
+        prior$init(1L, !e$prior.only)
         ppar <- if (is.null(R)) q else q - ncol(R)
       } else {  # var "diagonal"
-        prior <- pr_exp(prior$scale, q0, !e$prior.only)
+        prior$init(q0, !e$prior.only)
         ppar <- if (is.null(RA)) l else l - ncol(RA)
       }
       ppar <- 1 - ppar/2
@@ -407,7 +404,7 @@ gen <- function(formula = ~ 1, factor=NULL,
   if (var == "scalar") {
     # also check given precision matrix Q0, if any
     if (!is.null(Q0)) {
-      Q0 <- economizeMatrix(Q0, symmetric=TRUE, vec.diag=TRUE)
+      Q0 <- economizeMatrix(Q0, symmetric=TRUE, vec.diag=TRUE, check=TRUE)
       if (is.vector(Q0)) {
         if (all(length(Q0) != c(1L, q0))) stop("incompatible 'Q0'")
       } else {
@@ -433,7 +430,6 @@ gen <- function(formula = ~ 1, factor=NULL,
     name_gl <- paste0(name, "_gl")
     glp <- vars[[1L]]
     glp$name <- name_gl
-    glp$e <- self
     gl <- TRUE
     rm(vars)
   }
@@ -475,7 +471,7 @@ gen <- function(formula = ~ 1, factor=NULL,
 
   make_predict <- function(newdata=NULL, Xnew, verbose=TRUE) {
     if (is.null(newdata)) {
-      Xnew <- economizeMatrix(Xnew, strip.names=TRUE)
+      Xnew <- economizeMatrix(Xnew, strip.names=TRUE, check=TRUE)
       if (ncol(Xnew) != q) stop("wrong number of columns for Xnew matrix of component ", name)
       linpred <- function(p) Xnew %m*v% p[[name]]
     } else {
@@ -505,7 +501,7 @@ gen <- function(formula = ~ 1, factor=NULL,
         # in this case we allow oos random effects and mixed cases by matching training and test levels
         m <- match(colnames(Xnew), e$coef.names[[name]])
         qnew <- ncol(Xnew)
-        Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE)
+        Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE, check=TRUE)
         if (all(is.na(m))) {
           # all random effects in Xnew are new
           if (verbose) message("model component '", name, "': all categories in 'newdata' are out-of-sample categories")
@@ -540,7 +536,7 @@ gen <- function(formula = ~ 1, factor=NULL,
         if (remove.redundant || drop.empty.levels)
         Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
         if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
-        Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE)
+        Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE, check=TRUE)
         linpred <- function(p) Xnew %m*v% p[[name]]
       }
     }
@@ -605,7 +601,7 @@ gen <- function(formula = ~ 1, factor=NULL,
   }
 
   if (gl) {  # draw group-level predictor coefficients
-    rprior <- add(rprior, bquote(p[[.(name_gl)]] <- drawMVN_Q(glp$Q0, sd=.(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])))))
+    rprior <- add(rprior, bquote(p[[.(name_gl)]] <- glp$prior$rprior(p)))
   }
 
   if (!is.null(priorA)) {
@@ -643,6 +639,14 @@ gen <- function(formula = ~ 1, factor=NULL,
       rprior <- add(rprior, quote(if (is.null(rMVNprior)) setup_priorMVNsampler(self, Q)))
       rprior <- add(rprior, bquote(p[[.(name)]] <- rMVNprior(p, Q)))
     }
+  }
+  if (gl) {
+    # add U alpha, where U = glp$X x I_q0 and alpha are the gl effects
+    #rprior <- add(rprior, quote(browser()))
+    if (glp$p0 == 1L)
+      rprior <- add(rprior, bquote(p[[.(name)]] <- p[[.(name)]] + glp$X %m*m% matrix(p[[.(name_gl)]], 1L)))
+    else
+      rprior <- add(rprior, quote(stop("TBI: include multiple group-level effect centering in generation of random effects")))
   }
   rprior <- add(rprior, quote(p))
   # END rprior function
@@ -744,16 +748,17 @@ gen <- function(formula = ~ 1, factor=NULL,
   if (gl) {  # group-level predictors
     if (usePX) {
       # MH step
-      if (PX$vector) {
+      if (PX$vector)
         draw <- add(draw, bquote(logr <- .(glp$p0) * (sum(log(abs(xi))) - sum(log(abs(p[[.(name_xi)]]))))))
-      } else {
-        draw <- add(draw, bquote(logr <- .(q0 * glp$p0) * (sum(log(abs(xi))) - sum(log(abs(p[[.(name_xi)]]))))))
-      }
+      else
+        draw <- add(draw, bquote(logr <- .(q0 * glp$p0) * (log(abs(xi)) - log(abs(p[[.(name_xi)]])))))
       draw <- add(draw, bquote(delta <- (xi * inv_xi) * p[[.(name_gl)]]))
+      # in case !sigma.fixed, we need sigma^-2 factor in 2nd term on next line(?)
       draw <- add(draw, quote(logr <- logr - 0.5 * dotprodC(delta, glp$Q0 %m*v% delta)))
       draw <- add(draw, bquote(delta <- p[[.(name_gl)]]))
+      # in case !sigma.fixed, we need sigma^-2 factor in 2nd term on next line(?)
       draw <- add(draw, quote(logr <- logr + 0.5 * dotprodC(delta, glp$Q0 %m*v% delta)))
-      draw <- add(draw, bquote(if (logr < log(runif(1L))) xi <- p[[.(name_xi)]]))  # reject, otherwise accept
+      draw <- add(draw, bquote(if (logr < log(runif(1L))) xi <- p[[.(name_xi)]]))  # NB reject, otherwise accept
     }
     # NB use old value of xi to get 'raw' group-level coefficients
     if (q0 == 1L) {
@@ -996,8 +1001,8 @@ setup_priorGMRFsampler <- function(mc, Qv) {
   # TODO
   # - support local scale parameters DA --> diag(omega_i)^-1/2 DA
   # - in some cases perm=TRUE may be more efficient
-  mc$cholDD <- build_chol(tcrossprod(mc$DA), perm=FALSE)
-  mc$cholQv <- build_chol(Qv, perm=FALSE)
+  mc$cholDD <- build_chol(tcrossprod(mc$DA), control=chol_control(perm=FALSE))
+  mc$cholQv <- build_chol(Qv, control=chol_control(perm=FALSE))
   rGMRF <- function(Qv) {}
   rGMRF <- add(rGMRF, quote(cholQv$update(Qv)))
   if (mc$q0 == 1L) {

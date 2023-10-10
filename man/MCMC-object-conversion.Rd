@@ -64,7 +64,7 @@ str(as.matrix(sim$beta))
 # generate some example data
 n <- 250
 dat <- data.frame(x=runif(n), f=as.factor(sample(1:5, n, replace=TRUE)))
-gd <- generate_data(~ reg(~ x + f, Q0=1, name="beta"), data=dat)
+gd <- generate_data(~ reg(~ x + f, prior=pr_normal(precision=1), name="beta"), data=dat)
 dat$y <- gd$y
 sampler <- create_sampler(y ~ reg(~ x + f, name="beta"), data=dat)
 sim <- MCMCsim(sampler, n.chain=2, n.iter=400)

@@ -29,8 +29,8 @@ TMVN_HMC_C <- function(S, S_cols, v0, x0, s_adj, refl_fac, zero_mu, mu, simplifi
     .Call(`_mcmcsae_TMVN_HMC_C`, S, S_cols, v0, x0, s_adj, refl_fac, zero_mu, mu, simplified, VS, diagnostic, bounces, t_sim, max_refl)
 }
 
-cCHM_dsC_Cholesky <- function(a, perm, LDL, super, Imult, m) {
-    .Call(`_mcmcsae_cCHM_dsC_Cholesky`, a, perm, LDL, super, Imult, m)
+cCHM_dsC_Cholesky <- function(a, perm, super, Imult, m) {
+    .Call(`_mcmcsae_cCHM_dsC_Cholesky`, a, perm, super, Imult, m)
 }
 
 cCHMf_solve <- function(a, b, system) {

@@ -14,13 +14,18 @@
 #'  The default is determined by a simple heuristic based on storage size.
 #' @param X a (possibly sparse) design matrix can be specified directly, as an alternative to the
 #'  creation of one based on \code{formula}. If \code{X} is specified \code{formula} is ignored.
+#' @param prior prior specification for the coefficients. Currently only
+#'  normal priors are supported, specified using function \code{\link{pr_normal}}.
 #' @param Q0 prior precision matrix for the regression effects. The default is a
 #'  zero matrix corresponding to a noninformative improper prior.
+#'  DEPRECATED, please use argument \code{prior} instead, i.e.
+#'  \code{prior = pr_normal(mean = b0.value, precision = Q0.value)}.
 #' @param b0 prior mean for the regression effect. Defaults to a zero vector.
+#'  DEPRECATED, please use argument \code{prior} instead, i.e.
+#'  \code{prior = pr_normal(mean = b0.value, precision = Q0.value)}.
 #' @param name the name of the model component. This name is used in the output of the
 #'  MCMC simulation function \code{\link{MCMCsim}}. By default the name will be 'vreg'
 #'  with the number of the variance model term attached.
-#' @param e for internal use only.
 #' @return An object with precomputed quantities and functions for sampling from
 #'  prior or conditional posterior distributions for this model component. Intended
 #'  for internal use by other package functions.
@@ -34,8 +39,9 @@
 #'    of the t distribution for longitudinal data.
 #'    Journal of Statistical Planning and Inference 141(4), 1543-1553.
 vreg <- function(formula=NULL, remove.redundant=FALSE, sparse=NULL, X=NULL,
-                 Q0=NULL, b0=NULL, name="", e=parent.frame()) {
+                 prior=NULL, Q0=NULL, b0=NULL, name="") {
 
+  e <- sys.frame(-2L)
   type <- "vreg"
   if (name == "") stop("missing model component name")
 
@@ -45,48 +51,48 @@ vreg <- function(formula=NULL, remove.redundant=FALSE, sparse=NULL, X=NULL,
     X <- model_matrix(formula, e$data, sparse=sparse)
     if (remove.redundant) X <- remove_redundancy(X)
   } else
-    X <- economizeMatrix(X, strip.names=FALSE)
+    X <- economizeMatrix(X, strip.names=FALSE, check=TRUE)
   if (nrow(X) != e$n) stop("design matrix with incompatible number of rows")
   e$coef.names[[name]] <- colnames(X)
   X <- unname(X)
   q <- ncol(X)
 
-  Q0 <- set_prior_precision(Q0, q)
-  informative.prior <- !is_zero_matrix(Q0)
-  if (!informative.prior || is.null(b0) || all(b0 == 0)) {
-    b0 <- 0
-    Q0b0 <- 0
-    zero.mean <- TRUE
+  if (!is.null(b0) || !is.null(Q0)) {
+    warn("arguments 'b0' and 'Q0' are deprecated; please use argument 'prior' instead")
+    if (is.null(prior)) prior <- pr_normal(mean = if (is.null(b0)) 0 else b0, precision = if (is.null(Q0)) 0 else Q0)
   } else {
-    if (length(b0) == 1L) {
-      Q0b0 <- Q0 %m*v% rep.int(b0, q)
-    } else {
-      if (length(b0) == q)
-        Q0b0 <- Q0 %m*v% b0
-      else
-        stop("wrong input for prior mean 'b0' in model component", name)
-    }
-    zero.mean <- FALSE
+    if (is.null(prior)) prior <- pr_normal(mean=0, precision=0)
   }
+  if (prior$type != "normal") stop("only a normal prior is currently supported for 'vreg' model component effects")
+  prior$init(q, e$coef.names[[name]])
+  informative.prior <- prior$informative
+  Q0 <- prior$precision
+  zero.mean <- !informative.prior || all(prior$mean == 0)
+  if (zero.mean) {
+    prior$mean <- 0
+    Q0b0 <- 0
+  } else {
+    if (length(prior$mean) == 1L)
+      Q0b0 <- Q0 %m*v% rep.int(prior$mean, q)
+    else
+      Q0b0 <- Q0 %m*v% prior$mean
+  }
+  rprior <- function(p) prior$rprior(p)
+
   sumX <- 0.5 * colSums(X) - Q0b0
 
-  MVNsampler <- create_TMVN_sampler(
-    Q=0.5*crossprod(X) + Q0, name=name
-  )
+  MVNsampler <- create_TMVN_sampler(Q=0.5*crossprod(X) + Q0, name=name)
 
   compute_Qfactor <- function(p) exp(X %m*v% (- p[[name]]))
 
   # function that creates an oos prediction function (closure) based on new data
   make_predict_Vfactor <- function(newdata) {
-    #Xnew <- unname(compute_X(formula, data=newdata))  # oos design matrix
     Xnew <- model_matrix(formula, newdata)
     # TODO remove columns not corresponding to columns in X
     Xnew <- unname(Xnew)
     rm(newdata)
     function(p) exp(Xnew %m*v% p[[name]])
   }
-
-  rprior <- function(p) b0 + drawMVN_Q(Q0)
 
   if (e$prior.only) return(environment())
 
@@ -103,9 +109,9 @@ vreg <- function(formula=NULL, remove.redundant=FALSE, sparse=NULL, X=NULL,
     else
       Qres <- p[["Q_"]] * (1 / p[["sigma_"]]^2) * p[["e_"]]^2
     Qratio <- exp(X %m*v% (gamma - gamma.star))
-    log_ar <- 0.5 * (dotprodC(gamma, Q0 %m*v% gamma) - dotprodC(gamma.star, Q0 %m*v% gamma.star)) +
+    log.ar <- 0.5 * (dotprodC(gamma, Q0 %m*v% gamma) - dotprodC(gamma.star, Q0 %m*v% gamma.star)) +
               dotprodC(gamma - gamma.star, sumX) + 0.5 * sum((1 - Qratio) * Qres)
-    if (log(runif(1L)) < log_ar) {
+    if (log(runif(1L)) < log.ar) {
       p[[name]] <- gamma.star
       p$Q_ <- p[["Q_"]] * Qratio
     }

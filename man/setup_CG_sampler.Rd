@@ -24,9 +24,9 @@ An environment with precomputed quantities and functions for multiplication
 Set up conjugate gradient sampler
 }
 \references{
-A. Nishimura and M.A. Suchard (2018).
+A. Nishimura and M.A. Suchard (2022).
    Prior-preconditioned conjugate gradient method for accelerated Gibbs sampling in
-   large n & large p sparse Bayesian regression.
-   arXiv:1810.12437.
+   "large n, large p" Bayesian sparse regression.
+   Journal of the American Statistical Association, 1-14.
 }
 \keyword{internal}

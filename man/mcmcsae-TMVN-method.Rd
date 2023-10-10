@@ -31,12 +31,21 @@ m_HMCZigZag(
   debug = FALSE
 )
 
-m_softTMVN(sharpness = 100, useV = FALSE, debug = FALSE)
+m_softTMVN(
+  sharpness = 100,
+  useV = FALSE,
+  CG = NULL,
+  PG.approx = TRUE,
+  PG.approx.m = -2L,
+  debug = FALSE
+)
 }
 \arguments{
 \item{slice}{if \code{TRUE}, a Gibbs within slice sampler is used.}
 
-\item{diagnostic}{whether information about violations of inequalities is printed to the screen}
+\item{diagnostic}{whether information about violations of inequalities, bounces
+off inequality walls (for 'HMC' and 'HMCZigZag' methods) or gradient events
+(for 'HMCZigZag') is printed to the screen.}
 
 \item{debug}{if \code{TRUE} a breakpoint is set at the beginning of the TMVN sampling
 function. Mainly intended for developers.}
@@ -67,11 +76,20 @@ one or the number of inequality restrictions.}
 
 \item{useV}{for method 'softTMVN' whether to base computations on variance instead of precision
 matrices.}
+
+\item{CG}{use a conjugate gradient iterative algorithm instead of Cholesky updates for sampling
+the model's coefficients. This must be a list with possible components \code{max.it},
+\code{stop.criterion}, \code{verbose}. See the help for function \code{\link{CG_control}},
+which can be used to specify these options. Currently the preconditioner and scale
+options cannot be set for this use case.}
+
+\item{PG.approx}{see \code{\link{sampler_control}}.}
+
+\item{PG.approx.m}{see \code{\link{sampler_control}}.}
 }
 \value{
 A method object, for internal use only.
 }
 \description{
 These functions are intended for use in the \code{method} argument of \code{\link{create_TMVN_sampler}}.
-In future versions these functions may gain additional arguments.
 }

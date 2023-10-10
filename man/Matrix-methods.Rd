@@ -6,6 +6,8 @@
 \alias{\%*\%,dgCMatrix,matrix-method}
 \alias{\%*\%,dsCMatrix,matrix-method}
 \alias{\%*\%,tabMatrix,matrix-method}
+\alias{\%*\%,matrix,tabMatrix-method}
+\alias{\%*\%,tabMatrix,numLike-method}
 \alias{\%*\%,ddiMatrix,dgCMatrix-method}
 \alias{\%*\%,ddiMatrix,tabMatrix-method}
 \alias{\%*\%,CsparseMatrix,tabMatrix-method}
@@ -27,6 +29,10 @@
 \S4method{\%*\%}{dsCMatrix,matrix}(x, y)
 
 \S4method{\%*\%}{tabMatrix,matrix}(x, y)
+
+\S4method{\%*\%}{matrix,tabMatrix}(x, y)
+
+\S4method{\%*\%}{tabMatrix,numLike}(x, y)
 
 \S4method{\%*\%}{ddiMatrix,dgCMatrix}(x, y)
 

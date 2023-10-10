@@ -2,24 +2,18 @@
 % Please edit documentation in R/priors.R
 \name{pr_fixed}
 \alias{pr_fixed}
-\title{Create an object containing information about a degenerate prior fixing a
-parameter to a fixed value}
+\title{Create an object representing a degenerate prior fixing a
+parameter (vector) to a fixed value}
 \usage{
-pr_fixed(value = 1, n = NULL, post = FALSE)
+pr_fixed(value = 1)
 }
 \arguments{
-\item{value}{value parameter of length 1 or \code{n}.}
-
-\item{n}{dimension, if known. For internal use only.}
-
-\item{post}{whether conditional posterior sampling function should be
-created. For internal use only.}
+\item{value}{scalar or vector value parameter.}
 }
 \value{
-An environment with information about the prior and possibly conditional
- posterior distribution(s), to be used by other package functions.
+An environment representing the specified prior, for internal use.
 }
 \description{
-Create an object containing information about a degenerate prior fixing a
-parameter to a fixed value
+Create an object representing a degenerate prior fixing a
+parameter (vector) to a fixed value
 }

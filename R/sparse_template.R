@@ -51,7 +51,7 @@ sparse_template <- function(mc, update.XX=FALSE, add.outer.R=FALSE, prior.only=F
       XX_Q <- if (update.XX) mat_sum(XX, Q) else mat_sum(Q)
       tryCatch(
         suppressWarnings(
-          mc$MVNsampler <- create_TMVN_sampler(Q=XX_Q, update.Q=TRUE, name=mc$name, R=R, S=mc$S)
+          mc$MVNsampler <- create_TMVN_sampler(Q=XX_Q, update.Q=TRUE, name=mc$name, R=R, S=mc$S, chol.control=mc$e$control$chol.control)
         ),
         error = function(e) {
           # TODO really need this? examples? besides, determinant check is not a very reliable test for singularity
@@ -77,7 +77,7 @@ sparse_template <- function(mc, update.XX=FALSE, add.outer.R=FALSE, prior.only=F
       else
         mat_sum <- make_mat_sum(M0=economizeMatrix(XX + tcrossprod(R), symmetric=TRUE), M1=Q)
       XX_Q <- if (update.XX) mat_sum(XX, Q) else mat_sum(Q)
-      mc$MVNsampler <- create_TMVN_sampler(Q=XX_Q, update.Q=TRUE, name=mc$name, R=R, S=mc$S)
+      mc$MVNsampler <- create_TMVN_sampler(Q=XX_Q, update.Q=TRUE, name=mc$name, R=R, S=mc$S, chol.control=mc$e$control$chol.control)
     }
 
     keep.ms <- TRUE

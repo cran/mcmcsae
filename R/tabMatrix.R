@@ -313,6 +313,31 @@ setMethod("rbind2", c("tabMatrix", "tabMatrix"), function(x, y, ...) {
   out
 })
 
+setMethod("rbind2", c("tabMatrix", "Matrix"), function(x, y, ...)
+  rbind2(Ctab2dgC(x), y, ...)
+)
+setMethod("rbind2", c("Matrix", "tabMatrix"), function(x, y, ...)
+  rbind2(x, Ctab2dgC(y), ...)
+)
+setMethod("cbind2", c("tabMatrix", "Matrix"), function(x, y, ...)
+  cbind2(Ctab2dgC(x), y, ...)
+)
+setMethod("cbind2", c("Matrix", "tabMatrix"), function(x, y, ...)
+  cbind2(x, Ctab2dgC(y), ...)
+)
+setMethod("rbind2", c("tabMatrix", "matrix"), function(x, y, ...)
+  rbind2(Ctab2dgC(x), y, ...)
+)
+setMethod("rbind2", c("matrix", "tabMatrix"), function(x, y, ...)
+  rbind2(x, Ctab2dgC(y), ...)
+)
+setMethod("cbind2", c("tabMatrix", "matrix"), function(x, y, ...)
+  cbind2(Ctab2dgC(x), y, ...)
+)
+setMethod("cbind2", c("matrix", "tabMatrix"), function(x, y, ...)
+  cbind2(x, Ctab2dgC(y), ...)
+)
+
 
 setMethod("nnzero", "tabMatrix", function(x, na.counted=NA) {
   if (x@reduced)

@@ -11,10 +11,11 @@ K <- 5  # number of categories
 
 test_that("categorical data generation, fitting and prediction work", {
   gd <- generate_data(
-    ~ reg(~ 1 + x, b0=c(-1, 1), Q0=1e10),
+    ~ reg(~ 1 + x, prior=pr_fixed(c(-1, 1))),
     family=f_multinomial(K=K),
     data=dat
   )
+  expect_equal(gd$pars$reg1, setNames(c(-1, 1), c("(Intercept)", "x")))
   expect_true(is.integer(gd$y))
   expect_true(all(gd$y %in% 1:5))
   dat$y <- gd$y
@@ -36,7 +37,7 @@ test_that("categorical data generation, fitting and prediction work", {
 test_that("multinomial data generation works", {
   ny <- 10
   gd <- generate_data(
-    ~ reg(~ 1 + x, b0=c(-1, 1), Q0=1e10),
+    ~ reg(~ 1 + x, prior=pr_fixed(c(-1, 1))),
     family=f_multinomial(K=K), ny=ny,
     data=dat
   )

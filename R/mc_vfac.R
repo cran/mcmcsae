@@ -19,15 +19,15 @@
 #'  term attached.
 #' @param debug If \code{TRUE} a breakpoint is set at the beginning of the posterior
 #'  draw function associated with this model component. Mainly intended for developers.
-#' @param e For internal use only.
 #' @return An object with precomputed quantities and functions for sampling from
 #'  prior or conditional posterior distributions for this model component. Intended
 #'  for internal use by other package functions.
 # TODO generalize inverse chi-squared (including beta-prime) and exponential priors to generalized hyperbolic
 vfac <- function(factor="local_",
                  prior=pr_invchisq(df=1, scale=1),
-                 name="", debug=FALSE, e=parent.frame()) {
+                 name="", debug=FALSE) {
 
+  e <- sys.frame(-2L)
   type <- "vfac"
   if (name == "") stop("missing model component name")
 
@@ -53,9 +53,9 @@ vfac <- function(factor="local_",
     if (sum(abs(commutator(e$Q0, Diagonal(x = X %m*v% sin(1.23*seq_len(q)))))) > sqrt(.Machine$double.eps)) stop("'formula.V' incompatible with 'Q0'")
   }
 
-  prior <- switch(prior$type,
-    invchisq = pr_invchisq(prior$df, prior$scale, q, !e$prior.only),
-    exp = pr_exp(prior$scale, q, !e$prior.only)
+  switch(prior$type,
+    invchisq = prior$init(q, !e$prior.only),
+    exp = prior$init(q, !e$prior.only)
   )
 
   compute_Qfactor <- function(p) X %m*v% (1 / p[[name]])

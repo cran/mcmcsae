@@ -15,11 +15,11 @@ options(width=100)  # width of output
 
 The basic area-level model [@Fay1979; @rao2015small] is given by
 $$
-y_i | \theta_i \stackrel{\mathrm{ind}}{\sim} {\cal N} (\theta_i, \psi_i) \,, \\
+y_i | \theta_i \stackrel{\mathrm{iid}}{\sim} {\cal N} (\theta_i, \psi_i) \,, \\
 \theta_i = \beta' x_i  + v_i \,,
 $$
 where $i$ runs from 1 to $m$, the number of areas, $\beta$ is a vector of regression coefficients for given
-covariates $x_i$, and $v_i \stackrel{\mathrm{ind}}{\sim} {\cal N} (0, \sigma_v^2)$ are independent
+covariates $x_i$, and $v_i \stackrel{\mathrm{iid}}{\sim} {\cal N} (0, \sigma_v^2)$ are independent
 random area effects. For each area an observation $y_i$ is available with given variance $\psi_i$.
 
 First we generate some data according to this model:

@@ -2,26 +2,20 @@
 % Please edit documentation in R/priors.R
 \name{pr_gig}
 \alias{pr_gig}
-\title{Create an object containing information about Generalized Inverse Gaussian (GIG) prior distributions}
+\title{Create an object representing Generalized Inverse Gaussian (GIG) prior distributions}
 \usage{
-pr_gig(a, b, p, n = NULL, post = FALSE)
+pr_gig(a, b, p)
 }
 \arguments{
-\item{a}{parameter of length 1 or \code{n}.}
+\item{a}{scalar or vector parameter.}
 
-\item{b}{parameter of length 1 or \code{n}.}
+\item{b}{scalar or vector parameter.}
 
-\item{p}{parameter of length 1 or \code{n}.}
-
-\item{n}{dimension, if known. For internal use only.}
-
-\item{post}{whether conditional posterior sampling function should be
-created. For internal use only.}
+\item{p}{scalar or vector parameter.}
 }
 \value{
-An environment with information about the prior and possibly conditional
- posterior distribution(s), to be used by other package functions.
+An environment representing the specified prior, for internal use.
 }
 \description{
-Create an object containing information about Generalized Inverse Gaussian (GIG) prior distributions
+Create an object representing Generalized Inverse Gaussian (GIG) prior distributions
 }

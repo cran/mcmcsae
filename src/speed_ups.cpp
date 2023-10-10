@@ -62,9 +62,9 @@ void mv_update(Eigen::Map<Eigen::VectorXd> & y, const bool plus, const SEXP M, c
       const bool num(::Rf_asLogical(as<S4>(M).slot("num")));
       if (reduced) {
         if (plus) {
-          for (int i = 0; i < n; i++) y[i] += (perm[i] >= 0) * x[perm[i]];
+          for (int i = 0; i < n; i++) if (perm[i] >= 0) y[i] += x[perm[i]];
         } else {
-          for (int i = 0; i < n; i++) y[i] -= (perm[i] >= 0) * x[perm[i]];
+          for (int i = 0; i < n; i++) if (perm[i] >= 0) y[i] -= x[perm[i]];
         }
       } else if (num) {
         const NumericVector Mxslot(as<S4>(M).slot("x"));

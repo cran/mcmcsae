@@ -6,7 +6,8 @@ set.seed(1, kind="Mersenne-Twister", normal.kind="Inversion")
 n <- 100L
 df <- data.frame(x=runif(n), f=factor(sample(1:8, n, replace=TRUE)))
 Vmodel <- ~ vfac(factor="f", prior=pr_invchisq(df=5))
-dat <- generate_data(~ reg(~ x + f, Q0=1), sigma.fixed=TRUE, formula.V=Vmodel, data=df)
+dat <- generate_data(~ reg(~ x + f, prior=pr_normal(precision=1)),
+                     sigma.fixed=TRUE, formula.V=Vmodel, data=df)
 
 test_that("generated data based on vfac model is OK", {
   expect_true(length(dat$y) == n)
@@ -28,7 +29,8 @@ test_that("modeling vfac variance structure works", {
 subdiv <- c(25,10,25,25,8,7)
 df$f <- as.factor(rep(1:6, subdiv))
 Q0 <- bdiag(mapply(Q_RW2, subdiv)) + Diagonal(n)
-dat <- generate_data(~ reg(~ x + f, Q0=1), sigma.fixed=TRUE, Q0=Q0, formula.V=Vmodel, data=df)
+dat <- generate_data(~ reg(~ x + f, prior=pr_normal(precision=1)),
+         sigma.fixed=TRUE, Q0=Q0, formula.V=Vmodel, data=df)
 
 test_that("vfac variance structure works for compatible non-diagonal sampling variance matrix", {
   df$y <- dat$y
@@ -42,8 +44,9 @@ test_that("vfac variance structure works for compatible non-diagonal sampling va
 })
 
 
-Vmodel <- ~ vreg(~ x, Q0=1)
-dat <- generate_data(~ reg(~ x + f, Q0=1), sigma.fixed=TRUE, formula.V=Vmodel, data=df)
+Vmodel <- ~ vreg(~ x, prior=pr_normal(precision=1))
+dat <- generate_data(~ reg(~ x + f, prior=pr_normal(precision=1)),
+         sigma.fixed=TRUE, formula.V=Vmodel, data=df)
 
 test_that("generated data based on vreg model is OK", {
   expect_true(length(dat$y) == n)

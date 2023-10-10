@@ -89,7 +89,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
 
   fun. <- match.fun(fun.)
   arg1 <- length(formals(fun.))
-  if (arg1 < 1L || arg1 > 2L) stop("'fun.' must be a funtion of 1 or 2 arguments")
+  if (arg1 < 1L || arg1 > 2L) stop("'fun.' must be a function of 1 or 2 arguments")
   arg1 <- arg1 == 1L  # flag for single argument function, i.e. function of prediction x only
 
   cholQ <- NULL
@@ -125,6 +125,11 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
       if (fam$family == "multinomial" && type == "data_cat") n <- n %/% model$Km1
       if (fam$family == "negbinomial") ry <- model$ry
     } else {
+      if (fam$family == "gamma") {
+        # for X.="linpred" and custom X., we currently
+        # disallow vector shape parameter
+        if (!fam$alpha.scalar) stop("cannot derive vector shape")
+      }
       if (identical(X., "linpred")) {
         if (all("linpred_" != par.names))
           stop("'linpred_' not found in object. Use linpred='fitted' in create_sampler.")
@@ -243,6 +248,15 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
   subtract.offset <- fam$family == "poisson"
   if (subtract.offset) log.ry <- log(model$ry)
 
+  if (type %in% c("data", "data_cat")) {
+    if (fam$family == "gamma") {
+      rpred <- fam$make_rpredictive(newdata)
+      rpredictive <- function(p, lp, cholQ=NULL, var=NULL, V=NULL, ny, ry)
+        rpred(p, lp)
+    } else
+      rpredictive <- if (type == "data") model$rpredictive else model$rpredictive_cat
+  }
+
   if (is.null(cl))
     n.cores <- max(as.integer(n.cores)[1L], 1L)
   else
@@ -284,8 +298,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
             ystar <- model$lin_predict(p, X.)
           if (subtract.offset) ystar <- ystar + log.ry
           switch(type,
-            data = ystar <- model$rpredictive(p, ystar, cholQ, var, V, ny, ry),
-            data_cat = ystar <- model$rpredictive_cat(p, ystar, cholQ, var, V, ny, ry),
+            data=, data_cat = ystar <- rpredictive(p, ystar, cholQ, var, V, ny, ry),
             response = ystar <- linkinv(ystar)
           )
           out[[ch]][i, ] <- if (arg1) fun.(ystar) else fun.(ystar, p)
@@ -330,8 +343,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
           ystar <- model$lin_predict(p, X.)
         if (subtract.offset) ystar <- ystar + log.ry
         switch(type,
-          data = ystar <- model$rpredictive(p, ystar, cholQ, var, V, ny, ry),
-          data_cat = ystar <- model$rpredictive_cat(p, ystar, cholQ, var, V, ny, ry),
+          data=, data_cat = ystar <- rpredictive(p, ystar, cholQ, var, V, ny, ry),
           response = ystar <- linkinv(ystar)
         )
         if (to.file)
@@ -393,12 +405,17 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
 #' @return A list with a generated data vector and a list of prior means of the
 #'  parameters. The parameters are drawn from their priors.
 generate_data <- function(formula, data=NULL, family="gaussian",
-                          ny=NULL, ry, r.mod,
-                          sigma.fixed=!isTRUE(family == "gaussian"),
-                          sigma.mod=NULL, Q0=NULL, formula.V=NULL,
+                          ny=NULL, ry=NULL, r.mod,
+                          sigma.fixed=NULL, sigma.mod=NULL, Q0=NULL, formula.V=NULL,
                           linpred=NULL) {
-  if (!sigma.fixed && is.null(sigma.mod))
-    sigma.mod <- pr_invchisq(df=1, scale=1, n=1L)  # use a proper prior for sigma by default
+  if (identical(family, "gaussian") || (is.environment(family) && family$family == "gaussian")) {
+    if (is.null(sigma.fixed)) sigma.fixed <- FALSE
+    if (!sigma.fixed && is.null(sigma.mod)) {
+      # use a proper prior for sigma by default
+      sigma.mod <- pr_invchisq(df=1, scale=1)
+      sigma.mod$init(n=1L)
+    }
+  }
   sampler <- create_sampler(formula=formula, data=data, family=family, ny=ny, ry=ry, r.mod=r.mod,
                             sigma.fixed=sigma.fixed, sigma.mod=sigma.mod, Q0=Q0, formula.V=formula.V,
                             linpred=linpred, prior.only=TRUE)

@@ -41,8 +41,9 @@ and "poisson" for the Poisson distribution. See \link{mcmcsae-family} for the
 functional way of specifying \code{family} and associated settings.
 For the binomial distribution logistic and probit link functions are supported, the latter only
 for binary data. For the negative binomial and Poisson distributions a log link function is assumed.
-Note that posterior inference based on the Poisson distribution is implemented only approximately,
-as a special case of the negative binomial distribution.
+Note that posterior inferences for \code{family = 'poisson'} are only approximate,
+as they are implemented using the negative binomial distribution with its
+(reciprocal) overdispersion parameter set to a very large value.
 For categorical or multinomial data, \code{family = "multinomial"} can be used. The implementation
 is based on a stick-breaking representation of the multinomial distribution, and the logistic link
 function relates each category except the last to a linear predictor. The categories can be
@@ -141,7 +142,8 @@ The right hand side of the \code{formula} argument to \code{create_sampler} can 
 additive model components. Currently four model components are supported: \code{\link{reg}(...)}
 for regression or 'fixed' effects, \code{\link{gen}(...)} for generic random effects,
 \code{\link{mec}(...)} for measurement in covariates effects, and \code{\link{bart}(...)}
-for a Bayesian additive regression trees component.
+for a Bayesian additive regression trees component. Note that an offset can be added
+separately, in the usual way using \code{\link{offset}(...)}.
 
 For gaussian models, \code{formula.V} can be used to specify the variance structure of the model.
 Currently two specialized variance model components are supported, \code{\link{vreg}(...)} for regression
@@ -176,6 +178,10 @@ J.H. Albert and S. Chib (1993).
  S.W. Linderman, M.J. Johnson and R.P. Adams (2015).
    Dependent multinomial models made easy: Stick-breaking with the Polya-Gamma augmentation.
    Advances in Neural Information Processing Systems, 3456-3464.
+
+ P.A. Parker, S.H. Holan and R. Janicki (2023).
+   Conjugate Modeling Approaches for Small Area Estimation with Heteroscedastic Structure.
+   Journal of Survey Statistics and Methodology, smad002.
 
  N. Polson, J.G. Scott and J. Windle (2013).
    Bayesian Inference for Logistic Models Using Polya-Gamma Latent Variables.

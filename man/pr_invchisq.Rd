@@ -2,10 +2,10 @@
 % Please edit documentation in R/priors.R
 \name{pr_invchisq}
 \alias{pr_invchisq}
-\title{Create an object containing information about inverse chi-squared priors
+\title{Create an object representing inverse chi-squared priors
 with possibly modeled degrees of freedom and scale parameters}
 \usage{
-pr_invchisq(df = 1, scale = 1, n = NULL, post = FALSE)
+pr_invchisq(df = 1, scale = 1)
 }
 \arguments{
 \item{df}{degrees of freedom parameter. This can be a numeric scalar or
@@ -34,17 +34,11 @@ chi-squared prior a list can be passed with some of the following components:
   \item{common}{whether the modeled scale parameter of the inverse chi-squared
     distribution is (a scalar parameter) common to all \code{n} parameters.}
 }}
-
-\item{n}{dimension, if known. For internal use only.}
-
-\item{post}{whether conditional posterior sampling function should be
-created. For internal use only.}
 }
 \value{
-An environment with information about the prior and possibly conditional
- posterior distribution(s), to be used by other package functions.
+An environment representing the specified prior, for internal use.
 }
 \description{
-Create an object containing information about inverse chi-squared priors
+Create an object representing inverse chi-squared priors
 with possibly modeled degrees of freedom and scale parameters
 }

@@ -9,8 +9,7 @@ vfac(
   factor = "local_",
   prior = pr_invchisq(df = 1, scale = 1),
   name = "",
-  debug = FALSE,
-  e = parent.frame()
+  debug = FALSE
 )
 }
 \arguments{
@@ -31,8 +30,6 @@ term attached.}
 
 \item{debug}{If \code{TRUE} a breakpoint is set at the beginning of the posterior
 draw function associated with this model component. Mainly intended for developers.}
-
-\item{e}{For internal use only.}
 }
 \value{
 An object with precomputed quantities and functions for sampling from

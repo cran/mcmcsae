@@ -115,18 +115,17 @@ BEGIN_RCPP
 END_RCPP
 }
 // cCHM_dsC_Cholesky
-SEXP cCHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP LDL, SEXP super, SEXP Imult, SEXP m);
-RcppExport SEXP _mcmcsae_cCHM_dsC_Cholesky(SEXP aSEXP, SEXP permSEXP, SEXP LDLSEXP, SEXP superSEXP, SEXP ImultSEXP, SEXP mSEXP) {
+SEXP cCHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP super, SEXP Imult, SEXP m);
+RcppExport SEXP _mcmcsae_cCHM_dsC_Cholesky(SEXP aSEXP, SEXP permSEXP, SEXP superSEXP, SEXP ImultSEXP, SEXP mSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< SEXP >::type a(aSEXP);
     Rcpp::traits::input_parameter< SEXP >::type perm(permSEXP);
-    Rcpp::traits::input_parameter< SEXP >::type LDL(LDLSEXP);
     Rcpp::traits::input_parameter< SEXP >::type super(superSEXP);
     Rcpp::traits::input_parameter< SEXP >::type Imult(ImultSEXP);
     Rcpp::traits::input_parameter< SEXP >::type m(mSEXP);
-    rcpp_result_gen = Rcpp::wrap(cCHM_dsC_Cholesky(a, perm, LDL, super, Imult, m));
+    rcpp_result_gen = Rcpp::wrap(cCHM_dsC_Cholesky(a, perm, super, Imult, m));
     return rcpp_result_gen;
 END_RCPP
 }

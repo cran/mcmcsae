@@ -5,25 +5,49 @@
 # define R function to set defaults
 # ordering=1L (AMD only) seems to give same permutations as Matrix::Cholesky
 # ordering=0L is the cholmod default and also tries nested dissection
-Cholesky_dsC <- function(A, perm=TRUE, LDL=FALSE, super=NA, Imult=0, ordering=.opts$chol.ordering)
-  cCHM_dsC_Cholesky(A, perm, LDL, super, Imult, ordering)
+Cholesky_dsC <- function(A, perm=TRUE, super=NA, Imult=0, ordering=0L)
+  cCHM_dsC_Cholesky(A, perm, super, Imult, ordering)
 
+#' Set options for Cholesky decomposition
+#'
+#' These options are only effective in case the matrix to be decomposed is sparse, i.p.
+#' of class \code{\link[Matrix]{dsCMatrix-class}}.
+#'
+#' @export
+#' @param perm logical scalar, see \code{\link[Matrix]{Cholesky}}. If \code{NULL}, the default,
+#'  the choice is left to a simple heuristic.
+#' @param super logical scalar, see \code{\link[Matrix]{Cholesky}}.
+#' @param ordering an integer scalar passed to CHOLMOD routines determining which reordering
+#'  schemes are tried to limit sparse Cholesky fill-in.
+#' @param inplace whether sparse Cholesky updates should re-use the same memory location.
+#' @return A list with specified options used for Cholesky decomposition.
+chol_control <- function(perm=NULL, super=NA, ordering=0L, inplace=TRUE)
+  list(perm=perm, super=super, ordering=ordering, inplace=inplace)
+
+check_chol_control <- function(control) {
+  if (is.null(control)) control <- list()
+  if (!is.list(control)) stop("control options must be specified as a list, preferably using the appropriate control setter function")
+  defaults <- chol_control()
+  w <- which(!(names(control) %in% names(defaults)))
+  if (length(w)) stop("unrecognized control parameters ", paste(names(control)[w], collapse=", "))
+  control <- modifyList(defaults, control, keep.null=TRUE)
+  control$ordering <- as.integer(control$ordering)
+  control
+}
 
 # in case of permutation/pivoting, the decomposition is PtLLtP
-build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opts$chol.ordering) {
-
-  if (LDL) stop("LDL decompositions not (yet) supported")
+build_chol <- function(M, Imult=0, control=chol_control()) {
   type <- class(M)[1L]
   if (all(type != c("numeric", "matrix", "ddiMatrix", "dsCMatrix"))) stop("'", type, "' is not a supported matrix class")
   size <- if (type == "numeric") length(M) else dim(M)[1L]
 
   if (type == "dsCMatrix") {
-    if (is.null(perm)) {
+    if (is.null(control$perm)) {
       # TODO find better decision rule for use of permutation in cholesky factorization
-      perm <- size > 100L
+      control$perm <- size > 100L
     }
   } else {
-    perm <- FALSE
+    control$perm <- FALSE
   }
 
   # define update, solve and Ltimes methods with arguments
@@ -35,6 +59,7 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
   #   system: the type of system to be solved, see Matrix package
   #   systemP: if TRUE modifies system Lt to LtP and L to PtL; has no effect if PERM=FALSE or system="A" or type="ddiMatrix"
   # Ltimes left-multiplies a vector/matrix by L (in case of permutations P'L which need not be lower triangular!) or its transpose
+  # inverse: return inverse of the original matrix
   switch(type,
     numeric=, ddiMatrix = {  # diagonal represented as vector case (including trivial scalar case)
       if (type == "ddiMatrix" && M@diag == "U") {  # trivial case, identity matrix, no updates
@@ -43,6 +68,7 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
         update <- function(parent, mult=0) if (mult != 0) stop("unit ddiMatrix assumed fixed")
         Ltimes <- function(x, transpose=TRUE) x
         solve <- function(rhs, system="A", systemP=FALSE) rhs
+        inverse <- function() cholM
       } else {
         if (type == "ddiMatrix") {
           cholM <- sqrt(M@x + Imult)  # a vector is sufficient as internal representation
@@ -73,16 +99,17 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
             stop("'", class(rhs)[1L], "' not supported as right hand side in solve")
           )
         }
+        inverse <- function() Cdiag(1 / cholM^2)
       }
     },
     dsCMatrix = {
-      cholM <- Cholesky_dsC(M, perm=perm, LDL=LDL, super=super, Imult=Imult, ordering=ordering)
+      cholM <- Cholesky_dsC(M, perm=control$perm, super=control$super, Imult=Imult, ordering=control$ordering)
       perm <- is.unsorted(cholM@perm, strictly = TRUE)
       if (perm) {  # permutation matrix unaffected by updates
         P <- cholM@perm + 1L
         iP <- invPerm(cholM@perm, zero.p=TRUE)
       }
-      if (.opts$chol.inplace) {
+      if (control$inplace) {
         # requires that zero-pattern does not change!
         update <- function(parent, mult=0) cCHM_update_inplace(cholM, parent, mult)
       } else {
@@ -145,8 +172,12 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
             stop("'", class(rhs)[1L], "' not supported as right hand side in solve")
           )
       }
+      inverse <- function() {
+        I <- new("dgCMatrix", i=0:(size - 1L), p=0:size, Dim=c(size, size), x=rep.int(1, size))
+        solve(I)
+      }
     },
-    matrix = {  # LDL, super ignored
+    matrix = {
       # NB Ccholesky currently returns upper triangular matrix, i.e. Lt
       if (Imult == 0)
         cholM <- Ccholesky(M)
@@ -191,9 +222,10 @@ build_chol <- function(M, perm=NULL, LDL=FALSE, super=NA, Imult=0, ordering=.opt
           stop("'", class(rhs)[1L], "' not supported as right hand side in solve")
         )
       }
+      inverse <- function() chol2inv(cholM)
     }
   )  # END switch(type, ...)
 
-  rm(M, type, LDL, super, Imult)
+  rm(M, type, Imult, control)
   environment()
 }

@@ -53,7 +53,7 @@ void chm_set_ordering(const int m) {
 // Cholesky of dsCMatrix
 // see Matrix package's internal_chm_factor and dsCMatrix_Cholesky in dsCMatrix.c
 // added argument m: ordering method (integer)
-SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP LDL, SEXP super, SEXP Imult, SEXP m) {
+SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP super, SEXP Imult, SEXP m) {
   CHM_FR L;
   CHM_SP A = AS_CHM_SP__(a);
   double beta[2] = {0, 0};
@@ -61,15 +61,14 @@ SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP LDL, SEXP super, SEXP Imult, SEXP 
   R_CheckStack();
 
   int iSuper = asLogical(super),
-      iPerm  = asLogical(perm),
-      iLDL   = asLogical(LDL);
+      iPerm  = asLogical(perm);
   int im     = asInteger(m);
   if ((im < -1) || (im > 3)) error("Cholesky ordering method must be an integer between -1 and 3");
 
   // NA --> let CHOLMOD choose
   if (iSuper == NA_LOGICAL)	iSuper = -1;
 
-  c.final_ll = (iLDL == 0) ? 1 : 0;
+  c.final_ll = 1;
   c.supernodal = (iSuper > 0) ? CHOLMOD_SUPERNODAL :
     ((iSuper < 0) ? CHOLMOD_AUTO : CHOLMOD_SIMPLICIAL);
 
@@ -78,6 +77,8 @@ SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP LDL, SEXP super, SEXP Imult, SEXP 
   } else {  // no permutation, m ignored in this case
     chm_set_ordering(-1);
   }
+
+  //printf("c.final_ll = %d", c.final_ll);
   L = M_cholmod_analyze(A, &c);
   if (!M_cholmod_factorize_p(A, beta, (int*)NULL, 0, L, &c))
     error("Cholesky factorization failed");

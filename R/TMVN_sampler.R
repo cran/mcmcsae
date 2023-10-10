@@ -20,22 +20,22 @@
 #' # example taken from Pakman and Paninski (2014)
 #' # 1. exact Hamiltonian Monte Carlo (Pakman and Paninski, 2014)
 #' sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="HMC")
-#' sim <- MCMCsim(sampler)
+#' sim <- MCMCsim(sampler, n.iter=600, verbose=FALSE)
 #' summary(sim)
 #' plot(as.matrix(sim$x), pch=".")
 #' # 2. exact Hamiltonian Monte Carlo with Laplace momentum (Nishimura et al., 2021)
 #' sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="HMCZigZag")
-#' sim <- MCMCsim(sampler)
+#' sim <- MCMCsim(sampler, n.iter=600, verbose=FALSE)
 #' summary(sim)
 #' plot(as.matrix(sim$x), pch=".")
 #' # 3. Gibbs sampling approach (Rodriguez-Yam et al., 2004)
 #' sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="Gibbs")
-#' sim <- MCMCsim(sampler)
+#' sim <- MCMCsim(sampler, burnin=500, n.iter=2000, verbose=FALSE)
 #' summary(sim)
 #' plot(as.matrix(sim$x), pch=".")
 #' # 4. soft TMVN approximation (Souris et al., 2018)
 #' sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="softTMVN")
-#' sim <- MCMCsim(sampler)
+#' sim <- MCMCsim(sampler, n.iter=600, verbose=FALSE)
 #' summary(sim)
 #' plot(as.matrix(sim$x), pch=".")
 #' }
@@ -43,7 +43,6 @@
 #' @export
 #' @author Harm Jan Boonstra, with help from Grzegorz Baltissen
 #' @param Q precision matrix of the (unconstrained) multivariate normal distribution.
-#' @param perm whether permutation/pivoting should be used to build a Cholesky object.
 #' @param mu mean of the (unconstrained) multivariate normal distribution.
 #' @param Xy alternative to specifying mu; in this case \code{mu} is computed as \eqn{Q^{-1}\code{Xy}}.
 #' @param update.Q whether \code{Q} is updated for each draw.
@@ -68,6 +67,7 @@
 #'  options to non-default values, see \code{\link{mcmcsae-TMVN-method}}.
 #' @param reduce whether to a priori restrict the simulation to the subspace defined by the
 #'  equality constraints.
+#' @param chol.control options for Cholesky decomposition, see \code{\link{chol_control}}.
 #' @return An environment for sampling from a possibly degenerate and truncated multivariate normal
 #'  distribution.
 #' @references
@@ -106,18 +106,18 @@
 #'  K.A. Valeriano, C.E. Galarza and L.A. Matos (2023).
 #'    Moments and random number generation for the truncated elliptical family of distributions.
 #'    Statistics and Computing 33(1), 1-20.
-create_TMVN_sampler <- function(Q, perm=NULL,
-                                mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=update.Q,
+create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=update.Q,
                                 name="x", coef.names=NULL,
                                 R=NULL, r=NULL, S=NULL, s=NULL, lower=NULL, upper=NULL,
                                 check.constraints = FALSE,
-                                method=NULL, reduce=NULL) {
+                                method=NULL, reduce=NULL,
+                                chol.control=chol_control()) {
 
   if (name == "") stop("empty name")
   store_default <- function(prior.sampler=FALSE) name  # for direct use of create_TMVN_sampler
 
   if (!update.Q) {
-    Q <- economizeMatrix(Q, symmetric=TRUE, drop.zeros=TRUE)
+    Q <- economizeMatrix(Q, symmetric=TRUE, drop.zeros=TRUE, check=TRUE)
   }
   n <- nrow(Q)
 
@@ -140,7 +140,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     eq <- FALSE
   } else {
     if (check.constraints) Rnames <- colnames(R)
-    R <- economizeMatrix(R, vec.as.diag=FALSE)
+    R <- economizeMatrix(R, vec.as.diag=FALSE, check=TRUE)
     if (nrow(R) != n || ncol(R) > n) stop("incompatible constraint matrix 'R'")
     if (is.null(r)) {
       r <- rep.int(0, ncol(R))
@@ -183,7 +183,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       S <- cbind(S, -S)
       s <- c(lower, -upper)
     }
-    S <- economizeMatrix(S, vec.as.diag=FALSE)
+    S <- economizeMatrix(S, vec.as.diag=FALSE, check=TRUE)
     if (nrow(S) != n) stop("incompatible constraint matrix 'S'")
     ncS <- ncol(S)
     if (is.null(s)) {
@@ -235,9 +235,8 @@ create_TMVN_sampler <- function(Q, perm=NULL,
   }
   if (method$method != "direct") debug <- method$debug
 
-  if (is.null(reduce)) {
-    reduce <- eq && method$method=="Gibbs"
-  }
+  if (is.null(reduce)) reduce <- eq && method$method == "Gibbs"
+
   if (eq && method$method == "Gibbs" && !reduce) {
     warn("'reduce' has been set to TRUE for Gibbs method with equalities")
     reduce <- TRUE
@@ -251,7 +250,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     if (update.Q || update.mu) stop("'update.Q=TRUE' or 'update.mu=TRUE' not supported in combination with 'reduce=TRUE'")
 
     if (!is.null(Xy)) {
-      mu <- build_chol(Q, perm)$solve(Xy)
+      mu <- build_chol(Q, control=chol.control)$solve(Xy)
     }
 
     QRofR <- qr(economizeMatrix(R, sparse=FALSE))  # check the rank
@@ -267,7 +266,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     mu_z1 <- crossprod_mv(Q1, mu)
     mu_z2 <- crossprod_mv(Q2, mu)
     # NB cholQ will now refer to z2 subspace
-    cholQ <- build_chol(crossprod_sym(Q2, Q))  # chol factor L
+    cholQ <- build_chol(crossprod_sym(Q2, Q), control=chol.control)  # chol factor L
     mu_z2_given_z1 <- mu_z2 - cholQ$solve(crossprod_mv(Q2, (Q %m*v% (Q1 %m*v% (z1 - mu_z1)))))
     if (any(method$method == c("softTMVN", "HMCZigZag"))) {
       Q <- crossprod_sym(Q2, Q)
@@ -304,7 +303,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
           # TODO using determinant is not a very good way to check for non-pd
           d <- determinant(Q, logarithm=FALSE)
           if (d$sign * d$modulus < .Machine$double.eps) {
-            stop("Non-positive-definite matrix in model component `", name, "`. Perhaps increasing the coefficients' prior precision helps.")
+            stop("Non-positive-definite matrix in model component `", name, "`. Consider using 'remove.redundant=TRUE' or increasing the coefficients' prior precision.")
           } else {
             stop(err)
           }
@@ -315,7 +314,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       if (class(V)[1L] == "dsCMatrix") attr(V, "factors") <- list()
       use.cholV <- TRUE
     } else {
-      cholQ <- build_chol(Q, perm)
+      cholQ <- build_chol(Q, control=chol.control)
     }
 
     if (all(method$method != c("softTMVN", "HMCZigZag"))) rm(Q)
@@ -336,7 +335,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       if (update.Q) {
         bigR <- prod(dim(R)) > 100000L && ncol(R) > 5L  # if bigR a different (typically faster for large R) projection method is used
         #cholRVR <- build_chol(crossprod_sym2(R, cholQ$solve(R)))  # cholesky template object for (hopefully) faster projection
-        cholRVR <- build_chol(crossprod_sym2(cholQ$solve(R, system="L", systemP=TRUE)))
+        cholRVR <- build_chol(crossprod_sym2(cholQ$solve(R, system="L", systemP=TRUE)), control=chol.control)
       } else {
         if (method$method != "softTMVN") {
           VR <- if (use.cholV) economizeMatrix(V %*% R, allow.tabMatrix=FALSE) else cholQ$solve(R)
@@ -350,8 +349,10 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     }  # END if (eq)
   }  # END !reduce
   if (use.cholV && !update.mu) rm(V)
-  rm(perm, Xy)
+  rm(Xy)
 
+  self <- environment()
+  
   if (ineq && method$method == "Gibbs") {
     # transform to unit covariance matrix frame
     # inequalities U'v >= u
@@ -476,8 +477,9 @@ create_TMVN_sampler <- function(Q, perm=NULL,
 
   if (method$method == "softTMVN") {
     useV <- method$useV
-    if (.opts$PG.approx) {
-      mPG <- as.integer(.opts$PG.approx.m)
+    if (!is.null(method$CG) && eq) stop("conjugate gradients with equality constraints is not supported")
+    if (method$PG.approx) {
+      mPG <- as.integer(method$PG.approx.m)
       if (all(length(mPG) != c(1L, n))) stop("invalid value for option 'PG.approx.m'")
       rPolyaGamma <- function(b, c) CrPGapprox(ncS, b, c, mPG)
     } else {
@@ -487,20 +489,21 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     }
     if (useV) {
       # 'dual' version of MVN sampling
-      V <- chol2inv(chol(Q))
-      cholQ <- build_chol(Q)
       rm(Q)
+      V <- cholQ$inverse()
       # define Diagonal matrix template to hold omega.tilde for use in sparse matrix templated sum
-      D.omega.tilde.inv <- Diagonal(x=runif(ncS, 0.9, 1.1))
+      D.omega.tilde.inv <- Diagonal(x=10*runif(ncS, 0.9, 1.1))  # choose large enough so that the matrix template below is pos-def
       matsum <- make_mat_sum(M0=economizeMatrix(crossprod_sym(S, V), symmetric=TRUE, drop.zeros=TRUE), M1=D.omega.tilde.inv)
-      ch <- build_chol(matsum(D.omega.tilde.inv))
+      ch <- build_chol(matsum(D.omega.tilde.inv), control=chol.control)
       VS <- economizeMatrix(V %*% S, drop.zeros=TRUE)
       if (eq && !reduce) {
         VR <- economizeMatrix(V %*% R, drop.zeros=TRUE)
         RVR <- economizeMatrix(crossprod(R, VR), drop.zeros=TRUE, symmetric=TRUE)
         SVR <- economizeMatrix(crossprod(S, VR), drop.zeros=TRUE)
-        matsum_RVxR <- make_mat_sum(M0=RVR, M1=-crossprod_sym2(SVR, ch$solve(SVR)))
-        cholRVxR <- build_chol(matsum_RVxR(M1=crossprod_sym2(SVR, ch$solve(SVR)), w1=-1))
+        temp <- crossprod_sym2(SVR, ch$solve(SVR))
+        matsum_RVxR <- make_mat_sum(M0 = RVR, M1 = -temp)
+        cholRVxR <- build_chol(matsum_RVxR(M1 = temp, w1 = -1), control=chol.control)
+        rm(temp)
       }
     } else {
       St <- t(S)  # for use in crossprod_sym
@@ -509,9 +512,9 @@ create_TMVN_sampler <- function(Q, perm=NULL,
           M0 = Q, M1 = crossprod_sym(St, runif(nrow(St), 0.9, 1.1)),
           sparse = if (eq && inherits(R, "CsparseMatrix")) TRUE else NULL
       )
-      ch <- build_chol(matsum(crossprod_sym(St, runif(nrow(St), 0.9, 1.1))))
+      ch <- build_chol(matsum(crossprod_sym(St, runif(nrow(St), 0.9, 1.1))), control=chol.control)
       if (eq && !reduce)
-        cholRVR <- build_chol(crossprod_sym2(R, ch$solve(R)))
+        cholRVR <- build_chol(crossprod_sym2(R, ch$solve(R)), control=chol.control)
     }
   }  # END softTMVN
 
@@ -598,63 +601,76 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     sharpness <- method$sharpness
     sharpness_squared <- sharpness^2
     sharpness_inv <- 1/sharpness
-    draw <- function(p) {
-      if (debug) browser()
-      # 1. draw Polya-Gamma mixture precisions
-      if (reduce)  # equalities have already been taken care of
-        x <- p[[name.tr]]
+    draw <- function(p) {}
+    if (debug) draw <- add(draw, quote(browser()))
+    # 1. draw Polya-Gamma mixture precisions
+    if (reduce)  # equalities have already been taken care of
+      draw <- add(draw, bquote(x <- p[[.(name.tr)]]))
+    else
+      draw <- add(draw, bquote(x <- p[[.(name)]]))
+    draw <- add(draw, quote(discr <- crossprod_mv(S, x) - s))
+    draw <- add(draw, quote(omega <- rPolyaGamma(1, sharpness * discr)))
+    # 2. draw vector of coefficients
+    draw <- add(draw, quote(omega.tilde <- sharpness_squared * omega))
+    if (useV) {
+      draw <- add(draw, quote(attr(D.omega.tilde.inv, "x") <- 1 / omega.tilde))
+      draw <- add(draw, quote(XX_V <- matsum(D.omega.tilde.inv)))
+      draw <- add(draw, quote(ch$update(XX_V)))
+      draw <- add(draw, quote(alpha <- sharpness * s + 0.5/omega))
+      if (zero.mu)
+        draw <- add(draw, quote(y1 <- drawMVN_cholQ(cholQ)))
       else
-        x <- p[[name]]
-      discr <- crossprod_mv(S, x) - s
-      omega <- rPolyaGamma(1, sharpness * discr)
-      # 2. draw vector of coefficients
-      omega.tilde <- sharpness_squared * omega
-      if (useV) {
-        attr(D.omega.tilde.inv, "x") <- 1 / omega.tilde
-        XX_V <- matsum(D.omega.tilde.inv)
-        ch$update(XX_V)
-        alpha <- sharpness * s + 0.5/omega
-        if (zero.mu)
-          y1 <- drawMVN_cholQ(cholQ)
-        else
-          y1 <- mu + drawMVN_cholQ(cholQ)
-        y2 <- Crnorm(length(s)) * sqrt(1/omega)
+        draw <- add(draw, quote(y1 <- mu + drawMVN_cholQ(cholQ)))
+      draw <- add(draw, bquote(y2 <- Crnorm(.(length(s))) * sqrt(1/omega)))
+      if (reduce) {
+        draw <- add(draw, bquote(p[[.(name.tr)]] <- y1 + VS %m*v% ch$solve(sharpness_inv * (alpha - y2) - crossprod_mv(S, y1))))
+        draw <- add(draw, bquote(p[[.(name)]] <- untransform(p[[.(name.tr)]])))
+      } else {
+        draw <- add(draw, quote(coef <- y1 + VS %m*v% ch$solve((alpha - y2) * sharpness_inv - crossprod_mv(S, y1))))
+        if (eq) {
+          draw <- add(draw, quote(cholRVxR$update(matsum_RVxR(M1=crossprod_sym2(SVR, ch$solve(SVR)), w1=-1))))
+          draw <- add(draw, quote(temp <- V %m*v% (R %m*v% cholRVxR$solve(r - crossprod_mv(R, coef)))))
+          draw <- add(draw, bquote(p[[.(name)]] <- coef + temp - V %m*v% (S %m*v% ch$solve(crossprod_mv(S, temp)))))
+        } else
+          draw <- add(draw, bquote(p[[.(name)]] <- coef))
+      }
+    } else {
+      draw <- add(draw, quote(alpha <- 0.5 * sharpness + s * omega.tilde))
+      if (zero.mu)
+        draw <- add(draw, quote(Xy <- crossprod_mv(St, alpha)))
+      else
+        draw <- add(draw, quote(Xy <- crossprod_mv(St, alpha) + Qmu))
+      if (is.null(method$CG)) {
+        # Cholesky
+        draw <- add(draw, quote(XX <- crossprod_sym(St, omega.tilde)))
+        draw <- add(draw, quote(XX_Q <- matsum(XX)))
+        draw <- add(draw, quote(ch$update(XX_Q)))
         if (reduce) {
-          p[[name.tr]] <- y1 + VS %m*v% ch$solve((alpha - sharpness * crossprod_mv(S, y1) - y2) * sharpness_inv)
-          p[[name]] <- untransform(p[[name.tr]])
+          draw <- add(draw, bquote(p[[.(name.tr)]] <- drawMVN_cholQ(ch, Xy)))
+          draw <- add(draw, bquote(p[[.(name)]] <- untransform(p[[.(name.tr)]])))
         } else {
-          coef <- y1 + VS %m*v% ch$solve((alpha - sharpness * crossprod_mv(S, y1) - y2) * sharpness_inv)
+          draw <- add(draw, quote(coef <- drawMVN_cholQ(ch, Xy)))
           if (eq) {
-            cholRVxR$update(matsum_RVxR(M1=crossprod_sym2(SVR, ch$solve(SVR)), w1=-1))
-            temp <- V %m*v% (R %m*v% cholRVxR$solve(r - crossprod_mv(R, coef)))
-            p[[name]] <- coef + temp - V %m*v% (S %m*v% ch$solve(crossprod_mv(S, temp)))
+            draw <- add(draw, quote(VR <- ch$solve(R)))
+            draw <- add(draw, quote(cholRVR$update(crossprod_sym2(R, VR))))
+            draw <- add(draw, bquote(p[[.(name)]] <- coef + VR %m*v% cholRVR$solve(r - crossprod_mv(R, coef))))
           } else
-            p[[name]] <- coef
+            draw <- add(draw, bquote(p[[.(name)]] <- coef))
         }
       } else {
-        XX <- crossprod_sym(St, omega.tilde)
-        XX_Q <- matsum(XX)
-        ch$update(XX_Q)
-        alpha <- 0.5 * sharpness + s * omega.tilde
-        if (zero.mu)
-          Xy <- crossprod_mv(St, alpha)
-        else
-          Xy <- crossprod_mv(St, alpha) + Qmu
-        if (reduce) {
-          p[[name.tr]] <- drawMVN_cholQ(ch, Xy)
-          p[[name]] <- untransform(p[[name.tr]])
-        } else {
-          coef <- drawMVN_cholQ(ch, Xy)
-          if (eq) {
-            VR <- ch$solve(R)
-            cholRVR$update(crossprod_sym2(R, VR))
-            p[[name]] <- coef + VR %m*v% cholRVR$solve(r - crossprod_mv(R, coef))
-          } else
-            p[[name]] <- coef
-        }
+        # conjugate gradients
+        draw <- add(draw, quote(u <- Xy + crossprod_mv(St, sqrt(omega.tilde) * Crnorm(length(omega.tilde))) + cholQ$Ltimes(Crnorm(n), transpose=FALSE)))
+        A_times <- function(x, omega.tilde) crossprod_mv(St, omega.tilde * (St %m*v% x)) + Q %m*v% x
+        dQinv <- sqrt(1/diag(Q))  # seems better as a preconditioner than 1/diag(Q)
+        M_solve <- function(x, omega.tilde) dQinv * x
+        max.it <- method$CG$max.it
+        stop.criterion <- method$CG$stop.criterion
+        verbose <- method$CG$verbose
+        draw <- add(draw, bquote(p[[.(name)]] <- CG(u, self, p[[.(name)]], max.it=max.it, e=stop.criterion, verbose=verbose,
+                                                    omega.tilde=omega.tilde)))
       }
-      p
     }
+    draw <- add(draw, quote(p))
   }  # END softTMVN
 
   if (method$method == "Gibbs") {
@@ -1028,7 +1044,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     }
     if (eq && !reduce) {
       if (update.Q) {
-        # TODO: do we really need a start funtion in this case, or call draw
+        # TODO: do we really need a start function in this case, or call draw
         if (bigR) {
           start <- add(start, quote(cholV.R <- cholQ$solve(R, system="L", systemP=TRUE)))
           start <- add(start, quote(cholRVR$update(crossprod_sym2(cholV.R))))
@@ -1041,9 +1057,9 @@ create_TMVN_sampler <- function(Q, perm=NULL,
       } else {
         if (method$method == "softTMVN") {
           if (useV) {
-            start <- add(start, quote(VxR <- VR - VS %*% ch$solve(SVR)))  # TODO for sparse matrices use matsum template
-            start <- add(start, quote(cholRVxR$update(crossprod(R, VxR))))
-            start <- add(start, bquote(p[[.(name)]] <- coef + VxR %m*v% cholRVxR$solve(r - crossprod_mv(R, coef))))
+            start <- add(start, quote(cholRVxR$update(matsum_RVxR(M1=crossprod_sym2(SVR, ch$solve(SVR)), w1=-1))))
+            start <- add(start, quote(temp <- V %m*v% (R %m*v% cholRVxR$solve(r - crossprod_mv(R, coef)))))
+            start <- add(start, bquote(p[[.(name)]] <- coef + temp - V %m*v% (S %m*v% ch$solve(crossprod_mv(S, temp)))))
           } else
             start <- add(start, bquote(p[[.(name)]] <- coef + ch$solve(R) %m*v% cholRVR$solve(r - crossprod_mv(R, coef))))
         } else {
@@ -1063,7 +1079,7 @@ create_TMVN_sampler <- function(Q, perm=NULL,
     start <- add(start, quote(p))
   }
 
-  rm(use.cholV)
+  rm(chol.control, use.cholV)
 
-  environment()
+  self
 }

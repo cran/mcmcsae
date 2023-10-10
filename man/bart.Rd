@@ -5,7 +5,7 @@
 \title{Create a model component object for a BART (Bayesian Additive Regression Trees)
 component in the linear predictor}
 \usage{
-bart(formula, X = NULL, name = "", debug = FALSE, e = parent.frame(), ...)
+bart(formula, X = NULL, name = "", debug = FALSE, ...)
 }
 \arguments{
 \item{formula}{a formula specifying the predictors to be used in the BART
@@ -23,8 +23,6 @@ with the number of the model term attached.}
 
 \item{debug}{if \code{TRUE} a breakpoint is set at the beginning of the posterior
 draw function associated with this model component. Mainly intended for developers.}
-
-\item{e}{for internal use only.}
 
 \item{...}{parameters passed to \code{\link[dbarts]{dbarts}}.}
 }

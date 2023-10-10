@@ -466,7 +466,7 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
 #'   # 2. generate some data according to a model with a few regression
 #'   # effects, as well as spatial random effects
 #'   gd <- generate_data(
-#'     ~ reg(~ AREA + BIR74, Q0=1, name="beta") +
+#'     ~ reg(~ AREA + BIR74, prior=pr_normal(precision=1), name="beta") +
 #'       gen(factor = ~ spatial(NAME, poly.df=nc), name="vs"),
 #'     sigma.mod = pr_invchisq(df=10, scale=1),
 #'     data = nc
@@ -478,11 +478,11 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
 #'   # 3. fit a model to the generated data, and see to what extent the
 #'   #    parameters used to generate the data, gd$pars, are reproduced
 #'   sampler <- create_sampler(
-#'     y ~ reg(~ AREA + BIR74, Q0=1, name="beta") +
+#'     y ~ reg(~ AREA + BIR74, prior=pr_normal(precision=1), name="beta") +
 #'     gen(factor = ~ spatial(NAME, poly.df=nc), name="vs"),
 #'     block=TRUE, data=nc
 #'   )
-#'   sim <- MCMCsim(sampler, store.all=TRUE)
+#'   sim <- MCMCsim(sampler, store.all=TRUE, n.iter=600, n.chain=2, verbose=FALSE)
 #'   (summ <- summary(sim))
 #'   nc$vs <- summ$vs[, "Mean"]
 #'   plot(nc[c("vs_true", "vs")])
@@ -734,7 +734,7 @@ allow_fastGMRFprior <- function(mc) {
   TRUE
 }
 
-#' Maximize log-likelihood defined inside a sampler function
+#' Maximize the log-likelihood or log-posterior as defined by a sampler closure
 #'
 #' @examples
 #' \donttest{
@@ -744,33 +744,66 @@ allow_fastGMRFprior <- function(mc) {
 #'   f = factor(sample(1:50, n, replace=TRUE))
 #' )
 #' df <- generate_data(
-#'   ~ reg(~x, name="beta", Q0=1) + gen(~x, factor=~f, name="v"),
+#'   ~ reg(~x, name="beta", prior=pr_normal(precision=1)) + gen(~x, factor=~f, name="v"),
 #'   sigma.fixed=TRUE, data=dat
 #' )
 #' dat$y <- df$y
 #' sampler <- create_sampler(y ~ x + gen(~x, factor=~f, name="v"), data=dat)
-#' opt <- maximize_llh(sampler)
+#' opt <- maximize_log_lh_p(sampler)
 #' str(opt)
 #' plot(df$par$v, opt$par$v); abline(0, 1, col="red")
 #' }
 #'
 #' @export
-#' @param sampler sampler function.
+#' @param sampler sampler function closure, i.e. the return value of a call to \code{\link{create_sampler}}.
+#' @param type either "llh" (default) or "lpost", for optimization of the log-likelihood,
+#'  or the log-posterior, respectively.
 #' @param method optimization method, passed to \code{\link[stats]{optim}}.
 #' @param control control parameters, passed to \code{\link[stats]{optim}}.
 #' @param ... other parameters passed to \code{\link[stats]{optim}}.
-#' @return A list of parameter values that, provided the optimization was successful, maximize the likelihood.
-maximize_llh <- function(sampler, method="BFGS", control=list(fnscale=-1), ...) {
+#' @return A list of parameter values that, provided the optimization was successful, maximize the (log-)likelihood
+#'  or (log-)posterior.
+maximize_log_lh_p <- function(sampler, type=c("llh", "lpost"), method="BFGS", control=list(fnscale=-1), ...) {
+  type <- match.arg(type)
   e <- sampler
   if (!is.null(e$Vmod)) stop("optimization not yet implemented for models with sampling variance model specified in 'formula.V'")
   ind_sigma <- e$vec_list[["sigma_"]]
-  f <- function(x) {
-    if (!is.null(ind_sigma) && x[ind_sigma] < 0)
-      -Inf
-    else
-      e$llh_opt(x)
+  if (type == "llh") {
+    f <- function(x)
+      if (!is.null(ind_sigma) && x[ind_sigma] < 0) -Inf else e$llh_opt(x)
+  } else {
+    logposterior_opt <- make_logposterior_opt(e)
+    f <- function(x)
+      if (!is.null(ind_sigma) && x[ind_sigma] < 0) -Inf else logposterior_opt(x)
   }
   res <- optim(par=e$list2vec(sampler$start()), f, method=method, control=control, ...)
   res$par <- e$vec2list(res$par)
   res
+}
+
+make_logposterior_opt <- function(sampler) {
+  # logprior for optimization of logposterior = logprior + llh; llh is defined in sampler
+  log_prior <- function(p) {
+    out <- 0
+  }
+  for (k in seq_along(sampler$mod)) {
+    mc <- sampler$mod[[k]]
+    switch(mc$type,
+      reg = {
+        mc$prior$setup_logprior(mc$name)
+        log_prior <- add(log_prior, bquote(out <- out + mod[[.(k)]]$prior$logprior(p)))
+      },
+      stop("TBI: log-prior for components other than 'reg'")
+    )
+  }
+  # TODO add log-priors of Vmod components
+  log_prior <- add(log_prior, quote("out"))
+  assign("log_prior", log_prior, environment(sampler))
+  # log-posterior function for optimization: function of a vector instead of list
+  f <- function(x) {}
+  f <- add(f, quote(p <- vec2list(x)))
+  f <- add(f, quote(p$e_ <- compute_e(p)))
+  f <- add(f, quote(log_prior(p) + llh(p)))
+  environment(f) <- environment(sampler)
+  f
 }

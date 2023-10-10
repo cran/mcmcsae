@@ -10,10 +10,10 @@ vreg(
   remove.redundant = FALSE,
   sparse = NULL,
   X = NULL,
+  prior = NULL,
   Q0 = NULL,
   b0 = NULL,
-  name = "",
-  e = parent.frame()
+  name = ""
 )
 }
 \arguments{
@@ -30,16 +30,21 @@ The default is determined by a simple heuristic based on storage size.}
 \item{X}{a (possibly sparse) design matrix can be specified directly, as an alternative to the
 creation of one based on \code{formula}. If \code{X} is specified \code{formula} is ignored.}
 
-\item{Q0}{prior precision matrix for the regression effects. The default is a
-zero matrix corresponding to a noninformative improper prior.}
+\item{prior}{prior specification for the coefficients. Currently only
+normal priors are supported, specified using function \code{\link{pr_normal}}.}
 
-\item{b0}{prior mean for the regression effect. Defaults to a zero vector.}
+\item{Q0}{prior precision matrix for the regression effects. The default is a
+zero matrix corresponding to a noninformative improper prior.
+DEPRECATED, please use argument \code{prior} instead, i.e.
+\code{prior = pr_normal(mean = b0.value, precision = Q0.value)}.}
+
+\item{b0}{prior mean for the regression effect. Defaults to a zero vector.
+DEPRECATED, please use argument \code{prior} instead, i.e.
+\code{prior = pr_normal(mean = b0.value, precision = Q0.value)}.}
 
 \item{name}{the name of the model component. This name is used in the output of the
 MCMC simulation function \code{\link{MCMCsim}}. By default the name will be 'vreg'
 with the number of the variance model term attached.}
-
-\item{e}{for internal use only.}
 }
 \value{
 An object with precomputed quantities and functions for sampling from

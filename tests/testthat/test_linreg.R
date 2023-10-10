@@ -96,7 +96,7 @@ test_that("simplified formula + offset works for linear regression", {
 
 test_that("model specification in two steps works", {
   mod <- y ~ x1 + x2 + x3 + x4
-  ml_mod <- y ~ reg(mod, Q0=1e-6, name="beta")
+  ml_mod <- y ~ reg(mod, prior=pr_normal(precision=1e-6), name="beta")
   sampler <- create_sampler(ml_mod, data=df, block=TRUE)
   sim <- MCMCsim(sampler, n.iter=500, burnin=100, n.chain=2, verbose=FALSE)
   summ <- summary(sim)
@@ -124,4 +124,41 @@ test_that("different priors for residual variance work", {
   sim <- MCMCsim(sampler, n.iter=500, burnin=100, n.chain=2, verbose=FALSE)
   pm_sigma <- summary(sim$sigma_)[, "Mean"]
   expect_true((0.75*sd0 < pm_sigma) && (pm_sigma < 1.25*sd0))
+})
+
+test_that("redundancy in design matrix is handled well in estimation and prediction", {
+  n <- 500L
+  dat <- data.frame(
+    age5 = factor(sample(5, n, replace=TRUE)),
+    sex = factor(sample(c("M", "F"), n, replace=TRUE))
+  )
+  dat$age3 <- dat$age5
+  levels(dat$age3) <- c("1", "1", "2", "3", "3")
+  gd <- generate_data(
+    ~ reg(~ age5 + sex*age3, name="beta", prior=pr_normal(prec=1)),
+    data=dat
+  )
+  expect_error(
+    sampler <- create_sampler(
+      gd$y ~ reg(~ age5 + sex*age3, name="beta"),
+      data=dat
+    ), "Non-positive-definite matrix"
+  )
+  sampler <- create_sampler(
+    gd$y ~ reg(~ age5 + sex*age3, name="beta", prior=pr_normal(precision=1)),
+    data=dat
+  )
+  expect_identical(sampler$mod[["beta"]]$q, 10L)
+  sampler <- create_sampler(
+    gd$y ~ reg(~ age5 + sex*age3, name="beta", remove.redundant=TRUE),
+    data=dat
+  )
+  expect_lte(sampler$mod[["beta"]]$q, 8L)
+  sim <- MCMCsim(sampler, verbose = FALSE)
+  summ <- summary(sim)
+  pred0 <- predict(sim, show.progress=FALSE)
+  summpred0 <- summary(pred0)
+  pred <- predict(sim, newdata = dat, show.progress=FALSE)
+  summpred <- summary(pred)
+  all.equal(summpred0[, "Mean"], summpred[, "Mean"], tol=0.4)
 })

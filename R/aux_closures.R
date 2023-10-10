@@ -285,16 +285,16 @@ make_mat_sum <- function(M0=NULL, M1, M2=NULL, sparse=NULL) {
 }
 
 
-make_det <- function(M, perm=FALSE) {
+make_det <- function(M, chol.control=chol_control(perm=FALSE)) {
   if (nrow(M) <= 1000L) {
     # for moderate dimensions eigenvalues are the fastest way for simple determinant updates
     ev0 <- eigen(M, only.values=TRUE)$values
-    rm(M, perm)
+    rm(M, chol.control)
     function(w1, w2) sum(log(w1 * ev0 + w2))
   } else {
-    detchol <- build_chol(M, perm)
+    detchol <- build_chol(M, control=chol.control)
     d <- nrow(M)
-    rm(perm)
+    rm(chol.control)
     function(w1, w2) d * log(w1) + 2 * c(determinant(detchol$update(M, w2/w1)$cholM)$modulus)
   }
 }

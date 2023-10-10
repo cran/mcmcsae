@@ -2,14 +2,14 @@
 % Please edit documentation in R/priors.R
 \name{pr_invwishart}
 \alias{pr_invwishart}
-\title{Create an object containing information about an inverse Wishart prior,
+\title{Create an object representing an inverse Wishart prior,
 possibly with modeled scale matrix}
 \usage{
-pr_invwishart(df = NULL, scale = NULL, n = NULL)
+pr_invwishart(df = NULL, scale = NULL)
 }
 \arguments{
 \item{df}{Degrees of freedom parameter. This should be a scalar numeric value.
-The default value is the dimension (\code{n}) plus one.}
+Default value is the dimension plus one.}
 
 \item{scale}{Either a (known) scale matrix, or
 \code{scale="modeled"} or \code{scale="modelled"}, which puts default
@@ -22,15 +22,12 @@ following components:
   \item{common}{whether the modeled scale parameter of the inverse chi-squared
     distribution is (a scalar parameter) common to all \code{n} diagonal elements.}
 }}
-
-\item{n}{dimension, if known. For internal use only.}
 }
 \value{
-An environment with information about the prior distribution used,
- to be used by other package functions.
+An environment representing the specified prior, for internal use.
 }
 \description{
-Create an object containing information about an inverse Wishart prior,
+Create an object representing an inverse Wishart prior,
 possibly with modeled scale matrix
 }
 \references{

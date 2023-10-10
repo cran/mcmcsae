@@ -50,7 +50,7 @@ if (requireNamespace("sf")) {
   # 2. generate some data according to a model with a few regression
   # effects, as well as spatial random effects
   gd <- generate_data(
-    ~ reg(~ AREA + BIR74, Q0=1, name="beta") +
+    ~ reg(~ AREA + BIR74, prior=pr_normal(precision=1), name="beta") +
       gen(factor = ~ spatial(NAME, poly.df=nc), name="vs"),
     sigma.mod = pr_invchisq(df=10, scale=1),
     data = nc
@@ -62,11 +62,11 @@ if (requireNamespace("sf")) {
   # 3. fit a model to the generated data, and see to what extent the
   #    parameters used to generate the data, gd$pars, are reproduced
   sampler <- create_sampler(
-    y ~ reg(~ AREA + BIR74, Q0=1, name="beta") +
+    y ~ reg(~ AREA + BIR74, prior=pr_normal(precision=1), name="beta") +
     gen(factor = ~ spatial(NAME, poly.df=nc), name="vs"),
     block=TRUE, data=nc
   )
-  sim <- MCMCsim(sampler, store.all=TRUE)
+  sim <- MCMCsim(sampler, store.all=TRUE, n.iter=600, n.chain=2, verbose=FALSE)
   (summ <- summary(sim))
   nc$vs <- summ$vs[, "Mean"]
   plot(nc[c("vs_true", "vs")])

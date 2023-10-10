@@ -1,7 +1,7 @@
-## ---- echo=FALSE----------------------------------------------------------------------------------
+## ----echo=FALSE-----------------------------------------------------------------------------------
 options(width=100)  # width of output
 
-## ---- message=FALSE-------------------------------------------------------------------------------
+## ----message=FALSE--------------------------------------------------------------------------------
 library(survey)
 data(api)
 # define the regression model
@@ -19,7 +19,7 @@ svymean(~ api00, cal)  # GREG estimate
 ## -------------------------------------------------------------------------------------------------
 mean(apipop$api00)
 
-## ---- message=FALSE-------------------------------------------------------------------------------
+## ----message=FALSE--------------------------------------------------------------------------------
 library(mcmcsae)
 set.seed(1)
 sampler <- create_sampler(model, data=apisrs)
@@ -48,7 +48,7 @@ predictions <- predict(sim, X=list(reg1=XpopR), var=N-n, fun=function(x, p) (sam
                        show.progress=FALSE)
 summary(predictions)
 
-## ---- fig.width=4, fig.height=4, fig.align="center"-----------------------------------------------
+## ----fig.width=4, fig.height=4, fig.align="center"------------------------------------------------
 sampler <- create_sampler(model, data=apisrs,
                           linpred=list(reg1=matrix(XpopT/N, nrow=1)),
                           compute.weights=TRUE)
@@ -57,11 +57,11 @@ plot(weights(cal)/N, weights(sim)); abline(0, 1)
 sum(weights(sim) * apisrs$api00)
 print(summary(sim, "linpred_"), digits=6)
 
-## ---- fig.width=4, fig.height=4, fig.align="center", message=FALSE--------------------------------
+## ----fig.width=4, fig.height=4, fig.align="center", message=FALSE---------------------------------
 sampler <- create_sampler(model, formula.V=~vfac(prior=pr_invchisq(df="modeled")),
                           linpred=list(reg1=matrix(XpopR/N, nrow=1)),
                           data=apisrs, compute.weights=TRUE)
-sim <- MCMCsim(sampler, n.iter=5000, burnin=1000, verbose=FALSE)
+sim <- MCMCsim(sampler, burnin=1000, n.iter=5000, thin=2, verbose=FALSE)
 (summ <- summary(sim))
 plot(sim, "vfac1_df")
 acceptance_rates(sim)

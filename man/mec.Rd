@@ -10,6 +10,7 @@ mec(
   sparse = NULL,
   X = NULL,
   V = NULL,
+  prior = NULL,
   Q0 = NULL,
   b0 = NULL,
   R = NULL,
@@ -19,9 +20,7 @@ mec(
   lower = NULL,
   upper = NULL,
   name = "",
-  perm = NULL,
-  debug = FALSE,
-  e = parent.frame()
+  debug = FALSE
 )
 }
 \arguments{
@@ -46,14 +45,19 @@ specified \code{formula} is ignored.}
 
 \item{V}{measurement error variance; can contain zeros}
 
+\item{prior}{prior specification for the regression coefficients. Currently only
+normal priors are supported, specified using function \code{\link{pr_normal}}.}
+
 \item{Q0}{prior precision matrix for the regression effects. The default is a
 zero matrix corresponding to a noninformative improper prior.
 It can be specified as a scalar value, as a numeric vector of appropriate
-length, or as a matrix object.}
+length, or as a matrix object. DEPRECATED, please use argument \code{prior}
+instead, i.e. \code{prior = pr_normal(mean = b0.value, precision = Q0.value)}.}
 
 \item{b0}{prior mean for the regression effect. Defaults to a zero vector.
 It can be specified as a scalar value or as a numeric vector of
-appropriate length.}
+appropriate length. DEPRECATED, please use argument \code{prior}
+instead, i.e. \code{prior = pr_normal(mean = b0.value, precision = Q0.value)}.}
 
 \item{R}{optional constraint matrix for equality restrictions R'x = r where
 \code{x} is the vector of regression effects.}
@@ -75,13 +79,8 @@ for two-sided constraints lower <= S'x <= upper.}
 MCMC simulation function \code{\link{MCMCsim}}. By default the name will be 'reg'
 with the number of the model term attached.}
 
-\item{perm}{whether permutation should be used in the Cholesky decomposition used for
-updating the model component's coefficient. Default is based on a simple heuristic.}
-
 \item{debug}{if \code{TRUE} a breakpoint is set at the beginning of the posterior
 draw function associated with this model component. Mainly intended for developers.}
-
-\item{e}{for internal use only.}
 }
 \value{
 an object with precomputed quantities and functions for sampling from

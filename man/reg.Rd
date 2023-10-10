@@ -10,6 +10,7 @@ reg(
   remove.redundant = FALSE,
   sparse = NULL,
   X = NULL,
+  prior = NULL,
   Q0 = NULL,
   b0 = NULL,
   R = NULL,
@@ -19,9 +20,7 @@ reg(
   lower = NULL,
   upper = NULL,
   name = "",
-  perm = NULL,
-  debug = FALSE,
-  e = parent.frame()
+  debug = FALSE
 )
 }
 \arguments{
@@ -42,14 +41,21 @@ be sparse. The default is to base this on a simple heuristic.}
 alternative to the creation of one based on \code{formula}. If \code{X} is
 specified \code{formula} is ignored.}
 
+\item{prior}{prior specification for the regression coefficients. Supported
+priors can be specified using functions \code{\link{pr_normal}},
+\code{\link{pr_fixed}}, \code{\link{pr_MLiG}}. The latter prior is only
+available in conjunction with a gamma family sampling distribution.}
+
 \item{Q0}{prior precision matrix for the regression effects. The default is a
 zero matrix corresponding to a noninformative improper prior.
 It can be specified as a scalar value, as a numeric vector of appropriate
-length, or as a matrix object.}
+length, or as a matrix object. DEPRECATED, please use argument \code{prior}
+instead, i.e. \code{prior = pr_normal(mean = b0.value, precision = Q0.value)}.}
 
 \item{b0}{prior mean for the regression effect. Defaults to a zero vector.
 It can be specified as a scalar value or as a numeric vector of
-appropriate length.}
+appropriate length. DEPRECATED, please use argument \code{prior}
+instead, i.e. \code{prior = pr_normal(mean = b0.value, precision = Q0.value)}.}
 
 \item{R}{optional constraint matrix for equality restrictions R'x = r where
 \code{x} is the vector of regression effects.}
@@ -57,7 +63,7 @@ appropriate length.}
 \item{r}{right hand side for the equality constraints.}
 
 \item{S}{optional constraint matrix for inequality constraints S'x >= s where
-x is the vector of regression effects.}
+\code{x} is the vector of regression effects.}
 
 \item{s}{right hand side for the inequality constraints.}
 
@@ -71,13 +77,8 @@ for two-sided constraints lower <= S'x <= upper.}
 MCMC simulation function \code{\link{MCMCsim}}. By default the name will be 'reg'
 with the number of the model term attached.}
 
-\item{perm}{whether permutation should be used in the Cholesky decomposition used for
-updating the model component's coefficient. Default is based on a simple heuristic.}
-
 \item{debug}{if \code{TRUE} a breakpoint is set at the beginning of the posterior
 draw function associated with this model component. Mainly intended for developers.}
-
-\item{e}{for internal use only.}
 }
 \value{
 an object with precomputed quantities and functions for sampling from
@@ -89,10 +90,13 @@ This function is intended to be used on the right hand side of the
 \code{formula} argument to \code{\link{create_sampler}} or
 \code{\link{generate_data}}. It creates an additive regression term in the
 model's linear predictor. By default, the prior for the regression
-coefficients is improper uniform. If \code{b0} or \code{Q0} are specified
-the prior becomes normal with mean \code{b0} (default 0) and variance
-(matrix) \code{sigma_^2 Q0^-1} where \code{sigma_^2} is the overall scale
-parameter of the model, if any.
+coefficients is improper uniform. A proper normal prior can be set up
+using function \code{\link{pr_normal}}, and passed to argument \code{prior}.
+It should be noted that \code{\link{pr_normal}} expects a precision matrix
+as input for its second argument, and that the prior variance (matrix) is
+taken to be the inverse of this precision matrix, where in case the
+model's family is \code{"gaussian"} this matrix is additionally
+multiplied by the residual scalar variance parameter \code{sigma_^2}.
 }
 \examples{
 \donttest{
@@ -106,14 +110,14 @@ sim <- MCMCsim(sampler, burnin=100, n.iter=400)
 summary(sim)
 # (weakly) informative normal priors on regression coefficients
 sampler <- create_sampler(Sepal.Length ~
-    reg(~ Petal.Length + Species, Q0=1e-2, name="beta"),
+    reg(~ Petal.Length + Species, prior=pr_normal(precision=1e-2), name="beta"),
   data=iris
 )
 sim <- MCMCsim(sampler, burnin=100, n.iter=400)
 summary(sim)
 # binary regression
 sampler <- create_sampler(Species == "setosa" ~
-    reg(~ Sepal.Length, Q=0.1, name="beta"),
+    reg(~ Sepal.Length, prior=pr_normal(precision=0.1), name="beta"),
   family="binomial", data=iris)
 sim <- MCMCsim(sampler, burnin=100, n.iter=400)
 summary(sim)

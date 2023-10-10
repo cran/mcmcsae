@@ -7,7 +7,7 @@ set.seed(1, kind="Mersenne-Twister", normal.kind="Inversion")
 n <- 1000L
 r <- 0.17  # dispersion parameter
 df <- data.frame(x1=rnorm(n), x2=runif(n))
-mod <- ~ reg(~ 1 + x1 + x2, b0=c(3, 1, 0.5), Q0=1e10*diag(3), name="beta")
+mod <- ~ reg(~ 1 + x1 + x2, prior=pr_fixed(c(3, 1, 0.5)), name="beta")
 dat <- generate_data(mod, family="negbinomial", ry=r, r.mod=pr_fixed(value=1), data=df)
 
 test_that("fitting a negative binomial model works", {
@@ -64,7 +64,7 @@ test_that("fitting a negative binomial model with dispersion parameter fixed by 
 n <- 1000L
 r <- 1  # dispersion parameter
 df <- data.frame(x1=rnorm(n), x2=runif(n), f=factor(sample(1:25, n, replace=TRUE)))
-mod <- ~ reg(~ 1 + x1 + x2, b0=c(3, 1, 0.5), Q0=1e10*diag(3), name="beta") +
+mod <- ~ reg(~ 1 + x1 + x2, prior=pr_fixed(c(3, 1, 0.5)), name="beta") +
   gen(factor=~f, prior=pr_invchisq(df=1000, scale=0.1), name="v")
 ry <- c(rep.int(1, 500), rep.int(5, 500))
 dat <- generate_data(mod, family="negbinomial", ry=ry, r.mod=pr_fixed(value=1/r), data=df)

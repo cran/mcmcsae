@@ -333,16 +333,16 @@ crossprod_sym <- function(M, Q) {
 
 # create a template for fast updating of X'QX under changing
 # diagonal matrix Q, and fixed sparse (dgC) X
-sparse_crossprod_sym_template <- function(X) {
+sparse_crossprod_sym_template <- function(X, max.size.cps.template=100) {
   if (!inherits(X, "dgCMatrix")) stop("matrix of class 'dgCMatrix' expected")
   XtQX <- crossprod_sym(X, 0.1 + runif(nrow(X)))
   XtQX_nsT <- as(as(XtQX, "nMatrix"), "TsparseMatrix")
   nnz_per_col <- Cnnz_per_col_scps_template(X, XtQX_nsT@i, XtQX_nsT@j)
   # check whether the total number of nonzeros is above a certain threshold
-  # if so, then we revert to direct computation of the sparse symmetric crossproduct 
+  # if so, then we revert to direct computation of the sparse symmetric crossproduct
   # approximate size of the sparse template matrix in MB:
   mem <- ((8 + 4) * sum(nnz_per_col) + length(nnz_per_col)) / 1e6
-  if (mem > .opts$max.size.cps.template) {
+  if (mem > max.size.cps.template) {
     stop("sparse symmetric crossproduct template requires ", mem, " MB of memory")
   }
   spX <- Ccreate_sparse_crossprod_sym_template(X, XtQX_nsT@i, XtQX_nsT@j, nnz_per_col)
@@ -416,6 +416,16 @@ setMethod("%*%", signature("dsCMatrix", "matrix"), function(x, y) {
 #' @rdname Matrix-methods
 setMethod("%*%", signature("tabMatrix", "matrix"), function(x, y)
   Ctab_dense_prod(x, y)
+)
+
+#' @rdname Matrix-methods
+setMethod("%*%", signature("matrix", "tabMatrix"), function(x, y)
+  x %*% Ctab2dgC(y)
+)
+
+#' @rdname Matrix-methods
+setMethod("%*%", signature("tabMatrix", "numLike"), function(x, y)
+  Ctab_dense_prod(x, matrix(y, ncol=1L))
 )
 
 #' @rdname Matrix-methods
@@ -523,13 +533,11 @@ economizeDiagMatrix <- function(M, strip.names=TRUE, vec.diag=FALSE) {
   if (vec.diag) {  # NB in scalar case names are not returned
     if (M@diag == "U") {
       1
-    } else {
-      if (all(M@x == M@x[1L])) {
-        M@x[1L]
-      } else {
-        if (strip.names) M@x else setNames(M@x, labs)
-      }
-    }
+    } else if (all(M@x == M@x[1L])) {
+      M@x[1L]
+    } else if (strip.names) {
+      M@x
+    } else setNames(M@x, labs)
   } else {
     if (strip.names) {
       M <- rm_Matrix_names(M)
@@ -559,17 +567,16 @@ economizeDiagMatrix <- function(M, strip.names=TRUE, vec.diag=FALSE) {
 #'  of the vector are equal then it is reduced to a scalar.
 #' @param vec.as.diag if \code{TRUE}, the default, vector input is expanded to a diagonal matrix with
 #'  this vector at its diagonal. Otherwise, vector \code{M} is interpreted as a single-column matrix.
+#' @param check if \code{TRUE}, do some checks on the input matrix, such as a check for NAs and a
+#'  symmetry check in case \code{symmetric=TRUE}.
 #' @return the matrix in an efficient (memory and performance-wise) format.
 economizeMatrix <- function(M, sparse=NULL, symmetric=FALSE, strip.names=TRUE,
-                            allow.tabMatrix=TRUE, drop.zeros=FALSE, vec.diag=FALSE, vec.as.diag=TRUE) {
+                            allow.tabMatrix=TRUE, drop.zeros=FALSE, vec.diag=FALSE, vec.as.diag=TRUE, check=FALSE) {
   if (is.vector(M)) {
-    if (vec.as.diag)
-      M <- Cdiag(M)
-    else
-      M <- matrix(M, ncol=1L)
+    if (vec.as.diag) M <- Cdiag(M) else M <- matrix(M, ncol=1L)
   }
-  if (!is_a_matrix(M)) stop("not a matrix or Matrix")
-  if (anyNA(M)) stop("economizeMatrix: missing values in input matrix")
+  if (check && !is_a_matrix(M)) stop("not a matrix or Matrix")
+  if (check && anyNA(M)) stop("economizeMatrix: missing values in input matrix")
   if (symmetric && !identical(sparse, FALSE) && isDiagonal(M)) {
     return(economizeDiagMatrix(M, strip.names, vec.diag))
   }
@@ -580,7 +587,7 @@ economizeMatrix <- function(M, sparse=NULL, symmetric=FALSE, strip.names=TRUE,
     if (!is.matrix(M)) M <- as.matrix(M)
     # make sure the matrix has mode 'double', otherwise some C++ matrix routines might not work
     if (!is.double(M)) storage.mode(M) <- "double"
-    # if symmetric==TRUE maybe check that M is symmetric (isSymmetric.matrix with not too small tolerance)
+    if (check && symmetric && !isSymmetric(M)) stop("economizeMatrix: matrix is not symmetric")
     return(if (strip.names) unname(M) else M)
   }
   if (isDiagonal(M)) return(economizeDiagMatrix(M, strip.names, vec.diag))
@@ -597,8 +604,10 @@ economizeMatrix <- function(M, sparse=NULL, symmetric=FALSE, strip.names=TRUE,
   if (all(class(M)[1L] != c("dgCMatrix", "dsCMatrix")))
     M <- as(as(as(M, "CsparseMatrix"), "generalMatrix"), "dMatrix")
   if (drop.zeros) M <- drop0(M)
-  if (symmetric && class(M)[1L] == "dgCMatrix")
-    M <- as(M, "symmetricMatrix")
+  if (symmetric && class(M)[1L] == "dgCMatrix") {
+    if (check && !isSymmetric(M)) stop("economizeMatrix: matrix is not symmetric")
+    M <- forceSymmetric(M, uplo="U")
+  }
   if (class(M)[1L] == "dsCMatrix" && M@uplo != "U") stop("need uplo='U' for dsCMatrix")
   if (strip.names) rm_Matrix_names(M) else M
 }
@@ -677,7 +686,7 @@ cross <- function(Q1, Q2) {
     else
       return(Cdiag(as.numeric(base::tcrossprod(ddi_diag(Q1), ddi_diag(Q2)))))
   }
-  if (all(c(c1, c2) %in% c("ddiMatrix", "dsCMatrix"))) return(as(as(kronecker(Q2, Q1), "CsparseMatrix"), "symmetricMatrix"))
+  if (all(c(c1, c2) %in% c("ddiMatrix", "dsCMatrix"))) return(forceSymmetric(as(kronecker(Q2, Q1), "CsparseMatrix"), uplo="U"))
   return(as(kronecker(Q2, Q1), "CsparseMatrix"))  # at least one matrix is dgC
 }
 

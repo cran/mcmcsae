@@ -8,10 +8,10 @@ generic random effects component.}
 glreg(
   formula = NULL,
   remove.redundant = FALSE,
+  prior = NULL,
   Q0 = NULL,
   data = NULL,
-  name = "",
-  e = parent.frame()
+  name = ""
 )
 }
 \arguments{
@@ -23,8 +23,13 @@ group-level means from the unit-level data passed as \code{data} argument to
 \item{remove.redundant}{whether redundant columns should be removed from the design matrix.
 Default is \code{FALSE}.}
 
+\item{prior}{prior specification for the group-level effects. Currently only
+normal priors with mean 0 can be specified, using function \code{\link{pr_normal}}.}
+
 \item{Q0}{prior precision matrix for the group-level effects. The default is a
-zero matrix corresponding to a noninformative improper prior.}
+zero matrix corresponding to a noninformative improper prior.
+DEPRECATED, please use argument \code{prior} instead, i.e.
+\code{prior = pr_normal(precision = Q0.value)}.}
 
 \item{data}{group-level data frame in which the group-level variables specified in
 \code{formula} are looked up.}
@@ -32,8 +37,6 @@ zero matrix corresponding to a noninformative improper prior.}
 \item{name}{the name of the model component. This name is used in the output of the
 MCMC simulation function \code{\link{MCMCsim}}. By default this name will be
 the name of the corresponding generic random effects component appended by '_gl'.}
-
-\item{e}{for internal use only.}
 }
 \value{
 An object with precomputed quantities for sampling from

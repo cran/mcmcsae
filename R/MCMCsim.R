@@ -54,7 +54,7 @@
 #' # example using create_sampler; first generate some data
 #' n <- 100
 #' dat <- data.frame(x=runif(n), f=as.factor(sample(1:4, n, replace=TRUE)))
-#' gd <- generate_data(~ reg(~ x + f, Q0=1, name="beta"), data=dat)
+#' gd <- generate_data(~ reg(~ x + f, prior=pr_normal(precision=1), name="beta"), data=dat)
 #' dat$y <- gd$y
 #' sampler <- create_sampler(y ~ x + f, data=dat)
 #' sim <- MCMCsim(sampler, burnin=100, n.iter=400, n.chain=2)
@@ -405,7 +405,8 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
   if (verbose) cat("\r                         ")  # blank the output
 
   if (adapt) {  # reset, only keep acceptance rates after burnin
-    out[["_accept"]] <- rep.int(list(rep.int(list(0L), n.chain)), length(MHpars))
+    for (a in seq_along(MHpars))
+      out[["_accept"]][[a]] <- rep.int(list(0L), n.chain)
   }
 
   # part 2: sampling after burnin, store parameters, compute predicted quantities
@@ -561,7 +562,7 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
 #' # generate some example data
 #' n <- 250
 #' dat <- data.frame(x=runif(n), f=as.factor(sample(1:5, n, replace=TRUE)))
-#' gd <- generate_data(~ reg(~ x + f, Q0=1, name="beta"), data=dat)
+#' gd <- generate_data(~ reg(~ x + f, prior=pr_normal(precision=1), name="beta"), data=dat)
 #' dat$y <- gd$y
 #' sampler <- create_sampler(y ~ reg(~ x + f, name="beta"), data=dat)
 #' sim <- MCMCsim(sampler, n.chain=2, n.iter=400)
@@ -683,7 +684,7 @@ par_names <- function(obj) obj[["_info"]][["parnames"]]
 #' # NB this example creates a file "MCdraws_e_.RData" in the working directory
 #' n <- 100
 #' dat <- data.frame(x=runif(n), f=as.factor(sample(1:5, n, replace=TRUE)))
-#' gd <- generate_data(~ reg(~ x + f, Q0=1, name="beta"), data=dat)
+#' gd <- generate_data(~ reg(~ x + f, prior=pr_normal(precision=1), name="beta"), data=dat)
 #' dat$y <- gd$y
 #' sampler <- create_sampler(y ~ reg(~ x + f, name="beta"), data=dat)
 #' # run the MCMC simulation and write draws of residuals to file:
@@ -733,7 +734,7 @@ get_from <- function(dc, vars=seq_len(nvars(dc)), chains=seq_len(nchains(dc)), d
 #' @examples
 #' n <- 300
 #' dat <- data.frame(x=runif(n), f=as.factor(sample(1:7, n, replace=TRUE)))
-#' gd <- generate_data(~ reg(~ x + f, Q0=1, name="beta"), data=dat)
+#' gd <- generate_data(~ reg(~ x + f, prior=pr_normal(precision=1), name="beta"), data=dat)
 #' dat$y <- gd$y
 #' sampler <- create_sampler(y ~ reg(~ x + f, name="beta"), data=dat)
 #' sim <- MCMCsim(sampler)

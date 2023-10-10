@@ -111,7 +111,7 @@ trace_plot <- function(dc1, xlab="iterations", ylab="") {
 #'   x=runif(n),
 #'   f=factor(sample(1:20, n, replace=TRUE))
 #' )
-#' model <- ~ reg(~ x, Q0=1, name="beta") + gen(factor=~f, name="v")
+#' model <- ~ reg(~ x, prior=pr_normal(precision=1), name="beta") + gen(factor=~f, name="v")
 #' gd <- generate_data(model, data=dat)
 #' dat$y <- gd$y
 #' # fit a base model

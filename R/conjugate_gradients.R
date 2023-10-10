@@ -22,7 +22,7 @@
 CG <- function(b, env, x=NULL, max.it=NULL, e=NULL, verbose=FALSE, ...) {
   if (is.null(x)) x <- 0*b
   if (is.null(max.it)) max.it <- length(b)
-  if (is.null(e)) e <- length(b)*1e-12
+  if (is.null(e)) e <- 1e-10 * length(b)
   r <- b - env$A_times(x, ...)
   z <- env$M_solve(r, ...)
   p <- z
@@ -43,7 +43,7 @@ CG <- function(b, env, x=NULL, max.it=NULL, e=NULL, verbose=FALSE, ...) {
       if (k > max.it) warn("max.it iterations reached with discrepancy ", dotprodC(z, z))
       break
     }
-    #if (verbose) cat("iteration ", k, "   |r| = ", sqrt(sum(r^2)), "   |z| = ", sqrt(sum(z^2)), "\n")
+    if (verbose) cat("iteration ", k, "   |r| = ", sqrt(sum(r^2)), "   |z| = ", sqrt(sum(z^2)), "\n")
     beta <- dotprodC(r, z) / rz
     p <- z + beta * p
     k <- k + 1L
@@ -67,10 +67,10 @@ CG <- function(b, env, x=NULL, max.it=NULL, e=NULL, verbose=FALSE, ...) {
 #' @return An environment with precomputed quantities and functions for multiplication
 #'   by A and by an (inverse) preconditioning matrix.
 #' @references
-#'  A. Nishimura and M.A. Suchard (2018).
+#'  A. Nishimura and M.A. Suchard (2022).
 #'    Prior-preconditioned conjugate gradient method for accelerated Gibbs sampling in
-#'    large n & large p sparse Bayesian regression.
-#'    arXiv:1810.12437.
+#'    "large n, large p" Bayesian sparse regression.
+#'    Journal of the American Statistical Association, 1-14.
 # TODO
 # - input checks
 # - allow updates of QA (priorA or Leroux), i.p. QA = DA' diag(w) DA where w is updated
@@ -94,7 +94,7 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
       )
       cholQ <- switch(sampler$Q0.type,
         unit=, diag = build_chol(runif(n, 0.9, 1.1)),
-        symm = build_chol(crossprod_sym(Cdiag(runif(0.9, 1.1)), sampler$Q0))
+        symm = build_chol(crossprod_sym(Cdiag(runif(0.9, 1.1)), sampler$Q0), control=control$chol.control)
       )
     } else {
       Q_x <- switch(sampler$Q0.type,
@@ -105,7 +105,7 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
       cholQ <- switch(sampler$Q0.type,
         unit = build_chol(Diagonal(n)),
         diag = build_chol(Cdiag(sampler$Q0@x)),
-        symm = build_chol(sampler$Q0)
+        symm = build_chol(sampler$Q0, control=control$chol.control)
       )
     }
   } else {
@@ -130,7 +130,7 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
     } else {
       if (mc$type != "reg") stop("TBI")
       # TODO account for b0, and optimize for zero Q0 (default)
-      cholQV[[mc$name]] <- build_chol(mc$Q0)
+      cholQV[[mc$name]] <- build_chol(mc$Q0, control=control$chol.control)
     }
   }
 
@@ -158,7 +158,7 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
       # TODO
       # - duplicate code, see setup_priorGMRFsampler in mc_gen
       # - cholDD needs update in case of local shrinkage priorA
-      mc$cholDD <- build_chol(tcrossprod(mc$DA), perm=FALSE)  # sometimes perm=TRUE may be more efficient
+      mc$cholDD <- build_chol(tcrossprod(mc$DA), control=chol_control(perm=FALSE))  # sometimes perm=TRUE may be more efficient
     } else {
       # regression usually uses non- or weakly-informative prior -->
       # use simple regression posterior variances in preconditioner, as suggested in NS paper
@@ -261,19 +261,26 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
 #' @param stop.criterion total squared error stop criterion for the CG algorithm.
 #' @param preconditioner one of  "GMRF", "GMRF2", "GMRF3" and "identity".
 #' @param scale scale parameter; only used by the "GMRF3" preconditioner.
+#' @param chol.control options for Cholesky decomposition, see \code{\link{chol_control}}.
 #' @param verbose whether diagnostic information about the CG sampler is shown.
 #' @return A list of options used by the conjugate gradients algorithm.
 CG_control <- function(max.it=NULL, stop.criterion=NULL,
                        preconditioner=c("GMRF", "GMRF2", "GMRF3", "identity"),
-                       scale=1, verbose=FALSE) {
+                       scale=1, chol.control=chol_control(),
+                       verbose=FALSE) {
   preconditioner <- match.arg(preconditioner)
-  list(max.it=max.it, stop.criterion=stop.criterion, preconditioner=preconditioner, scale=scale, verbose=verbose)
+  list(max.it=max.it, stop.criterion=stop.criterion, preconditioner=preconditioner, scale=scale,
+       chol.control=chol.control, verbose=verbose)
 }
 
 # a manually specified list of control options might not be complete or consistent --> check it
 check_CG_control <- function(control) {
+  if (is.null(control)) control <- list()
+  if (!is.list(control)) stop("control options must be specified as a list, preferably using the appropriate control setter function")
   defaults <- CG_control()
   w <- which(!(names(control) %in% names(defaults)))
   if (length(w)) stop("unrecognized control parameters ", paste(names(control)[w], collapse=", "))
-  modifyList(defaults, control)
+  control <- modifyList(defaults, control, keep.null=TRUE)
+  control$chol.control <- check_chol_control(control$chol.control)
+  control
 }

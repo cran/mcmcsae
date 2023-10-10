@@ -59,13 +59,17 @@
 #' @param V measurement error variance; can contain zeros
 # TODO in general case this can be a list of q x q precision matrices where q
 #      is the number of covariates
+#' @param prior prior specification for the regression coefficients. Currently only
+#'  normal priors are supported, specified using function \code{\link{pr_normal}}.
 #' @param Q0 prior precision matrix for the regression effects. The default is a
 #'  zero matrix corresponding to a noninformative improper prior.
 #'  It can be specified as a scalar value, as a numeric vector of appropriate
-#'  length, or as a matrix object.
+#'  length, or as a matrix object. DEPRECATED, please use argument \code{prior}
+#'  instead, i.e. \code{prior = pr_normal(mean = b0.value, precision = Q0.value)}.
 #' @param b0 prior mean for the regression effect. Defaults to a zero vector.
 #'  It can be specified as a scalar value or as a numeric vector of
-#'  appropriate length.
+#'  appropriate length. DEPRECATED, please use argument \code{prior}
+#'  instead, i.e. \code{prior = pr_normal(mean = b0.value, precision = Q0.value)}.
 #' @param R optional constraint matrix for equality restrictions R'x = r where
 #'  \code{x} is the vector of regression effects.
 #' @param r right hand side for the equality constraints.
@@ -79,11 +83,8 @@
 #' @param name the name of the model component. This name is used in the output of the
 #'  MCMC simulation function \code{\link{MCMCsim}}. By default the name will be 'reg'
 #'  with the number of the model term attached.
-#' @param perm whether permutation should be used in the Cholesky decomposition used for
-#'  updating the model component's coefficient. Default is based on a simple heuristic.
 #' @param debug if \code{TRUE} a breakpoint is set at the beginning of the posterior
 #'  draw function associated with this model component. Mainly intended for developers.
-#' @param e for internal use only.
 #' @return an object with precomputed quantities and functions for sampling from
 #'  prior or conditional posterior distributions for this model component. Intended
 #'  for internal use by other package functions.
@@ -95,11 +96,12 @@
 #'  S. Arima, G.S. Datta and B. Liseo (2015).
 #'    Bayesian estimators for small area models when auxiliary information is measured with error.
 #'    Scandinavian Journal of Statistics 42(2), 518-529.
-mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL, Q0=NULL, b0=NULL,
+mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
+                prior=NULL, Q0=NULL, b0=NULL,
                 R=NULL, r=NULL, S=NULL, s=NULL, lower=NULL, upper=NULL,
-                name="", perm=NULL,
-                debug=FALSE, e=parent.frame()) {
+                name="", debug=FALSE) {
 
+  e <- sys.frame(-2L)
   type <- "mec"
   if (name == "") stop("missing model component name")
   remove.redundant <- FALSE
@@ -162,32 +164,28 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL, Q0=NULL, b0=NULL,
     v0 <- 1/diag(e$Q0)[i.me]
   }
 
-  Q0 <- set_prior_precision(Q0, q, sparse=if (in_block) TRUE else NULL)  # mc_block uses x-slot of precision matrix
-  informative.prior <- !is_zero_matrix(Q0)
-  if (!informative.prior || is.null(b0) || all(b0 == 0)) {
-    b0 <- 0
+  if (!is.null(b0) || !is.null(Q0)) {
+    warn("arguments 'b0' and 'Q0' are deprecated; please use argument 'prior' instead")
+    if (is.null(prior)) prior <- pr_normal(mean = if (is.null(b0)) 0 else b0, precision = if (is.null(Q0)) 0 else Q0)
+  } else {
+    if (is.null(prior)) prior <- pr_normal(mean=0, precision=0)
+  }
+  if (prior$type != "normal") stop("only a normal prior is currently supported for 'mec' model component effects")
+  prior$init(q, e$coef.names[[name]], sparse=if (in_block) TRUE else NULL, sigma=!e$sigma.fixed)  # mc_block uses x-slot of precision matrix
+  informative.prior <- prior$informative
+  Q0 <- prior$precision
+  zero.mean <- !informative.prior || all(prior$mean == 0)
+  if (zero.mean) {
+    prior$mean <- 0
     Q0b0 <- 0
-    zero.mean <- TRUE
   } else {
     if (in_block) stop("not yet implemented: block sampling with non-zero prior mean")
-    if (length(b0) == 1L) {
-      Q0b0 <- Q0 %m*v% rep.int(as.numeric(b0), q)
-    } else {
-      if (length(b0) == q)
-        Q0b0 <- Q0 %m*v% as.numeric(b0)
-      else
-        stop("wrong input for prior mean 'b0' in model component", name)
-    }
-    zero.mean <- FALSE
+    b0 <- if (length(prior$mean) == 1L) rep.int(prior$mean, q) else prior$mean
+    Q0b0 <- Q0 %m*v% b0
   }
+  # TODO TMVN prior
 
   if (!zero.mean && e$compute.weights) stop("weights cannot be computed if some coefficients have non-zero prior means")
-  log_prior_0 <- -0.5 * q * log(2*pi)
-  if (informative.prior) {
-    d <- diag(suppressWarnings(chol(Q0, pivot=TRUE)))
-    log_prior_0 <- log_prior_0 + sum(log(d[d > 0]))
-    rm(d)
-  }
 
   name_X <- paste0(name, "_X")
   linpred <- function(p) p[[name_X]] %m*v% p[[name]]
@@ -195,9 +193,9 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL, Q0=NULL, b0=NULL,
   # function that creates an oos prediction function (closure) based on new data
   # this computes the contribution of this component to the linear predictor
   make_predict <- function(newdata=NULL, Xnew, verbose=TRUE) {
-    if (is.null(newdata)) stop("for out-of-sample prediction with 'mec' components a data frame",
+    if (is.null(newdata)) stop("for out-of-sample prediction with 'mec' components a data frame ",
                                "must be supplied")
-    if (!V.in.formula) stop("for out-of-sample prediction with 'mec' components make sure to specify",
+    if (!V.in.formula) stop("for out-of-sample prediction with 'mec' components make sure to specify ",
                             "the measurement error variances using the formula argument")
     Xnew <- model_matrix(formula.X, newdata, sparse=sparse)
     dimnames(Xnew) <- list(NULL, NULL)
@@ -229,9 +227,8 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL, Q0=NULL, b0=NULL,
     rprior <- add(rprior, bquote(p[[.(name_X)]] <- X))
     rprior <- add(rprior, bquote(p[[.(name_X)]][i.me, ] <- sqrt(.(if (q == 1L) quote(1/QME) else quote(V))) * Crnorm(length(QME))))
   }
-  rprior <- add(rprior, bquote(p[[.(name)]] <- b0 + drawMVN_Q(Q0, sd=.(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])))))
+  rprior <- add(rprior, bquote(p[[.(name)]] <- prior$rprior(p)))
   rprior <- add(rprior, quote(p))
-  # TODO TMVN prior
 
 
   if (!e$prior.only) {

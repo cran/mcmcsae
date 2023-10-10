@@ -99,7 +99,7 @@ D. Spiegelhalter, N. Best, B. Carlin and A. van der Linde (2002).
    Understanding predictive information criteria for Bayesian models.
    Statistics and Computing 24, 997-1016.
 
- A. Vehtari, A. Gelman and J. Gabry (2015).
+ A. Vehtari, D. Simpson, A. Gelman, Y. Yao and J. Gabry (2015).
    Pareto smoothed importance sampling.
    arXiv:1507.02646.
 
@@ -108,8 +108,8 @@ D. Spiegelhalter, N. Best, B. Carlin and A. van der Linde (2002).
    and WAIC.
    Statistics and Computing 27, 1413-1432.
 
- P.-C. Buerkner, J. Gabry and A. Vehtari (2020).
+ P.-C. Buerkner, J. Gabry and A. Vehtari (2021).
    Efficient leave-one-out cross-validation for Bayesian non-factorized
    normal and Student-t models.
-   arXiv:1810.10559.
+   Computational Statistics 36, 1243-1261.
 }

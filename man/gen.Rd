@@ -25,9 +25,7 @@ gen(
   formula.gl = NULL,
   name = "",
   sparse = NULL,
-  perm = NULL,
-  debug = FALSE,
-  e = parent.frame()
+  debug = FALSE
 )
 }
 \arguments{
@@ -90,7 +88,7 @@ by supplying a list with one or more of the following components:
 }}
 
 \item{GMRFmats}{list of incidence/precision/constraint matrices. This can be specified
-as an alternative to \code{factor}. It should be a list such as is usually returned
+as an alternative to \code{factor}. It should be a list such as that returned
 by \code{\link{compute_GMRF_matrices}}. Can be used together with argument \code{X}
 as a flexible alternative to \code{formula} and \code{factor}.}
 
@@ -148,13 +146,8 @@ function \code{\link{MCMCsim}}. By default the name will be 'gen' with the numbe
 \item{sparse}{whether the model matrix associated with \code{formula} should be sparse.
 The default is based on a simple heuristic based on storage size.}
 
-\item{perm}{whether permutation should be used in the Cholesky decomposition used for updating
-the model component's coefficient vector. Default is based on a simple heuristic.}
-
 \item{debug}{if \code{TRUE} a breakpoint is set at the beginning of the posterior
 draw function associated with this model component. Mainly intended for developers.}
-
-\item{e}{for internal use only.}
 }
 \value{
 An object with precomputed quantities and functions for sampling from

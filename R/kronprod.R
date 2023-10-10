@@ -114,9 +114,9 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
     },
     matnum = {
       expand <- q2 > length(M2)  # scalar M2
-      template <- as(as(kronecker(M1, Cdiag(if (expand) rep.int(M2, q2) else M2)), "CsparseMatrix"), "symmetricMatrix")
+      template <- forceSymmetric(as(kronecker(M1, Cdiag(if (expand) rep.int(M2, q2) else M2)), "CsparseMatrix"), uplo="U")
       attr(template, "x") <- NULL
-      M1dsC <- as(as(M1, "CsparseMatrix"), "symmetricMatrix")
+      M1dsC <- forceSymmetric(as(M1, "CsparseMatrix"), uplo="U")
       w <- which(as.matrix(M1dsC) != 0 & row(M1) <= col(M1))
       d <- diff(M1dsC@p)
       d <- d[d > 0L]
@@ -133,7 +133,7 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       }
     },
     ddidsC = {
-      template <- as(as(kronecker(M1, M2), "CsparseMatrix"), "symmetricMatrix")
+      template <- forceSymmetric(as(kronecker(M1, M2), "CsparseMatrix"), uplo="U")
       attr(template, "x") <- NULL
       if (isUnitDiag(M1)) {
         q1 <- nrow(M1)
@@ -163,7 +163,7 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
     dsCnum=, dgCnum = {
       expand <- q2 > length(M2)  # scalar M2
       template <- as(kronecker(M1, Cdiag(if (expand) rep.int(M2, q2) else M2)), "CsparseMatrix")
-      if (class(M1)[1L] == "dsCMatrix") template <- as(template, "symmetricMatrix")
+      if (class(M1)[1L] == "dsCMatrix") template <- forceSymmetric(template, uplo="U")
       attr(template, "x") <- NULL
       d <- diff(M1@p)
       d <- d[d > 0L]
@@ -179,7 +179,7 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       }
     },
     matdsC = {
-      template <- as(as(kronecker(M1, M2), "CsparseMatrix"), "symmetricMatrix")
+      template <- forceSymmetric(as(kronecker(M1, M2), "CsparseMatrix"), uplo="U")
       upper <- which(row(M1) <= col(M1))
       prod.table <- base_tcrossprod(M1[upper], M2@x)
       ind <- arrayInd(match(template@x, prod.table), dim(prod.table))
@@ -190,7 +190,7 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       rm(upper, ind, prod.table)
       if (M1.fixed) {
         attr(M2, "x") <- rep.int(1, length(M2@x))
-        x0 <- as(as(kronecker(M1, M2), "CsparseMatrix"), "symmetricMatrix")@x
+        x0 <- forceSymmetric(as(kronecker(M1, M2), "CsparseMatrix"), uplo="U")@x
         rm(ind1)
         update <- function(M1, M2x, values.only=FALSE) {
           x <- x0 * M2x[ind2]
@@ -216,7 +216,7 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       }
     },
     dsCmat = {
-      template <- as(as(kronecker(M1, M2), "CsparseMatrix"), "symmetricMatrix")
+      template <- forceSymmetric(as(kronecker(M1, M2), "CsparseMatrix"), uplo="U")
       upper <- which(row(M2) <= col(M2))
       x1 <- unique(M1@x)
       x1.ind <- match(x1, M1@x)
@@ -228,7 +228,7 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       attr(template, "x") <- NULL
       rm(upper, x1, x1.ind, ind, prod.table)
       if (M1.fixed) {
-       x0 <- as(as(kronecker(M1, matrix(1, nrow(M2), ncol(M2))), "CsparseMatrix"), "symmetricMatrix")@x
+       x0 <- forceSymmetric(as(kronecker(M1, matrix(1, nrow(M2), ncol(M2))), "CsparseMatrix"), uplo="U")@x
        rm(ind1)
        update <- function(M1, M2x, values.only=FALSE) {
          x <- x0 * M2x[ind2]
@@ -254,7 +254,7 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       }
     },
     dsCdsC = {
-      template <- as(as(kronecker(M1, M2), "CsparseMatrix"), "symmetricMatrix")
+      template <- forceSymmetric(as(kronecker(M1, M2), "CsparseMatrix"), uplo="U")
       x1 <- unique(M1@x)
       x1.ind <- match(x1, M1@x)
       x2 <- unique(M2@x)
@@ -268,7 +268,7 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       rm(ind, x1, x1.ind, x2, x2.ind, prod.table)
       if (M1.fixed) {
         attr(M2, "x") <- rep.int(1, length(M2@x))
-        x0 <- as(as(kronecker(M1, M2), "CsparseMatrix"), "symmetricMatrix")@x
+        x0 <- forceSymmetric(as(kronecker(M1, M2), "CsparseMatrix"), uplo="U")@x
         rm(ind1)
         update <- function(M1, M2x, values.only=FALSE) {
           x <- x0 * M2x[ind2]

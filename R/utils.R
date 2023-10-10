@@ -74,7 +74,9 @@ mcmcsae_example <- function(n=100L, family="gaussian") {
     fT=factor(sample(seq_len(nT), n, replace=TRUE))
   )
   # fake data simulation
-  model <- ~ reg(~x, Q0=1, name="beta") + gen(formula=~x, factor=~fA, name="v") + gen(factor=~RW2(fT), name="u")
+  model <- ~ reg(~x, prior=pr_normal(precision=1), name="beta") +
+             gen(formula=~x, factor=~fA, name="v") +
+             gen(factor=~RW2(fT), name="u")
   gd <- generate_data(model, data=dat, family=family)
   dat$y <- gd$y
   list(dat=dat, pars=gd$pars, model=update.formula(model, y ~ .), family=family)

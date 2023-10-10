@@ -14,21 +14,24 @@
 #'  \code{\link{create_sampler}} or \code{\link{generate_data}}.
 #' @param remove.redundant whether redundant columns should be removed from the design matrix.
 #'  Default is \code{FALSE}.
+#' @param prior prior specification for the group-level effects. Currently only
+#'  normal priors with mean 0 can be specified, using function \code{\link{pr_normal}}.
 #' @param Q0 prior precision matrix for the group-level effects. The default is a
 #'  zero matrix corresponding to a noninformative improper prior.
-#  NB here we do not support non-zero prior mean b0
+#'  DEPRECATED, please use argument \code{prior} instead, i.e.
+#'  \code{prior = pr_normal(precision = Q0.value)}.
 #' @param data group-level data frame in which the group-level variables specified in
 #'  \code{formula} are looked up.
 #' @param name the name of the model component. This name is used in the output of the
 #'  MCMC simulation function \code{\link{MCMCsim}}. By default this name will be
 #'  the name of the corresponding generic random effects component appended by '_gl'.
-#' @param e for internal use only.
 #' @return An object with precomputed quantities for sampling from
 #'  prior or conditional posterior distributions for this model component. Only intended
 #'  for internal use by other package functions.
-glreg <- function(formula=NULL, remove.redundant=FALSE, Q0=NULL,
-                  data=NULL, name="", e=parent.frame()) {
+glreg <- function(formula=NULL, remove.redundant=FALSE, prior=NULL, Q0=NULL,
+                  data=NULL, name="") {
 
+  e <- sys.frame(-1L)
   type <- "reg"
   if (name == "") stop("missing model component name")
 
@@ -44,7 +47,7 @@ glreg <- function(formula=NULL, remove.redundant=FALSE, Q0=NULL,
       factor.info <- get_factor_info(e$factor, e$e$data)
       if (any("spline" == factor.info$types)) stop("unsupported combination: splines and group-level covariates")
       fac <- combine_factors(factor.info$variables, e$e$data)
-      X <- economizeMatrix(crossprod(aggrMatrix(fac, mean=TRUE), X), strip.names=FALSE)
+      X <- economizeMatrix(crossprod(aggrMatrix(fac, mean=TRUE), X), strip.names=FALSE, check=TRUE)
       rm(fac)
     }
   } else {  # formula + group-level data provided
@@ -62,9 +65,18 @@ glreg <- function(formula=NULL, remove.redundant=FALSE, Q0=NULL,
   # if p0 > 1, each varying effect has its own coefficient and the same design matrix glp$X
   q <- p0 * e$q0  # number of gl coefficients
 
+  if (!is.null(Q0)) {
+    warn("argument 'Q0' is deprecated; please use argument 'prior' instead")
+    if (is.null(prior)) prior <- pr_normal(precision = if (is.null(Q0)) 0 else Q0)
+  } else {
+    if (is.null(prior)) prior <- pr_normal(mean=0, precision=0)
+  }
+
+  if (prior$type != "normal" || any(prior$mean != 0)) stop("only a normal prior with mean zero is currently supported for group-level effects")
   # if modeled.Q need sparse Q0 and XX in order to combine them easily using a block-diagonal sparse template
-  Q0 <- set_prior_precision(Q0, q, sparse=e$e$modeled.Q)
-  informative.prior <- !is_zero_matrix(Q0)
+  prior$init(q, e$e$coef.names[[name]], sparse=e$e$modeled.Q, sigma=!e$e$sigma.fixed)
+  informative.prior <- prior$informative
+  Q0 <- prior$precision
   Q0b0 <- rep.int(0, q)  # need this in draw function, even though only b0=0 is supported
 
   # for modeled Q, the XX block of XX.ext is updated -> choose sparse

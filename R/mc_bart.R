@@ -20,7 +20,6 @@
 #'  with the number of the model term attached.
 #' @param debug if \code{TRUE} a breakpoint is set at the beginning of the posterior
 #'  draw function associated with this model component. Mainly intended for developers.
-#' @param e for internal use only.
 #' @param ... parameters passed to \code{\link[dbarts]{dbarts}}.
 #' @return an object with precomputed quantities and functions for sampling from
 #'  prior or conditional posterior distributions for this model component. Intended
@@ -30,8 +29,9 @@
 #'    BART: Bayesian additive regression trees.
 #'    The Annals of Applied Statistics 4(1), 266-298.
 bart <- function(formula, X=NULL, name="",
-                 debug=FALSE, e=parent.frame(), ...) {
+                 debug=FALSE, ...) {
 
+  e <- sys.frame(-2L)
   type <- "bart"
   if (name == "") stop("missing model component name")
 
@@ -43,7 +43,7 @@ bart <- function(formula, X=NULL, name="",
     # TODO maybe use dbarts::makeModelMatrixFromDataFrame instead
     X <- model_matrix(formula, e$data, sparse=FALSE)
   }
-  X <- economizeMatrix(X, sparse=FALSE, strip.names=FALSE)
+  X <- economizeMatrix(X, sparse=FALSE, strip.names=FALSE, check=TRUE)
 
   control <- dbarts::dbartsControl(n.chains=1L, updateState=FALSE)
 

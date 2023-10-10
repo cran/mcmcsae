@@ -1,4 +1,20 @@
 
+version 0.7.5
+- added gamma regression (family = "gamma")
+- several improvements to the "softTMVN" truncated multivariate normal sampler
+- added a few more methods to class tabMatrix to prepare for Matrix 1.6.2
+  (thanks to Mikael Jagan)
+- removed a few obsolete arguments from exported functions
+- more consistent prior specification; normal priors can now be specified using
+  function pr_normal; arguments b0, Q0 for prior mean and precision in several
+  model components have been deprecated
+- function pr_fixed for specifying a degenerate prior can now be used in more
+  places
+- global option setting function set_opts has been replaced by several
+  control functions sampler_control and chol_control that can be used
+  to pass computational options to various functions
+
+
 version 0.7.4
 - replaced maptools in Suggests by sf for reading shape files; now both
   SpatialPolygonsDataframe (for backward compatibility) and sf spatial data

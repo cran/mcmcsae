@@ -39,7 +39,7 @@ Simulation based calibration
 # this example takes a long time
 n <- 10L  # data size
 dat <- data.frame(x=runif(n))
-SBC_test(~ reg(~ 1 + x, b0=c(0.25, 1), Q0=1, name="beta"),
+SBC_test(~ reg(~ 1 + x, prior=pr_normal(mean=c(0.25, 1), precision=1), name="beta"),
   sigma.mod=pr_invchisq(df=1, scale=list(df=1, scale=1)), data=dat,
   pars=list(mu="beta[1]", beta_x="beta[2]", sigma="sigma_"),
   n.draws=25L, n.sim=100L*25L, thin=3L, burnin=50L

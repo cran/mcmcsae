@@ -2,7 +2,7 @@
 #include <Rcpp.h>
 
 
-extern "C" SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP LDL, SEXP super, SEXP Imult, SEXP m);
+extern "C" SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP super, SEXP Imult, SEXP m);
 extern "C" SEXP CHMf_solve(SEXP a, SEXP b, SEXP system);
 extern "C" SEXP CHMf_solve_matrix(SEXP a, SEXP b, SEXP system);
 extern "C" SEXP CHMf_spsolve(SEXP a, SEXP b, SEXP system);
@@ -10,8 +10,8 @@ extern "C" SEXP CHM_update_inplace(SEXP object, SEXP parent, SEXP mult);
 
 
 // [[Rcpp::export]]
-SEXP cCHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP LDL, SEXP super, SEXP Imult, SEXP m) {
-  return CHM_dsC_Cholesky(a, perm, LDL, super, Imult, m);
+SEXP cCHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP super, SEXP Imult, SEXP m) {
+  return CHM_dsC_Cholesky(a, perm, super, Imult, m);
 }
 
 // [[Rcpp::export]]

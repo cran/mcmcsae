@@ -6,7 +6,6 @@
 \usage{
 create_TMVN_sampler(
   Q,
-  perm = NULL,
   mu = NULL,
   Xy = NULL,
   update.Q = FALSE,
@@ -21,13 +20,12 @@ create_TMVN_sampler(
   upper = NULL,
   check.constraints = FALSE,
   method = NULL,
-  reduce = NULL
+  reduce = NULL,
+  chol.control = chol_control()
 )
 }
 \arguments{
 \item{Q}{precision matrix of the (unconstrained) multivariate normal distribution.}
-
-\item{perm}{whether permutation/pivoting should be used to build a Cholesky object.}
 
 \item{mu}{mean of the (unconstrained) multivariate normal distribution.}
 
@@ -67,6 +65,8 @@ options to non-default values, see \code{\link{mcmcsae-TMVN-method}}.}
 
 \item{reduce}{whether to a priori restrict the simulation to the subspace defined by the
 equality constraints.}
+
+\item{chol.control}{options for Cholesky decomposition, see \code{\link{chol_control}}.}
 }
 \value{
 An environment for sampling from a possibly degenerate and truncated multivariate normal
@@ -94,22 +94,22 @@ S <- cbind(diag(2), c(-1, 1), c(1.1, -1))  # inequality matrix
 # example taken from Pakman and Paninski (2014)
 # 1. exact Hamiltonian Monte Carlo (Pakman and Paninski, 2014)
 sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="HMC")
-sim <- MCMCsim(sampler)
+sim <- MCMCsim(sampler, n.iter=600, verbose=FALSE)
 summary(sim)
 plot(as.matrix(sim$x), pch=".")
 # 2. exact Hamiltonian Monte Carlo with Laplace momentum (Nishimura et al., 2021)
 sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="HMCZigZag")
-sim <- MCMCsim(sampler)
+sim <- MCMCsim(sampler, n.iter=600, verbose=FALSE)
 summary(sim)
 plot(as.matrix(sim$x), pch=".")
 # 3. Gibbs sampling approach (Rodriguez-Yam et al., 2004)
 sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="Gibbs")
-sim <- MCMCsim(sampler)
+sim <- MCMCsim(sampler, burnin=500, n.iter=2000, verbose=FALSE)
 summary(sim)
 plot(as.matrix(sim$x), pch=".")
 # 4. soft TMVN approximation (Souris et al., 2018)
 sampler <- create_TMVN_sampler(Q=diag(2), mu=c(4, 4), S=S, method="softTMVN")
-sim <- MCMCsim(sampler)
+sim <- MCMCsim(sampler, n.iter=600, verbose=FALSE)
 summary(sim)
 plot(as.matrix(sim$x), pch=".")
 }
