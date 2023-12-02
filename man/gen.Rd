@@ -13,7 +13,7 @@ gen(
   var = NULL,
   prior = NULL,
   Q0 = NULL,
-  PX = TRUE,
+  PX = NULL,
   GMRFmats = NULL,
   priorA = NULL,
   Leroux = FALSE,
@@ -75,16 +75,21 @@ See the documentation of those prior specification functions for more details.}
 combination with \code{var="scalar"}.}
 
 \item{PX}{whether parameter expansion should be used. Default is \code{TRUE}, which
-applies parameter expansion with default options. Alternative options can be specified
+applies parameter expansion with default options. The only exception is that for
+gamma sampling distributions the default is \code{FALSE}, i.e. no parameter expansion.
+Alternative options can be specified
 by supplying a list with one or more of the following components:
 \describe{
+  \item{prior}{prior for the multiplicative expansion parameter. Defaults to a
+    normal prior with mean 0 and standard deviation 1, unless the sampling
+    distribution is gamma in which case the default is a Multivariate Log
+    inverse Gamma prior. The default parameters can be changed using functions
+    \code{\link{pr_normal}} or \code{\link{pr_MLiG}}.}
   \item{vector}{whether a redundant multiplicative expansion parameter is used for each varying effect
     specified by \code{formula}. The default is \code{TRUE} except when \code{var="scalar"}.
     If \code{FALSE} a single redundant multiplicative parameter is used.}
   \item{data.scale}{whether the data level scale is used as a variance factor for the expansion
     parameters. Default is \code{TRUE}.}
-  \item{mu0}{location (vector) parameter for parameter expansion. By default \code{0}.}
-  \item{Q0}{precision (matrix) parameter for parameter expansion. Default is the identity matrix.}
 }}
 
 \item{GMRFmats}{list of incidence/precision/constraint matrices. This can be specified

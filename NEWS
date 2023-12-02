@@ -1,4 +1,16 @@
 
+version 0.7.6
+- blocked Gibbs sampler now also works with nonzero prior means of regression
+  effects
+- fully-blocked Gibbs sampler is now the default, and argument block has been
+  moved to sampler_control
+- model components for fixed and random effects now also usable to model
+  log-variance of gaussian multilevel models
+- added support for random effects for log mean of gamma sampling distribution
+- shape parameter now given default gamma(1, 1) prior in gamma multilevel
+  models
+
+
 version 0.7.5
 - added gamma regression (family = "gamma")
 - several improvements to the "softTMVN" truncated multivariate normal sampler

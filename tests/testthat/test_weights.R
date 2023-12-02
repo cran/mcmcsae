@@ -22,9 +22,9 @@ test_that("Weights computation is correct", {
   w <- weights(sim)
   expect_equal(w, get_means(sim, "weights_")[[1]])
   # to be 'sure' use equality up to 5 sigmas
-  expect_true(
-    summ$linpred_[, "Mean"] - 5 * summ$linpred_[, "MCSE"] < sum(w * df$y) &&
-    sum(w * df$y) < summ$linpred_[, "Mean"] + 5 * summ$linpred_[, "MCSE"]
+  expect_between(sum(w * df$y),
+    summ$linpred_[, "Mean"] - 5 * summ$linpred_[, "MCSE"],
+    summ$linpred_[, "Mean"] + 5 * summ$linpred_[, "MCSE"]
   )
   # random effects model
   sampler <- create_sampler(y ~ reg(~ 1 + x, name="beta") + gen(factor = ~ iid(f), name="v"),
@@ -36,8 +36,8 @@ test_that("Weights computation is correct", {
   w <- weights(sim)
   expect_equal(w, get_means(sim, "weights_")[[1]])
   # to be 'sure' use equality up to 5 sigmas
-  expect_true(
-    summ$linpred_[, "Mean"] - 5 * summ$linpred_[, "MCSE"] < sum(w * df$y) &&
-    sum(w * df$y) < summ$linpred_[, "Mean"] + 5 * summ$linpred_[, "MCSE"]
+  expect_between(sum(w * df$y),
+    summ$linpred_[, "Mean"] - 5 * summ$linpred_[, "MCSE"],
+    summ$linpred_[, "Mean"] + 5 * summ$linpred_[, "MCSE"]
   )
 })

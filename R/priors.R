@@ -75,10 +75,11 @@ pr_normal <- function(mean=0, precision=0, labels=NULL) {
       log_prior_0 <<- log_prior_0 + sum(log(d[d > 0]))
     }
     log_prior <<- function(p) {}
-    log_prior <<- add(log_prior, bquote(delta.beta <- p[[.(name)]] - mean))
+    log_prior <<- add(bquote(delta.beta <- p[[.(name)]] - mean))
     if (sigma) {
-      log_prior <<- add(log_prior, quote(sigma <- p[["sigma_"]]))
-      log_prior <<- add(log_prior, quote(- n * log(sigma) - 0.5 * dotprodC(delta.beta, precision %m*v% delta.beta) / sigma^2))
+      log_prior <<- log_prior |>
+        add(quote(sigma <- p[["sigma_"]])) |>
+        add(quote(- n * log(sigma) - 0.5 * dotprodC(delta.beta, precision %m*v% delta.beta) / sigma^2))
     } else
       log_prior <<- add(log_prior, quote(- 0.5 * dotprodC(delta.beta, precision %m*v% delta.beta)))
   }
@@ -113,7 +114,7 @@ pr_MLiG <- function(mean=0, precision=0, labels=NULL, a=1000) {
   if (any(precision < 0)) stop("parameter 'precision' must be nonnegative")
   informative <- any(precision > 0)
   n <- NULL
-  rprior <- function() stop("please call method 'init' first")
+  rprior <- function(p) stop("please call method 'init' first")
   init <- function(n=1L, coefnames) {
     n <<- as.integer(n)
     if (is.null(labels)) {
@@ -131,7 +132,7 @@ pr_MLiG <- function(mean=0, precision=0, labels=NULL, a=1000) {
       temp[m] <- precision
       precision <<- temp
     }
-    rprior <<- function() mean + sqrt(a/precision) * rMLiG(n, a, a)
+    rprior <<- function(p) mean + sqrt(a/precision) * rMLiG(n, a, a)
   }
   type <- "MLiG"
   environment()
@@ -144,10 +145,10 @@ pr_MLiG <- function(mean=0, precision=0, labels=NULL, a=1000) {
 #' @param value scalar or vector value parameter.
 #' @return An environment representing the specified prior, for internal use.
 pr_fixed <- function(value=1) {
+  value <- as.numeric(value)
   n <- NULL
   rprior <- function() stop("please call method 'init' first")
   #draw <- function() stop("please call method 'init' first")
-  #init <- function(n=1L, post=FALSE) {
   init <- function(n=1L) {
     n <<- as.integer(n)
     if (all(length(value) != c(1L, n))) stop("value parameter has wrong length")
@@ -315,8 +316,9 @@ pr_invchisq <- function(df=1, scale=1) {
       psi0 <<- scale$df / scale$scale
       if (scale$common) {
         if (length(scale$df) != 1L || length(scale$scale) != 1L) stop("scalar 'df' and 'scale' expected in common scale model")
-        rprior <<- add(rprior, quote(scale <- rchisq_scaled(1L, scale$df, psi=psi0)))
-        rprior <<- add(rprior, bquote(1 / rchisq_scaled(.(n), df, scale)))
+        rprior <<- rprior |>
+          add(quote(scale <- rchisq_scaled(1L, scale$df, psi=psi0))) |>
+          add(bquote(1 / rchisq_scaled(.(n), df, scale)))
       } else {
         rprior <<- add(rprior, bquote(draw_betaprime(.(n), 0.5*scale$df, 0.5*df, df/psi0)))
       }
@@ -419,4 +421,3 @@ pr_invwishart <- function(df=NULL, scale=NULL) {
   type <- "invwishart"
   environment()
 }
-

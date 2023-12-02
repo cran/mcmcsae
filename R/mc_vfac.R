@@ -93,7 +93,7 @@ vfac <- function(factor="local_",
           }
         },
         exp = {  # Laplace marginal sampling distribution
-          pred <- add(pred, quote(rexp(qnew)))
+          pred <- add(pred, bquote(rexp(.(qnew))))
         }
       )
     } else {
@@ -107,8 +107,9 @@ vfac <- function(factor="local_",
     invchisq = {
       if (is.list(prior$df)) {
         name_df <- paste0(name, "_df")
-        rprior <- add(rprior, bquote(p[[.(name_df)]] <- prior$rprior_df()))
-        rprior <- add(rprior, bquote(p[[.(name)]] <- prior$rprior(p[[.(name_df)]])))
+        rprior <- rprior |>
+          add(bquote(p[[.(name_df)]] <- prior$rprior_df())) |>
+          add(bquote(p[[.(name)]] <- prior$rprior(p[[.(name_df)]])))
       } else {
         rprior <- add(rprior, bquote(p[[.(name)]] <- prior$rprior()))
       }
@@ -122,11 +123,10 @@ vfac <- function(factor="local_",
   if (e$prior.only) return(environment())
 
   # BEGIN draw function
-  draw <- function(p) {}
-  if (debug) draw <- add(draw, quote(browser()))
+  draw <- if (debug) function(p) {browser()} else function(p) {}
 
   # define function to compute partial variance factors (cf. partial residuals)
-  if (length(e$Vmod) == 1L) {
+  if (e$single.V.block) {
     switch(e$Q0.type,
       unit = {
         if (e$sigma.fixed)
@@ -136,9 +136,9 @@ vfac <- function(factor="local_",
       },
       diag = {
         if (e$sigma.fixed)
-          get_partial_factor <- function(p) crossprod_mv(X, e$Q0@x * p[["e_"]]^2)
+          get_partial_factor <- function(p) crossprod_mv(X, e[["Q0"]]@x * p[["e_"]]^2)
         else
-          get_partial_factor <- function(p) crossprod_mv(X, e$Q0@x * p[["e_"]]^2) * (1 / p[["sigma_"]]^2)
+          get_partial_factor <- function(p) crossprod_mv(X, e[["Q0"]]@x * p[["e_"]]^2) * (1 / p[["sigma_"]]^2)
       },
       symm = {
         # create list with blocks of Q0 corresponding to the subdivision by factor
@@ -192,17 +192,18 @@ vfac <- function(factor="local_",
     }
   )
 
-  if (length(e$Vmod) == 1L) {
+  if (e$single.V.block) {
     switch(e$Q0.type,
       unit = {
         draw <- add(draw, quote(p$Q_ <- X %m*v% (1 / lambda)))
       },
       diag = {
-        draw <- add(draw, quote(p$Q_ <- e$Q0@x * (X %m*v% (1 / lambda))))
+        draw <- add(draw, quote(p$Q_ <- e[["Q0"]]@x * (X %m*v% (1 / lambda))))
       },
       symm = {
-        draw <- add(draw, quote(p$Q_ <- X %m*v% (1 / lambda)))
-        draw <- add(draw, quote(p$QM_ <- block_scale_dsCMatrix(e$Q0, p[["Q_"]])))
+        draw <- draw |>
+          add(quote(p$Q_ <- X %m*v% (1 / lambda))) |>
+          add(quote(p$QM_ <- block_scale_dsCMatrix(e[["Q0"]], p[["Q_"]])))
       }
     )
   } else {
@@ -214,8 +215,9 @@ vfac <- function(factor="local_",
     )
   }
 
-  draw <- add(draw, bquote(p[[.(name)]] <- lambda))
-  draw <- add(draw, quote(p))
+  draw <- draw |>
+    add(bquote(p[[.(name)]] <- lambda)) |>
+    add(quote(p))
   # END draw function
 
   if (prior$type == "invchisq" && is.list(prior$df) && prior$df$adapt) {
@@ -230,14 +232,16 @@ vfac <- function(factor="local_",
 
   start <- function(p) {}
   if (prior$type == "invchisq" && is.list(prior$df)) {
-    start <- add(start, bquote(if (is.null(p[[.(name_df)]])) p[[.(name_df)]] <- rgamma(1L, prior$df$alpha0, prior$df$beta0)))
-    start <- add(start, bquote(if (length(p[[.(name_df)]]) != 1L) stop("wrong length for start value '", name_df, "'")))
+    start <- start |>
+      add(bquote(if (is.null(p[[.(name_df)]])) p[[.(name_df)]] <- rgamma(1L, prior$df$alpha0, prior$df$beta0))) |>
+      add(bquote(if (length(p[[.(name_df)]]) != 1L) stop("wrong length for start value '", name_df, "'")))
   }
   # starting values 1 seem better than drawing from prior
-  start <- add(start, bquote(if (is.null(p[[.(name)]])) p[[.(name)]] <- rep.int(1, .(q))))
-  start <- add(start, bquote(if (length(p[[.(name)]]) != .(q)) stop("wrong length for start value '", name, "'")))
-  start <- add(start, quote(p))
+  start <- start |>
+    add(bquote(if (is.null(p[[.(name)]])) p[[.(name)]] <- rep.int(1, .(q)))) |>
+    add(bquote(if (length(p[[.(name)]]) != .(q)) stop("wrong length for start value '", name, "'"))) |>
+    add(quote(p))
 
-  if (length(e$Vmod) > 1L || e$Q0.type == "unit") rm(e)
+  if (!e$single.V.block || e$Q0.type == "unit") rm(e)
   environment()
 }

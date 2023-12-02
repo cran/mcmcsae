@@ -91,14 +91,18 @@ an object with precomputed quantities and functions for sampling from
 This function is intended to be used on the right hand side of the
 \code{formula} argument to \code{\link{create_sampler}} or
 \code{\link{generate_data}}. It creates an additive regression term in the
-model's linear predictor. By default, the prior for the regression
-coefficients is improper uniform. If \code{b0} or \code{Q0} are specified
-the prior becomes normal with mean \code{b0} (default 0) and variance
-(matrix) \code{sigma_^2 Q0^-1} where \code{sigma_^2} is the overall scale
-parameter of the model, if any. Covariates are assumed to be measured subject
+model's linear predictor. Covariates are assumed to be measured subject
 to normally distributed errors with zero mean and variance specified using
 the \code{formula} or \code{V} arguments. Note that this means that \code{formula}
 should only contain quantitative variables, and no intercept.
+By default, the prior for the regression
+coefficients is improper uniform. A proper normal prior can be set up
+using function \code{\link{pr_normal}}, and passed to argument \code{prior}.
+It should be noted that \code{\link{pr_normal}} expects a precision matrix
+as input for its second argument, and that the prior variance (matrix) is
+taken to be the inverse of this precision matrix, where in case the
+model's family is \code{"gaussian"} this matrix is additionally
+multiplied by the residual scalar variance parameter \code{sigma_^2}.
 }
 \examples{
 \donttest{

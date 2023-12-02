@@ -52,7 +52,7 @@ which generates the data as a categorical vector, with integer coded levels.}
 
 \item{var}{variance(s) used for out-of-sample prediction. By default 1.}
 
-\item{ny}{number of trials for used for out-of-sample prediction in case of a binomial model. By default 1.}
+\item{ny}{number of trials used for out-of-sample prediction in case of a binomial model. By default 1.}
 
 \item{ry}{fixed part of the (reciprocal) dispersion parameter in case of a negative binomial model.}
 

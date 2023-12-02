@@ -48,7 +48,7 @@ sim <- MCMCsim(sampler, store.all=TRUE, verbose=FALSE)
 (summary(sim))
 ```
 
-We want to estimate the area population means
+We wish to estimate the area population means
 $$
 \theta_i = \frac{1}{N_i}\sum_{j \in U_i} y_j\,,
 $$

@@ -37,7 +37,7 @@
 #'  For multinomial models and single trials, a further option is \code{type="data_cat"},
 #'  which generates the data as a categorical vector, with integer coded levels.
 #' @param var variance(s) used for out-of-sample prediction. By default 1.
-#' @param ny number of trials for used for out-of-sample prediction in case of a binomial model. By default 1.
+#' @param ny number of trials used for out-of-sample prediction in case of a binomial model. By default 1.
 #' @param ry fixed part of the (reciprocal) dispersion parameter in case of a negative binomial model.
 # use fun. instead of fun to avoid argument name clash with parLapply
 #' @param fun. function applied to the vector of posterior predictions to compute one or multiple summaries
@@ -121,7 +121,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
         ny <- NULL
       }
       # BayesLogit::rpg flags ny=0, so we have set ny to a tiny value > 0 in sampler; need to undo it here as rbinom yields NA for non-integral ny
-      if (any(fam$family == c("binomial", "multinomial"))) ny <- as.integer(round(model$ny))
+      if (fam$family == "binomial" || fam$family == "multinomial") ny <- as.integer(round(model$ny))
       if (fam$family == "multinomial" && type == "data_cat") n <- n %/% model$Km1
       if (fam$family == "negbinomial") ry <- model$ry
     } else {
@@ -278,7 +278,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
     predict_obj <- function(obj) {
       chains <- seq_len(nchains(obj))
       iters <- seq_len(ndraws(obj))
-      if (any(out_type == c("logical", "integer")))
+      if (out_type == "logical" || out_type == "integer")
         out <- rep.int(list(matrix(NA_integer_, length(iters), d)), length(chains))
       else
         out <- rep.int(list(matrix(NA_real_, length(iters), d)), length(chains))
@@ -319,7 +319,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
       write.size <- if (write.single.prec) 4L else NA_integer_
       ppcheck <- FALSE  # TODO allow ppcheck in the case that predictions are written to file
     } else {
-      if (any(out_type == c("logical", "integer")))
+      if (out_type == "logical" || out_type == "integer")
         out <- rep.int(list(matrix(NA_integer_, n.it, d)), n.chain)
       else
         out <- rep.int(list(matrix(NA_real_, n.it, d)), n.chain)

@@ -4,14 +4,18 @@
 #' This function is intended to be used on the right hand side of the
 #' \code{formula} argument to \code{\link{create_sampler}} or
 #' \code{\link{generate_data}}. It creates an additive regression term in the
-#' model's linear predictor. By default, the prior for the regression
-#' coefficients is improper uniform. If \code{b0} or \code{Q0} are specified
-#' the prior becomes normal with mean \code{b0} (default 0) and variance
-#' (matrix) \code{sigma_^2 Q0^-1} where \code{sigma_^2} is the overall scale
-#' parameter of the model, if any. Covariates are assumed to be measured subject
+#' model's linear predictor. Covariates are assumed to be measured subject
 #' to normally distributed errors with zero mean and variance specified using
 #' the \code{formula} or \code{V} arguments. Note that this means that \code{formula}
 #' should only contain quantitative variables, and no intercept.
+#' By default, the prior for the regression
+#' coefficients is improper uniform. A proper normal prior can be set up
+#' using function \code{\link{pr_normal}}, and passed to argument \code{prior}.
+#' It should be noted that \code{\link{pr_normal}} expects a precision matrix
+#' as input for its second argument, and that the prior variance (matrix) is
+#' taken to be the inverse of this precision matrix, where in case the
+#' model's family is \code{"gaussian"} this matrix is additionally
+#' multiplied by the residual scalar variance parameter \code{sigma_^2}.
 #'
 #' @examples
 #' \donttest{
@@ -179,9 +183,10 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
     prior$mean <- 0
     Q0b0 <- 0
   } else {
-    if (in_block) stop("not yet implemented: block sampling with non-zero prior mean")
-    b0 <- if (length(prior$mean) == 1L) rep.int(prior$mean, q) else prior$mean
-    Q0b0 <- Q0 %m*v% b0
+    if (length(prior$mean) == 1L)
+      Q0b0 <- Q0 %m*v% rep.int(prior$mean, q)
+    else
+      Q0b0 <- Q0 %m*v% prior$mean
   }
   # TODO TMVN prior
 
@@ -222,21 +227,22 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
   rprior <- function(p) {}
   # X, QME are assumed to be part of the prior information
   if (nme == e$n)
-    rprior <- add(rprior, bquote(p[[.(name_X)]] <- X + sqrt(.(if (q == 1L) quote(1/QME) else quote(V))) * Crnorm(length(QME))))
+    rprior <- add(rprior, bquote(p[[.(name_X)]] <- X + sqrt(.(if (q == 1L) quote(1/QME) else quote(V))) * Crnorm(.(length(QME)))))
   else {
-    rprior <- add(rprior, bquote(p[[.(name_X)]] <- X))
-    rprior <- add(rprior, bquote(p[[.(name_X)]][i.me, ] <- sqrt(.(if (q == 1L) quote(1/QME) else quote(V))) * Crnorm(length(QME))))
+    rprior <- rprior |>
+      add(bquote(p[[.(name_X)]] <- X)) |>
+      add(bquote(p[[.(name_X)]][i.me, ] <- sqrt(.(if (q == 1L) quote(1/QME) else quote(V))) * Crnorm(.(length(QME)))))
   }
-  rprior <- add(rprior, bquote(p[[.(name)]] <- prior$rprior(p)))
-  rprior <- add(rprior, quote(p))
+  rprior <- rprior |>
+    add(bquote(p[[.(name)]] <- prior$rprior(p))) |>
+    add(quote(p))
 
 
   if (!e$prior.only) {
 
     if (q > 1L) base_tcrossprod <- base::tcrossprod
 
-    draw <- function(p) {}
-    if (debug) draw <- add(draw, quote(browser()))
+    draw <- if (debug) function(p) {browser()} else function(p) {}
     if (e$single.block && length(e$mod) == 1L) {
       draw <- add(draw, quote(p$e_ <- e$y_eff()))
     } else {
@@ -252,9 +258,9 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
     if (q == 1L) {
       draw <- add(draw, bquote(Vscaled <- 1 / (QME * scale + p[[.(name)]]^2)))
       if (nme == e$n) {
-        draw <- add(draw, bquote(p[[.(name_X)]] <- X + Vscaled * p[[.(name)]] * (p[["e_"]] - p[[.(name)]] * X) + sqrt(scale * Vscaled) * Crnorm(nme)))
+        draw <- add(draw, bquote(p[[.(name_X)]] <- X + Vscaled * p[[.(name)]] * (p[["e_"]] - p[[.(name)]] * X) + sqrt(scale * Vscaled) * Crnorm(.(nme))))
       } else {
-        draw <- add(draw, bquote(p[[.(name_X)]][i.me] <- X[i.me] + Vscaled * p[[.(name)]] * (p[["e_"]][i.me] - p[[.(name)]] * X[i.me]) + + sqrt(scale * Vscaled) * Crnorm(nme)))
+        draw <- add(draw, bquote(p[[.(name_X)]][i.me] <- X[i.me] + Vscaled * p[[.(name)]] * (p[["e_"]][i.me] - p[[.(name)]] * X[i.me]) + sqrt(scale * Vscaled) * Crnorm(.(nme))))
       }
     } else {
       # V-form (independent m.e.)
@@ -287,9 +293,9 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
         #draw <- add(draw, quote(XX <- crossprod_sym(p[[name_X]], p[["Q_"]])))
         if (informative.prior) {
           # TODO matsum template? or can we always assume dense matrices?
-          draw <- add(draw, bquote(XX <- crossprod_sym(p[[.(name_X)]], e$Q0) + Q0))
+          draw <- add(draw, bquote(XX <- crossprod_sym(p[[.(name_X)]], e[["Q0"]]) + Q0))
         } else
-          draw <- add(draw, bquote(XX <- crossprod_sym(p[[.(name_X)]], e$Q0)))
+          draw <- add(draw, bquote(XX <- crossprod_sym(p[[.(name_X)]], e[["Q0"]])))
       }
       if (informative.prior) {
         # TODO instead of runif(n, ...) account for the structure in Qmod; lambda may not vary per unit!
@@ -325,6 +331,5 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
 
   rm(R, r, S, s, lower, upper)
 
-  #rm(e)
   environment()
 }

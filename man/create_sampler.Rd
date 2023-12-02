@@ -18,7 +18,7 @@ create_sampler(
   logJacobian = NULL,
   linpred = NULL,
   compute.weights = FALSE,
-  block = compute.weights,
+  block = NULL,
   prior.only = FALSE,
   control = sampler_control()
 )
@@ -110,15 +110,16 @@ as a short-cut for simulations of the full in-sample linear predictor.}
 a large dataset in combination with vector-valued linear predictors the weights can take up a lot of memory.
 By default only means are stored in the simulation carried out using \code{\link{MCMCsim}}.}
 
-\item{block}{if \code{TRUE} all coefficients are sampled in a single block. Alternatively, a list of
-character vectors indicating which coefficients should be sampled together in blocks.}
+\item{block}{DEPRECATED, please use argument \code{control} instead, see also \code{\link{sampler_control}}.
+Note that this parameter is now by default set to \code{TRUE}.}
 
 \item{prior.only}{whether a sampler is set up only for sampling from the prior or for sampling from both prior
 and posterior distributions. Default \code{FALSE}. If \code{TRUE} there is no need to specify a response in
 \code{formula}. This is used by \code{\link{generate_data}}, which samples from the prior predictive
 distribution.}
 
-\item{control}{a list with further computational options, see details section.}
+\item{control}{a list with further computational options. These options can
+be specified using function \code{\link{sampler_control}}.}
 }
 \value{
 A sampler object, which is the main input for the MCMC simulation

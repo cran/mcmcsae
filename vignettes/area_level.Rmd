@@ -42,7 +42,7 @@ library(mcmcsae)
 model <- y ~ reg(~ 1 + x, name="beta") + gen(factor = ~iid(area), name="v")
 sampler <- create_sampler(model, sigma.fixed=TRUE, Q0=1/psi, linpred="fitted", data=df)
 ```
-The meaning of the arguments used here is as follows:
+The meaning of the arguments used is as follows:
 
 * the first argument is a formula specifying the response variable and the linear predictor part of the model
 * `sigma.fixed=TRUE` signifies that the observation level variance parameter is fixed at 1. In this case it means that the variances are known and given by `psi`.

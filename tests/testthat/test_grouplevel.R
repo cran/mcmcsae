@@ -3,7 +3,7 @@ context("Group-level covariates")
 
 set.seed(1, kind="Mersenne-Twister", normal.kind="Inversion")
 
-n <- 70L
+n <- 100L
 df <- data.frame(x=runif(n), t=1:n)
 dat <- generate_data(
   sigma.mod = pr_invchisq(df=1e6, scale=1),
@@ -26,9 +26,9 @@ test_that("generated parameters are as expected", {
 test_that("non-centered sampler runs", {
   sampler <- create_sampler(
     y ~ reg(~ 1 + x, name="beta") + gen(factor = ~ RW1(t), name="v"),
-    data=df, block=TRUE
+    data=df
   )
-  sim <- MCMCsim(sampler, n.chain=1L, n.iter=250L, verbose=FALSE)
+  sim <- MCMCsim(sampler, n.chain=2L, n.iter=250L, verbose=FALSE)
   expect_length(acceptance_rates(sim), 0L)
   summ <- summary(sim)
   expect_equal(rownames(summ$beta), names(dat$pars$beta))
@@ -39,9 +39,9 @@ test_that("non-centered sampler runs", {
 test_that("partially centered sampler (intercept) runs", {
   sampler <- create_sampler(y ~ reg(~ 0 + x, name="beta") +
       gen(factor = ~ RW1(t), formula.gl = ~ glreg(~ 1), name="v"),
-    data=df, block=TRUE
+    data=df
   )
-  sim <- MCMCsim(sampler, n.chain=1L, n.iter=250L, verbose=FALSE)
+  sim <- MCMCsim(sampler, n.chain=2L, n.iter=250L, verbose=FALSE)
   expect_length(acceptance_rates(sim), 1L)
   expect_gte(acceptance_rates(sim)[[1L]][[1L]], 0)
   expect_lte(acceptance_rates(sim)[[1L]][[1L]], 1)
@@ -56,9 +56,9 @@ test_that("partially centered sampler (intercept) runs", {
 test_that("partially centered sampler (x) runs", {
   sampler <- create_sampler(y ~ reg(~ 1, name="beta") +
       gen(factor = ~ RW1(t), formula.gl = ~ glreg(~ 0 + x), name="v"),
-    data=df, block=TRUE
+    data=df
   )
-  sim <- MCMCsim(sampler, n.chain=1L, n.iter=250L, verbose=FALSE)
+  sim <- MCMCsim(sampler, n.chain=2L, n.iter=250L, verbose=FALSE)
   expect_length(acceptance_rates(sim), 1L)
   summ <- summary(sim)
   expect_equal(rownames(summ$beta), "(Intercept)")
@@ -71,9 +71,9 @@ test_that("partially centered sampler (x) runs", {
 test_that("centered sampler runs", {
   sampler <- create_sampler(
     y ~ gen(factor = ~ RW1(t), formula.gl = ~ glreg(~ x), name="v"),
-    data=df, block=TRUE
+    data=df
   )
-  sim <- MCMCsim(sampler, n.chain=1L, n.iter=250L, verbose=FALSE)
+  sim <- MCMCsim(sampler, n.chain=2L, n.iter=250L, verbose=FALSE)
   expect_length(acceptance_rates(sim), 1L)
   summ <- summary(sim)
   expect_equal(rownames(summ$v_gl), names(dat$pars$beta))

@@ -43,7 +43,7 @@ specified \code{formula} is ignored.}
 
 \item{prior}{prior specification for the regression coefficients. Supported
 priors can be specified using functions \code{\link{pr_normal}},
-\code{\link{pr_fixed}}, \code{\link{pr_MLiG}}. The latter prior is only
+\code{\link{pr_fixed}}, or \code{\link{pr_MLiG}}. The latter prior is only
 available in conjunction with a gamma family sampling distribution.}
 
 \item{Q0}{prior precision matrix for the regression effects. The default is a

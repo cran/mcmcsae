@@ -149,8 +149,9 @@ trace_plot <- function(dc1, xlab="iterations", ylab="") {
 #' @param maxrows maximum number of rows in a column.
 #' @param maxcols maximum number of columns of estimates on a page.
 #' @param offset space used between plots of multiple estimates for the same area.
-#' @param cex.var the fontsize of the variable names, default=0.8.
-#' @param mar a numerical vector of the form c(bottom, left, top, right) which gives the number of lines of margin to be specified on the four sides of the plot.
+#' @param cex.var the font size for the variable names, default=0.8.
+#' @param mar a numerical vector of the form \code{c(bottom, left, top, right)},
+#'  specifying the number of lines of margin on each of the four sides of the plot.
 plot_coef <- function(..., n.se=1, est.names, sort.by=NULL, decreasing=FALSE,
                       index=NULL, maxrows=50L, maxcols=6L,
                       offset=0.1, cex.var=0.8, mar=c(0.1,2.1,5.1,0.1)) {

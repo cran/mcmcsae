@@ -51,14 +51,12 @@ void chm_set_ordering(const int m) {
 }
 
 // Cholesky of dsCMatrix
-// see Matrix package's internal_chm_factor and dsCMatrix_Cholesky in dsCMatrix.c
 // added argument m: ordering method (integer)
 SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP super, SEXP Imult, SEXP m) {
   CHM_FR L;
   CHM_SP A = AS_CHM_SP__(a);
   double beta[2] = {0, 0};
   beta[0] = asReal(Imult);
-  R_CheckStack();
 
   int iSuper = asLogical(super),
       iPerm  = asLogical(perm);
@@ -78,12 +76,21 @@ SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP super, SEXP Imult, SEXP m) {
     chm_set_ordering(-1);
   }
 
-  //printf("c.final_ll = %d", c.final_ll);
   L = M_cholmod_analyze(A, &c);
-  if (!M_cholmod_factorize_p(A, beta, (int*)NULL, 0, L, &c))
-    error("Cholesky factorization failed");
 
-  return M_chm_factor_to_SEXP(L, 1 /* free */);
+  M_cholmod_factorize_p(A, beta, (int*)NULL, 0 /*fsize*/, L, &c);
+  int ok = (L->minor == L->n);
+  if (ok) {
+    //Rprintf("ok, c.final_ll = %d \n", c.final_ll);
+    SEXP out = PROTECT(M_chm_factor_to_SEXP(L, 0 /* do not free */));
+    M_cholmod_free_factor(&L, &c);
+    UNPROTECT(1);
+    return out;
+  } else {
+    M_cholmod_free_factor(&L, &c);
+    error("Cholesky factorization failed");
+    return R_NilValue;
+  }
 }
 
 // there is no M_chm_dense_to_SEXP in Matrix_stubs so write it here
@@ -114,7 +121,6 @@ SEXP CHMf_solve(SEXP a, SEXP b, SEXP system) {
   CHM_DN B = N_AS_CHM_DN(REAL(b), n, 1);
 
   int sys = asInteger(system);
-  R_CheckStack();
 
   if (!(sys--)) error("invalid system argument");
 
@@ -129,7 +135,6 @@ SEXP CHMf_solve_matrix(SEXP a, SEXP b, SEXP system) {
   CHM_DN B = N_AS_CHM_DN(REAL(b), dim[0], dim[1]);
 
   int sys = asInteger(system);
-  R_CheckStack();
 
   if (!(sys--)) error("invalid system argument");
 
@@ -141,7 +146,6 @@ SEXP CHMf_spsolve(SEXP a, SEXP b, SEXP system) {
   CHM_FR L = AS_CHM_FR(a);
   CHM_SP B = AS_CHM_SP__(b);
   int sys = asInteger(system);
-  R_CheckStack();
 
   if (!(sys--)) error("invalid system argument");
 
@@ -154,7 +158,6 @@ SEXP CHMf_spsolve(SEXP a, SEXP b, SEXP system) {
 SEXP CHM_update_inplace(SEXP object, SEXP parent, SEXP mult) {
   CHM_FR L = AS_CHM_FR(object);
   CHM_SP A = AS_CHM_SP__(parent);
-  R_CheckStack();
 
   M_chm_factor_update(L, A, asReal(mult));
   return R_NilValue;

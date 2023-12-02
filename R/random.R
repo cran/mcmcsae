@@ -79,13 +79,26 @@ negbinomial_coef <- function(r, y, log=TRUE) {
 #' @param m dimension.
 #' @param alpa shape (vector) parameter.
 #' @param kappa another (vector) parameter.
+#' @param log.kappa logarithm of \code{kappa}. This can be specified instead of
+#'  \code{kappa} if numerical computation of the latter would overflow.
 #' @return a draw from the MLiG distribution.
-rMLiG <- function(m, alpha, kappa) {
-  if (any(alpha < 0.1)) {
-    # prevent underflow, https://stats.stackexchange.com/questions/7969/how-to-quickly-sample-x-if-expx-gamma
-    # TODO only for those components with alpha < 0.1
-    # NB kappa can still underflow to zero causing unbounded results
-    -(log(rgamma(m, shape = alpha + 1, rate = kappa)) + log(runif(m))/alpha)
-  } else
-    -log(rgamma(m, shape = alpha, rate = kappa))
+rMLiG <- function(m, alpha, kappa, log.kappa) {
+  if (missing(kappa)) {
+    # version where log.kappa is specified; useful in case kappa overflows
+    if (any(alpha < 0.1)) {
+      # prevent underflow, https://stats.stackexchange.com/questions/7969/how-to-quickly-sample-x-if-expx-gamma
+      # TODO only for those components with alpha < 0.1
+      # NB kappa can still underflow to zero causing unbounded results
+      log.kappa - log(rgamma(m, shape = alpha + 1, rate = 1)) - log(runif(m))/alpha
+    } else
+      log.kappa - log(rgamma(m, shape = alpha, rate = 1))
+  } else {
+    if (any(alpha < 0.1)) {
+      # prevent underflow, https://stats.stackexchange.com/questions/7969/how-to-quickly-sample-x-if-expx-gamma
+      # TODO only for those components with alpha < 0.1
+      # NB kappa can still underflow to zero causing unbounded results
+      -(log(rgamma(m, shape = alpha + 1, rate = kappa)) + log(runif(m))/alpha)
+    } else
+      -log(rgamma(m, shape = alpha, rate = kappa))
+  }
 }

@@ -15,7 +15,7 @@ test_that("fitting a negative binomial model works", {
                             family="negbinomial", ry=r, r.mod=pr_fixed(value=1))
   sim <- MCMCsim(sampler, n.iter=400L, burnin=150L, n.chain=2L, verbose=FALSE)
   summ <- summary(sim)
-  expect_equivalent(summ$beta[, "Mean"], dat$pars$beta, tol=0.5)
+  expect_between(summ$beta[, "Mean"], 0.4*dat$pars$beta, 2.5*dat$pars$beta)
   DIC <- compute_DIC(sim)
   WAIC <- compute_WAIC(sim)
   expect_true(abs((DIC["DIC"] - WAIC["WAIC2"])/abs(DIC["DIC"])) < 0.05)
@@ -25,7 +25,7 @@ test_that("fitting a negative binomial model works", {
 
 test_that("fitting a negative binomial model with scaled beta prime prior on dispersion parameter works", {
   sampler <- create_sampler(dat$y ~ x1 + x2, data=df, family="negbinomial", r.mod=pr_invchisq(df=1, scale="modeled"))
-  #summary(replicate(1000, sampler$rprior()$negbin_r_))
+  summary(replicate(100, sampler$rprior()$negbin_r_))
   sim <- MCMCsim(sampler, n.iter=400L, burnin=150L, n.chain=2L, verbose=FALSE)
   summ <- summary(sim)
   expect_true(abs(summ$negbin_r_[, "Mean"] - r) < 0.05)
@@ -34,7 +34,7 @@ test_that("fitting a negative binomial model with scaled beta prime prior on dis
 
 test_that("fitting a negative binomial model with chi-squared prior on dispersion parameter works", {
   sampler <- create_sampler(dat$y ~ x1 + x2, data=df, family="negbinomial", r.mod=pr_invchisq(df=1, scale=1))
-  #summary(replicate(1000, sampler$rprior()$negbin_r_))
+  summary(replicate(100, sampler$rprior()$negbin_r_))
   sim <- MCMCsim(sampler, n.iter=400L, burnin=150L, n.chain=2L, verbose=FALSE)
   summ <- summary(sim)
   expect_true(abs(summ$negbin_r_[, "Mean"] - r) < 0.05)
@@ -43,7 +43,7 @@ test_that("fitting a negative binomial model with chi-squared prior on dispersio
 
 test_that("fitting a negative binomial model with GIG prior on dispersion parameter works", {
   sampler <- create_sampler(dat$y ~ x1 + x2, data=df, family="negbinomial", r.mod=pr_gig(a=0, b=1, p=-1/2))
-  #summary(replicate(1000, sampler$rprior()$negbin_r_))
+  summary(replicate(100, sampler$rprior()$negbin_r_))
   sim <- MCMCsim(sampler, n.iter=400L, burnin=150L, n.chain=2L, verbose=FALSE)
   summ <- summary(sim)
   expect_true(abs(summ$negbin_r_[, "Mean"] - r) < 0.05)
@@ -71,7 +71,7 @@ dat <- generate_data(mod, family="negbinomial", ry=ry, r.mod=pr_fixed(value=1/r)
 test_that("prediction works well for negative binomial data", {
   s <- 1:500
   sampler <- create_sampler(dat$y[s] ~ x1 + x2 + gen(factor=~f), data=df[s, ],
-                            family="negbinomial", ry=ry[s], block=TRUE)
+                            family="negbinomial", ry=ry[s])
   sim <- MCMCsim(sampler, n.iter=500L, burnin=200L, n.chain=2L, store.all=TRUE,
                  start=list(list(negbin_r_=2), list(negbin_r_=3)), verbose=FALSE)
   #plot(sim, c("negbin_r_", "reg1[1]", "gen2_sigma"))

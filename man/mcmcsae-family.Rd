@@ -23,7 +23,7 @@ f_multinomial(link = "logit", K = NULL)
 f_gamma(
   link = "log",
   shape.vec = ~1,
-  shape.prior = pr_fixed(1),
+  shape.prior = pr_gamma(1, 1),
   shape.MH.type = c("RW", "gamma")
 )
 }

@@ -91,18 +91,17 @@ bart <- function(formula, X=NULL, name="",
   }
 
   if (!e$prior.only) {
-    draw <- function(p) {}
-    if (debug) draw <- add(draw, quote(browser()))
+    draw <- if (debug) function(p) {browser()} else function(p) {}
     if (e$e.is.res)
       draw <- add(draw, bquote(p$e_ <- p[["e_"]] + p[[.(name)]]))
     else
       draw <- add(draw, bquote(p$e_ <- p[["e_"]] - p[[.(name)]]))
     draw <- add(draw, bquote(p[[.(name_sampler)]]$setResponse(p[["e_"]])))
-    if (e$modeled.Q) {
+    if (e$modeled.Q)
       draw <- add(draw, bquote(p[[.(name_sampler)]]$setWeights(p[["Q_"]])))
-    }
-    draw <- add(draw, bquote(p[[.(name_sampler)]]$setSigma(.(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])))))
-    draw <- add(draw, bquote(p[[.(name)]] <- p[[.(name_sampler)]]$run(0L, 1L)$train[, 1L]))
+    draw <- draw |>
+      add(bquote(p[[.(name_sampler)]]$setSigma(.(if (e$sigma.fixed) 1 else quote(p[["sigma_"]]))))) |>
+      add(bquote(p[[.(name)]] <- p[[.(name_sampler)]]$run(0L, 1L)$train[, 1L]))
     if (e$e.is.res)
       draw <- add(draw, bquote(p$e_ <- p[["e_"]] - p[[.(name)]]))
     else

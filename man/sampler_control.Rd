@@ -8,6 +8,8 @@ sampler_control(
   add.outer.R = NULL,
   recompute.e = TRUE,
   CG = NULL,
+  block = TRUE,
+  block.V = TRUE,
   auto.order.block = TRUE,
   chol.control = chol_control(),
   max.size.cps.template = 100,
@@ -30,6 +32,13 @@ the model's coefficients. This must be a list with possible components \code{max
 See the help for function \code{\link{CG_control}}, which can be used to specify these options.
 Conjugate gradient sampling is currently an experimental feature that can be used for
 blocked Gibbs sampling but with some limitations.}
+
+\item{block}{if \code{TRUE}, the default, all coefficients are sampled in a single block. Alternatively, a list of
+character vectors with names of model components whose coefficients should be sampled together in blocks.}
+
+\item{block.V}{if \code{TRUE}, the default, all coefficients of \code{reg} and \code{gen} components
+in a variance model formula are sampled in a single block. Alternatively, a list of
+character vectors with names of model components whose coefficients should be sampled together in blocks.}
 
 \item{auto.order.block}{whether Gibbs blocks should be ordered automatically in such a
 way that those with the most sparse design matrices come first. This way of ordering

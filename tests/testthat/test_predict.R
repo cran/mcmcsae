@@ -17,8 +17,7 @@ dat$y <- 1 + 2*dat$x + v1[dat$f1] + v2[dat$f2] + 0.1*rnorm(n)
 # and fit a model
 sampler <- create_sampler(
   y ~ x + gen(factor = ~f1) + gen(factor = ~f2),
-  data=dat,
-  block=TRUE
+  data=dat
 )
 sim <- MCMCsim(sampler, store.all=TRUE, n.iter=500, verbose=FALSE)
 
@@ -59,12 +58,14 @@ test_that("predict with on-the-fly aggregation works", {
   fun <- function(x) c(sum = sum(x > 2), neg_x1 = x[1] < 0, tapply(x, dat$f1, mean))
   pred <- predict(sim, newdata=dat, fun.=fun, ppcheck=TRUE, show.progress=FALSE, verbose=FALSE)
   ppp <- attr(pred, "ppp")
-  expect_true(length(ppp) == 7L && all(ppp >= 0) && all(ppp <= 1))
+  expect_length(ppp, 7L)
+  expect_between(ppp, 0,1)
   # test statistic that also depends on parameters
   fun <- function(x, p) c(p[["gen2_sigma"]] * sum(x > 1), x[1], p[["reg1"]])
   pred <- predict(sim, newdata=dat, fun.=fun, ppcheck=TRUE, show.progress=FALSE, verbose=FALSE)
   ppp <- attr(pred, "ppp")
-  expect_true(length(ppp) == 4L && all(ppp >= 0) && all(ppp <= 1))
+  expect_length(ppp, 4L)
+  expect_between(ppp, 0, 1)
 })
 
 test_that("predict generates out-of-sample random effects", {

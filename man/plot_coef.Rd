@@ -48,9 +48,10 @@ objects of class \code{dc_summary} and \code{sae}.}
 
 \item{offset}{space used between plots of multiple estimates for the same area.}
 
-\item{cex.var}{the fontsize of the variable names, default=0.8.}
+\item{cex.var}{the font size for the variable names, default=0.8.}
 
-\item{mar}{a numerical vector of the form c(bottom, left, top, right) which gives the number of lines of margin to be specified on the four sides of the plot.}
+\item{mar}{a numerical vector of the form \code{c(bottom, left, top, right)},
+specifying the number of lines of margin on each of the four sides of the plot.}
 }
 \description{
 This function plots estimates with error bars. Multiple sets of

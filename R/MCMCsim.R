@@ -283,7 +283,7 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
     else
       store <- sampler$store_default(from.prior)
     if (store.all)
-      store <- union(store, Filter(function(x) substring(x, nchar(x), nchar(x)) != "_" && all(x != store.mean), names(test_draw)))
+      store <- union(store, Filter(function(x) !endsWith(x, "_") && all(x != store.mean), names(test_draw)))
   }
   # always store derived quantities and 'diagnostic' parameters
   if (do.pred) store <- union(store, names(pred))

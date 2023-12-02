@@ -7,6 +7,14 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   debug <- any(sapply(mcs, `[[`, "debug"))
   vec_list <- list()
 
+  if (e$family$family == "gamma") {
+    modus <- "gamma"    # model for log(mean) of gamma
+  } else if (all(sapply(mcs, `[[`, "name") %in% names(e$Vmod))) {
+    modus <- "var"      # model for log(var) of gaussian
+  } else {
+    modus <- "regular"  # model for mean of gaussian/binomial/...
+  }
+
   if (e$control$auto.order.block) {
     # order the components such that sparse matrices come first; may help find a better Cholesky permutation
     o <- unname(which(vapply(mcs, function(m) isDiagonal(m$X), TRUE)))  # start with diagonal matrices
@@ -18,7 +26,6 @@ create_mc_block <- function(mcs, e=parent.frame()) {
     rm(o)
   }
 
-  # start with empty matrices
   X <- matrix(0, e$n, 0L)  # block design matrix
   ind <- 0L
   for (mc in mcs) {
@@ -31,6 +38,7 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   }
   rm(ind)
   X <- economizeMatrix(X)
+  q <- ncol(X)
 
   # template for (updating) blocked precision matrix
   # each mc$Q for gen is either ddi or dsC; the same holds true for mc$Q0 for reg and mec
@@ -71,6 +79,16 @@ create_mc_block <- function(mcs, e=parent.frame()) {
     Qvector
   }
 
+  # non-zero prior means of reg or mec components
+  nonzero.mean <- any(sapply(mcs, function(x) x$type %in% c("reg", "mec") && !x$zero.mean))
+  if (nonzero.mean) {
+    Q0b0 <- rep.int(0, q)
+    for (mc in mcs) {
+      if (mc$type %in% c("reg", "mec") && !mc$zero.mean)
+        Q0b0[vec_list[[mc$name]]] <- mc$Q0b0
+    }
+  }
+
   if (is.null(e$control$CG)) {
     if (e$modeled.Q)
       XX <- crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e$n, 0.9, 1.1)), e$Q0))
@@ -93,7 +111,7 @@ create_mc_block <- function(mcs, e=parent.frame()) {
             R <- bdiag(R, mc$R)
         }
       }
-      if (nrow(R) != ncol(X)) stop("incompatible dimensions of design and constraint matrices")
+      if (nrow(R) != q) stop("incompatible dimensions of design and constraint matrices")
       # TODO remove individual R matrices as they are not needed in the single block sampler
       #      add support for additional constraints defined over the whole coefficient vector
       # In the case of constraints the XX + Q matrix often becomes singular
@@ -113,24 +131,24 @@ create_mc_block <- function(mcs, e=parent.frame()) {
         else
           S <- bdiag(S, mc$S)
       }
-      if (nrow(S) != ncol(X)) stop("incompatible dimensions of design and constraint matrices")
+      if (nrow(S) != q) stop("incompatible dimensions of design and constraint matrices")
       # TODO remove individual S matrices as they are not needed in the single block sampler
       #      add support for additional constraints defined over the whole coefficient vector
     } else {
       S <- NULL
     }
 
-    if (e$family$family == "gamma") {
+    if (modus == "regular") {
+      sparse_template(environment(), update.XX=e$modeled.Q || any(sapply(mcs, `[[`, "type") == "mec"),
+                      add.outer.R=e$control$add.outer.R, prior.only=e$prior.only)
+    } else {
       if (!e$control$add.outer.R || is.null(R)) {
+        # TODO include in X0 the fixed part of QT (from reg components)
         mat_sum <- make_mat_sum(M0=XX, M1=QT)
-        XX_Q <- mat_sum(QT)
-        cholQ <- build_chol(XX_Q)
+        cholQ <- build_chol(mat_sum(QT))
       } else {
         stop("TBI: blocked sampler for gamma family with constraints")
       }
-    } else {
-      sparse_template(environment(), update.XX=e$modeled.Q || any(sapply(mcs, `[[`, "type") == "mec"),
-                    add.outer.R=e$control$add.outer.R, prior.only=e$prior.only)
     }
   } else {
     # TODO check that the only constraints are GMRF equality constraints
@@ -150,9 +168,14 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   if (e$prior.only) return(environment())
 
   # BEGIN draw function
-  draw <- function(p) {}
-  if (debug) draw <- add(draw, quote(browser()))
-  if (e$single.block) {
+  draw <- if (debug) function(p) {browser()} else function(p) {}
+  if (modus == "var") {
+    if (!e$single.V.block)
+      for (m in seq_along(mcs)) {
+        # TODO linpred function (NB name clash) --> apply exp() only once 
+        draw <- add(draw, bquote(p[["Q_"]] <- p[["Q_"]] * exp(mcs[[.(m)]]$linpred(p))))
+      }
+  } else if (e$single.block) {
     if (e$e.is.res || e$use.offset || e$family$family == "poisson")
       draw <- add(draw, quote(p$e_ <- e$y_eff()))
     # otherwise p$e_ = e$y_eff() = 0
@@ -167,52 +190,12 @@ create_mc_block <- function(mcs, e=parent.frame()) {
         draw <- add(draw, bquote(p$e_ <- p[["e_"]] - mcs[[.(m)]]$linpred(p)))
     }
   }
-  draw <- add(draw, bquote(tau <- .(if (e$sigma.fixed) 1 else quote(1 / p[["sigma_"]]^2))))
-  # update the block-diagonal joint precision matrix
-  draw <- add(draw, quote(attr(QT, "x") <- get_Qvector(p, tau)))
-  
-  if (e$family$family == "gamma") {
-    # TODO if only reg components cholQ is fixed
-    draw <- add(draw, quote(cholQ$update(mat_sum(QT))))
-    # compute alpha and kappa
-    if (e$family$alpha.fixed) {
-      alpha <- e$family$get_shape()
-      if (e$single.block)
-        kappa <- alpha * e$y
-      else {
-        kappa0 <- alpha * e$y
-        draw <- add(draw, quote(kappa <- kappa0 * exp(-p[["e_"]])))
-      }
-    } else {
-      draw <- add(draw, quote(alpha <- e$family$get_shape(p)))
-      if (e$single.block)
-        draw <- add(draw, quote(kappa <- alpha * e$y))
-      else
-        draw <- add(draw, quote(kappa <- alpha * e$y * exp(-p[["e_"]])))
-    }
-    draw <- add(draw, quote(z <- rMLiG(e$n, alpha, kappa)))
-    draw <- add(draw, quote(Hz <- crossprod_mv(X, z)))
-    # contributions from mcs
-    draw <- add(draw, quote(
-      for (m in seq_along(mcs)) {
-        if (m == 1L) ind <- 1L
-        mc <- mcs[[m]]
-        if (mc$type == "reg") {
-          if (mc$informative.prior) {
-            if (mc$zero.mean)
-              z <- rMLiG(mc$q, rep.int(mc$prior$a, mc$q), rep.int(mc$prior$a, mc$q))
-            else
-              z <- rMLiG(mc$q, rep.int(mc$prior$a, mc$q), mc$prior$a * exp((1/sqrt(mc$prior$a)) * sqrt(mc$prior$precision) * mc$prior$mean))
-            Hz[ind:(ind + mc$q - 1L)] <- Hz[ind:(ind + mc$q - 1L)] + sqrt(mc$prior$precision) * z
-          }
-        } else {
-          stop("TBI: blocked sampler for gamma sampling distribution with other than reg components")
-        }
-        ind <- ind + mc$q
-      }
-    ))
-    draw <- add(draw, quote(coef <- cholQ$solve(Hz)))
-  } else {
+  draw <- draw |>
+    add(bquote(tau <- .(if (e$sigma.fixed) 1 else quote(1 / p[["sigma_"]]^2)))) |>
+    # update the block-diagonal joint precision matrix
+    add(quote(attr(QT, "x") <- get_Qvector(p, tau)))
+
+  if (modus == "regular") {
     if (!is.null(S)) {  # need to reconstruct coef_ as input to TMVN sampler
       # TODO store coef_ component and only replace the subcomponents with PX
       #      and check whether this works in case of gen component with gl=TRUE
@@ -225,10 +208,18 @@ create_mc_block <- function(mcs, e=parent.frame()) {
     for (mc in mcs)
       if (mc$type == "mec")
         draw <- add(draw, bquote(X[, vec_list[[.(mc$name)]]] <- p[[.(mc$name_X)]]))
-    if (e$single.block && !e$modeled.Q && !any(sapply(mcs, `[[`, "type") == "mec") && e$family$link != "probit")
+    if (e$single.block && !e$modeled.Q && !any(sapply(mcs, `[[`, "type") == "mec") && e$family$link != "probit") {
       Xy <- crossprod_mv(X, e$Q0 %m*v% e$y_eff())
-    else
-      draw <- add(draw, quote(Xy <- crossprod_mv(X, e$Q_e(p))))
+      if (nonzero.mean) {
+        Xy <- Xy + Q0b0
+        rm(Q0b0)
+      }
+    } else {
+      if (nonzero.mean)
+        draw <- add(draw, quote(Xy <- crossprod_mv(X, e$Q_e(p)) + Q0b0))
+      else
+        draw <- add(draw, quote(Xy <- crossprod_mv(X, e$Q_e(p))))
+    }
     if (is.null(e$control$CG)) {
       if (e$modeled.Q) {
         if (e$Q0.type == "symm")
@@ -251,35 +242,97 @@ create_mc_block <- function(mcs, e=parent.frame()) {
           }
         }
       } else if (any(sapply(mcs, `[[`, "type") == "mec")) {
-        draw <- add(draw, quote(XX <- crossprod_sym(X, e$Q0)))
+        draw <- add(draw, quote(XX <- crossprod_sym(X, e[["Q0"]])))
       }
-      draw <- add(draw, quote(Qlist <- update(XX, QT, 1, 1/tau)))
-      draw <- add(draw, bquote(coef <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])), Q=Qlist$Q, Imult=Qlist$Imult, Xy=Xy)[[.(name)]]))
+      draw <- draw |>
+        add(quote(Qlist <- update(XX, QT, 1, 1/tau))) |>
+        add(bquote(coef <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])), Q=Qlist$Q, Imult=Qlist$Imult, Xy=Xy)[[.(name)]]))
     } else {
-      draw <- add(draw, quote(CGstart <- vector("numeric", ncol(X))))
-      draw <- add(draw, quote(for (mc in mcs) CGstart[vec_list[[mc$name]]] <- p[[mc$name]]))
-      draw <- add(draw, quote(coef <- CG_sampler$draw(p, Xy, X, QT, e, start=CGstart)))
+      draw <- draw |>
+        add(bquote(CGstart <- vector("numeric", .(q)))) |>
+        add(quote(for (mc in mcs) CGstart[vec_list[[mc$name]]] <- p[[mc$name]])) |>
+        add(quote(coef <- CG_sampler$draw(p, Xy, X, QT, e, start=CGstart)))
     }
+  } else {
+    # TODO if only reg components cholQ is fixed
+    draw <- add(draw, quote(cholQ$update(mat_sum(QT))))
+    if (modus == "gamma") {
+      if (e$family$alpha.fixed) {
+        alpha <- e$family$get_shape()
+        if (e$single.block && !e$use.offset)
+          kappa <- alpha * e$y
+        else {
+          kappa0 <- alpha * e$y
+          draw <- add(draw, quote(kappa <- kappa0 * exp(-p[["e_"]])))
+        }
+      } else {
+        draw <- add(draw, quote(alpha <- e$family$get_shape(p)))
+        if (e$single.block && !e$use.offset)
+          draw <- add(draw, quote(kappa <- alpha * e[["y"]]))
+        else
+          draw <- add(draw, quote(kappa <- alpha * e[["y"]] * exp(-p[["e_"]])))
+      }
+    } else {  # variance modelling
+      alpha <- 0.5
+      if (e$single.V.block)
+        draw <- add(draw, bquote(kappa <- .(if (e$sigma.fixed) 0.5 else quote(0.5/p[["sigma_"]]^2)) * p[["e_"]]^2))
+      else
+        draw <- add(draw, bquote(kappa <- .(if (e$sigma.fixed) 0.5 else quote(0.5/p[["sigma_"]]^2)) * p[["e_"]]^2 * p[["Q_"]]))
+    }
+    draw <- draw |>
+      add(bquote(z <- rMLiG(.(e$n), alpha, kappa))) |>
+      add(quote(Hz <- crossprod_mv(X, z))) |>
+      # contributions from mcs
+      add(quote(
+        for (m in seq_along(mcs)) {
+          mc <- mcs[[m]]
+          switch(mc$type,
+            reg = {
+              if (mc$informative.prior) {
+                if (mc$zero.mean)
+                  z <- rMLiG(mc$q, mc$prior$a, mc$prior$a)
+                else
+                  z <- rMLiG(mc$q, mc$prior$a, mc$prior$a * exp(sqrt(mc$prior$precision/mc$prior$a) * mc$prior$mean))
+                Hz[vec_list[[mc$name]]] <- Hz[vec_list[[mc$name]]] + sqrt(mc$prior$precision/mc$prior$a) * z
+              }
+            },
+            gen = {
+              z <- rMLiG(mc$q, mc$a, mc$a)
+              Hz[vec_list[[mc$name]]] <- Hz[vec_list[[mc$name]]] + z / (p[[mc$name_sigma]] * sqrt(mc$a))
+            },
+            stop("for gamma sampling distribution only reg and gen components are currently supported")
+          )
+        }
+      )) |>
+      add(quote(coef <- cholQ$solve(Hz)))
   }
 
   # split coef and assign to the separate coefficient batches
   for (m in seq_along(mcs)) {
     if (mcs[[m]]$type == "gen" && mcs[[m]]$gl) {
-      draw <- add(draw, bquote(u <- coef[vec_list[[.(mcs[[m]]$name)]]]))
-      draw <- add(draw, bquote(p[[.(mcs[[m]]$name)]] <- u[mcs[[.(m)]]$i.v]))
-      draw <- add(draw, bquote(p[[.(mcs[[m]]$name_gl)]] <- u[mcs[[.(m)]]$i.alpha]))
+      draw <- draw |>
+        add(bquote(u <- coef[vec_list[[.(mcs[[m]]$name)]]])) |>
+        add(bquote(p[[.(mcs[[m]]$name)]] <- u[mcs[[.(m)]]$i.v])) |>
+        add(bquote(p[[.(mcs[[m]]$name_gl)]] <- u[mcs[[.(m)]]$i.alpha]))
     } else {
       draw <- add(draw, bquote(p[[.(mcs[[m]]$name)]] <- coef[vec_list[[.(mcs[[m]]$name)]]]))
     }
-    if (e$e.is.res) {
-      draw <- add(draw, bquote(mv_update(p[["e_"]], plus=FALSE, mcs[[.(m)]][["X"]], p[[.(mcs[[m]]$name)]])))
+    if (modus == "var") {
+      if (e$single.V.block)
+        draw <- add(draw, bquote(p[["Q_"]] <- exp(-mcs[[.(m)]]$linpred(p))))
+      else
+        draw <- add(draw, bquote(p[["Q_"]] <- p[["Q_"]] * exp(-mcs[[.(m)]]$linpred(p))))
     } else {
-      if (m == 1L && e$single.block && !e$use.offset && e$family$family != "poisson") {
-        # in this case p$e_ = e$y_eff() = 0
-        draw <- add(draw, quote(p$e_ <- mcs[[1L]]$linpred(p)))
+      if (e$e.is.res) {
+        draw <- add(draw, bquote(mv_update(p[["e_"]], plus=FALSE, mcs[[.(m)]][["X"]], p[[.(mcs[[m]]$name)]])))
       } else {
-        #draw <- add(draw, bquote(p$e_ <- p[["e_"]] + mcs[[.(m)]]$linpred(p)))
-        draw <- add(draw, bquote(mv_update(p[["e_"]], plus=TRUE, mcs[[.(m)]][["X"]], p[[.(mcs[[m]]$name)]])))
+        if (m == 1L && e$single.block && !e$use.offset && e$family$family != "poisson") {
+          # in this case p$e_ = e$y_eff() = 0
+          draw <- add(draw, quote(p$e_ <- mcs[[1L]]$linpred(p)))
+        } else {
+          #draw <- add(draw, bquote(p$e_ <- p[["e_"]] + mcs[[.(m)]]$linpred(p)))
+          draw <- add(draw, bquote(mv_update(p[["e_"]], plus=TRUE, mcs[[.(m)]][["X"]], p[[.(mcs[[m]]$name)]])))
+        }
       }
     }
   }
@@ -293,7 +346,7 @@ create_mc_block <- function(mcs, e=parent.frame()) {
         draw <- add(draw, quote(p$weights_ <- p[["Q_"]] * p[["weights_"]]))
     } else {
       if (e$Q0.type != "unit") {
-        draw <- add(draw, quote(p$weights_ <- e$Q0 %m*m% p[["weights_"]]))
+        draw <- add(draw, quote(p$weights_ <- e[["Q0"]] %m*m% p[["weights_"]]))
       }
     }
   }
@@ -302,10 +355,10 @@ create_mc_block <- function(mcs, e=parent.frame()) {
 
   start <- function(p) {}
   if (is.null(e$control$CG)) {
-    if (e$family$family == "gamma") {
-      start <- add(start, bquote(coef <- Crnorm(.(ncol(X)))))
+    if (modus == "regular") {
+      start <- add(start, bquote(coef <- MVNsampler$start(p, e[["scale_sigma"]])[[.(name)]]))
     } else {
-      start <- add(start, bquote(coef <- MVNsampler$start(p, e$scale_sigma)[[.(name)]]))
+      start <- add(start, bquote(coef <- Crnorm(.(q))))
     }
     start <- add(start, quote(
       for (mc in mcs) {

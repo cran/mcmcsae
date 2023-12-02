@@ -178,11 +178,13 @@ build_chol <- function(M, Imult=0, control=chol_control()) {
       }
     },
     matrix = {
-      # NB Ccholesky currently returns upper triangular matrix, i.e. Lt
+      # use chol.default to initialize as it signals non-positive-definiteness
+      # use faster Ccholesky for update
+      # both return upper triangular matrix, i.e. Lt
       if (Imult == 0)
-        cholM <- Ccholesky(M)
+        cholM <- chol.default(M)
       else
-        cholM <- Ccholesky(add_diagC(M, rep.int(Imult, size)))
+        cholM <- chol.default(add_diagC(M, rep.int(Imult, size)))
       update <- function(parent, mult=0) {
         if (mult == 0)
           cholM <<- Ccholesky(parent)

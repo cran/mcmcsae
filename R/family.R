@@ -74,10 +74,10 @@ f_multinomial <- function(link="logit", K=NULL) {
 
 #' @export
 #' @rdname mcmcsae-family
-# TODO use control function for shape.vec, shape.prior and shape.MH.type
-f_gamma <- function(link="log", shape.vec = ~ 1, shape.prior = pr_fixed(1),
+# TODO use control function for shape.MH.type
+f_gamma <- function(link="log", shape.vec = ~ 1, shape.prior = pr_gamma(1, 1),
                     shape.MH.type = c("RW", "gamma")) {
-  family <- "gamma"  # later change to name <- "gamma"
+  family <- "gamma"  # later change to type <- "gamma"
   link <- match.arg(link)
   linkinv=make.link(link)$linkinv
   if (!inherits(shape.vec, "formula")) stop("'shape.vec' must be a formula")
@@ -141,15 +141,16 @@ f_gamma <- function(link="log", shape.vec = ~ 1, shape.prior = pr_fixed(1),
                 (alpha.star - alpha) * (sumlogy - sum(p[["e_"]]) - sum(y * exp(-p[["e_"]])))
               ))
           } else {
-            f <- add(f, quote(alpha.vec <- alpha0 * alpha))
-            f <- add(f, quote(alpha.star.vec <- alpha0 * alpha.star))
-            f <- add(f, quote(
-              log.ar <- shape.prior[["shape"]] * log(alpha.star/alpha) - shape.prior[["rate"]] * (alpha.star - alpha) +
-                sum(lgamma(alpha.vec) - lgamma(alpha.star.vec)) +
-                sum(alpha.star.vec * log(alpha.star.vec * y)) -
-                sum(alpha.vec * log(alpha.vec * y)) +
-                sum((alpha.vec - alpha.star.vec) * (y * exp(-p[["e_"]]) + p[["e_"]]))
-            ))
+            f <- f |>
+              add(quote(alpha.vec <- alpha0 * alpha)) |>
+              add(quote(alpha.star.vec <- alpha0 * alpha.star)) |>
+              add(quote(
+                log.ar <- shape.prior[["shape"]] * log(alpha.star/alpha) - shape.prior[["rate"]] * (alpha.star - alpha) +
+                  sum(lgamma(alpha.vec) - lgamma(alpha.star.vec)) +
+                  sum(alpha.star.vec * log(alpha.star.vec * y)) -
+                  sum(alpha.vec * log(alpha.vec * y)) +
+                  sum((alpha.vec - alpha.star.vec) * (y * exp(-p[["e_"]]) + p[["e_"]]))
+              ))
           }
           add(f, quote(if (log(runif(1L)) < log.ar) alpha.star else alpha))
         },

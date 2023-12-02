@@ -268,7 +268,7 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
     # NB cholQ will now refer to z2 subspace
     cholQ <- build_chol(crossprod_sym(Q2, Q), control=chol.control)  # chol factor L
     mu_z2_given_z1 <- mu_z2 - cholQ$solve(crossprod_mv(Q2, (Q %m*v% (Q1 %m*v% (z1 - mu_z1)))))
-    if (any(method$method == c("softTMVN", "HMCZigZag"))) {
+    if (method$method == "softTMVN" || method$method == "HMCZigZag") {
       Q <- crossprod_sym(Q2, Q)
     } else {
       rm(Q)
@@ -327,7 +327,7 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
       # currently tabMatrix disallowed because used as solve rhs below
       S <- economizeMatrix(S, sparse=if (class(cholQ$cholM)[1L] == "matrix") FALSE else NULL, allow.tabMatrix=FALSE)
     }
-    if (any(method$method == c("Gibbs", "HMCZigZag"))) n2 <- n
+    if (method$method == "Gibbs" || method$method == "HMCZigZag") n2 <- n
 
     if (eq) {
       # update.Q, dense cholQ --> faster to have dense R (and S) as well
@@ -564,15 +564,17 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
     if (eq && !reduce) {
       if (update.Q) {
         if (bigR) {
-          draw <- add(draw, quote(cholV.R <- cholQ$solve(R, system="L", systemP=TRUE)))
-          draw <- add(draw, quote(cholRVR$update(crossprod_sym2(cholV.R))))
-          draw <- add(draw, bquote(p[[.(name)]] <- coef + cholQ$solve(R %m*v% cholRVR$solve(r - crossprod_mv(R, coef)))))
+          draw <- draw |>
+            add(quote(cholV.R <- cholQ$solve(R, system="L", systemP=TRUE))) |>
+            add(quote(cholRVR$update(crossprod_sym2(cholV.R)))) |>
+            add(bquote(p[[.(name)]] <- coef + cholQ$solve(R %m*v% cholRVR$solve(r - crossprod_mv(R, coef)))))
           # alternative (this seems not faster, unless R is already dense, as cholV.R is usually less sparse than R):
           # draw <- add(draw, bquote(p[[.(name)]] <- coef + cholQ$solve(cholV.R %m*v% cholRVR$solve(r - crossprod_mv(R, coef)), system="Lt", systemP=TRUE)))
         } else {
-          draw <- add(draw, quote(VR <- cholQ$solve(R)))
-          draw <- add(draw, quote(cholRVR$update(crossprod_sym2(R, VR))))
-          draw <- add(draw, bquote(p[[.(name)]] <- coef + VR %m*v% cholRVR$solve(r - crossprod_mv(R, coef))))
+          draw <- draw |>
+            add(quote(VR <- cholQ$solve(R))) |>
+            add(quote(cholRVR$update(crossprod_sym2(R, VR)))) |>
+            add(bquote(p[[.(name)]] <- coef + VR %m*v% cholRVR$solve(r - crossprod_mv(R, coef))))
         }
       } else {
         draw <- add(draw, bquote(p[[.(name)]] <- coef + VR.RVRinv %m*v% (r - crossprod_mv(R, coef))))
@@ -601,36 +603,39 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
     sharpness <- method$sharpness
     sharpness_squared <- sharpness^2
     sharpness_inv <- 1/sharpness
-    draw <- function(p) {}
-    if (debug) draw <- add(draw, quote(browser()))
+    draw <- if (debug) function(p) {browser()} else function(p) {}
     # 1. draw Polya-Gamma mixture precisions
     if (reduce)  # equalities have already been taken care of
       draw <- add(draw, bquote(x <- p[[.(name.tr)]]))
     else
       draw <- add(draw, bquote(x <- p[[.(name)]]))
-    draw <- add(draw, quote(discr <- crossprod_mv(S, x) - s))
-    draw <- add(draw, quote(omega <- rPolyaGamma(1, sharpness * discr)))
-    # 2. draw vector of coefficients
-    draw <- add(draw, quote(omega.tilde <- sharpness_squared * omega))
+    draw <- draw |>
+      add(quote(discr <- crossprod_mv(S, x) - s)) |>
+      add(quote(omega <- rPolyaGamma(1, sharpness * discr))) |>
+      # 2. draw vector of coefficients
+      add(quote(omega.tilde <- sharpness_squared * omega))
     if (useV) {
-      draw <- add(draw, quote(attr(D.omega.tilde.inv, "x") <- 1 / omega.tilde))
-      draw <- add(draw, quote(XX_V <- matsum(D.omega.tilde.inv)))
-      draw <- add(draw, quote(ch$update(XX_V)))
-      draw <- add(draw, quote(alpha <- sharpness * s + 0.5/omega))
+      draw <- draw |>
+        add(quote(attr(D.omega.tilde.inv, "x") <- 1 / omega.tilde)) |>
+        add(quote(XX_V <- matsum(D.omega.tilde.inv))) |>
+        add(quote(ch$update(XX_V))) |>
+        add(quote(alpha <- sharpness * s + 0.5/omega))
       if (zero.mu)
         draw <- add(draw, quote(y1 <- drawMVN_cholQ(cholQ)))
       else
         draw <- add(draw, quote(y1 <- mu + drawMVN_cholQ(cholQ)))
       draw <- add(draw, bquote(y2 <- Crnorm(.(length(s))) * sqrt(1/omega)))
       if (reduce) {
-        draw <- add(draw, bquote(p[[.(name.tr)]] <- y1 + VS %m*v% ch$solve(sharpness_inv * (alpha - y2) - crossprod_mv(S, y1))))
-        draw <- add(draw, bquote(p[[.(name)]] <- untransform(p[[.(name.tr)]])))
+        draw <- draw |>
+          add(bquote(p[[.(name.tr)]] <- y1 + VS %m*v% ch$solve(sharpness_inv * (alpha - y2) - crossprod_mv(S, y1)))) |>
+          add(bquote(p[[.(name)]] <- untransform(p[[.(name.tr)]])))
       } else {
         draw <- add(draw, quote(coef <- y1 + VS %m*v% ch$solve((alpha - y2) * sharpness_inv - crossprod_mv(S, y1))))
         if (eq) {
-          draw <- add(draw, quote(cholRVxR$update(matsum_RVxR(M1=crossprod_sym2(SVR, ch$solve(SVR)), w1=-1))))
-          draw <- add(draw, quote(temp <- V %m*v% (R %m*v% cholRVxR$solve(r - crossprod_mv(R, coef)))))
-          draw <- add(draw, bquote(p[[.(name)]] <- coef + temp - V %m*v% (S %m*v% ch$solve(crossprod_mv(S, temp)))))
+          draw <- draw |>
+            add(quote(cholRVxR$update(matsum_RVxR(M1=crossprod_sym2(SVR, ch$solve(SVR)), w1=-1)))) |>
+            add(quote(temp <- V %m*v% (R %m*v% cholRVxR$solve(r - crossprod_mv(R, coef))))) |>
+            add(bquote(p[[.(name)]] <- coef + temp - V %m*v% (S %m*v% ch$solve(crossprod_mv(S, temp)))))
         } else
           draw <- add(draw, bquote(p[[.(name)]] <- coef))
       }
@@ -642,18 +647,21 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
         draw <- add(draw, quote(Xy <- crossprod_mv(St, alpha) + Qmu))
       if (is.null(method$CG)) {
         # Cholesky
-        draw <- add(draw, quote(XX <- crossprod_sym(St, omega.tilde)))
-        draw <- add(draw, quote(XX_Q <- matsum(XX)))
-        draw <- add(draw, quote(ch$update(XX_Q)))
+        draw <- draw |>
+          add(quote(XX <- crossprod_sym(St, omega.tilde))) |>
+          add(quote(XX_Q <- matsum(XX))) |>
+          add(quote(ch$update(XX_Q)))
         if (reduce) {
-          draw <- add(draw, bquote(p[[.(name.tr)]] <- drawMVN_cholQ(ch, Xy)))
-          draw <- add(draw, bquote(p[[.(name)]] <- untransform(p[[.(name.tr)]])))
+          draw <- draw |>
+            add(bquote(p[[.(name.tr)]] <- drawMVN_cholQ(ch, Xy))) |>
+            add(bquote(p[[.(name)]] <- untransform(p[[.(name.tr)]])))
         } else {
           draw <- add(draw, quote(coef <- drawMVN_cholQ(ch, Xy)))
           if (eq) {
-            draw <- add(draw, quote(VR <- ch$solve(R)))
-            draw <- add(draw, quote(cholRVR$update(crossprod_sym2(R, VR))))
-            draw <- add(draw, bquote(p[[.(name)]] <- coef + VR %m*v% cholRVR$solve(r - crossprod_mv(R, coef))))
+            draw <- draw |>
+              add(quote(VR <- ch$solve(R))) |>
+              add(quote(cholRVR$update(crossprod_sym2(R, VR)))) |>
+              add(bquote(p[[.(name)]] <- coef + VR %m*v% cholRVR$solve(r - crossprod_mv(R, coef))))
           } else
             draw <- add(draw, bquote(p[[.(name)]] <- coef))
         }
@@ -674,13 +682,13 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
   }  # END softTMVN
 
   if (method$method == "Gibbs") {
-    draw <- function(p) {}
-    if (debug) draw <- add(draw, quote(browser()))
+    draw <- if (debug) function(p) {browser()} else function(p) {}
     if (ineq) {
       eps <- sqrt(.Machine$double.eps)  # TODO, make this a parameter?
       # draw from truncated univariate normal full conditionals
-      draw <- add(draw, bquote(v <- p[[.(name.tr)]]))
-      draw <- add(draw, quote(ustar <- u - Ut %m*v% v))
+      draw <- draw |>
+        add(bquote(v <- p[[.(name.tr)]])) |>
+        add(quote(ustar <- u - Ut %m*v% v))
       if (method$slice) {
         if (sparse)
           draw <- add(draw, quote(v <- Crtmvn_slice_Gibbs_sparse(v, Ut, ustar, eps)))
@@ -696,8 +704,9 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
     } else {
       draw <- add(draw, bquote(v <- Crnorm(.(n2))))
     }
-    draw <- add(draw, bquote(p[[.(name)]] <- untransform(v)))
-    draw <- add(draw, quote(p))
+    draw <- draw |>
+      add(bquote(p[[.(name)]] <- untransform(v))) |>
+      add(quote(p))
   }  # END Gibbs
 
   if (method$method == "HMC") {
@@ -1046,20 +1055,23 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
       if (update.Q) {
         # TODO: do we really need a start function in this case, or call draw
         if (bigR) {
-          start <- add(start, quote(cholV.R <- cholQ$solve(R, system="L", systemP=TRUE)))
-          start <- add(start, quote(cholRVR$update(crossprod_sym2(cholV.R))))
-          start <- add(start, bquote(p[[.(name)]] <- coef + cholQ$solve(R %m*v% cholRVR$solve(r - crossprod_mv(R, coef)))))
+          start <- start |>
+            add(quote(cholV.R <- cholQ$solve(R, system="L", systemP=TRUE))) |>
+            add(quote(cholRVR$update(crossprod_sym2(cholV.R)))) |>
+            add(bquote(p[[.(name)]] <- coef + cholQ$solve(R %m*v% cholRVR$solve(r - crossprod_mv(R, coef)))))
         } else {
-          start <- add(start, quote(VR <- cholQ$solve(R)))
-          start <- add(start, quote(cholRVR$update(crossprod_sym2(R, VR))))
-          start <- add(start, bquote(p[[.(name)]] <- coef + VR %m*v% cholRVR$solve(r - crossprod_mv(R, coef))))
+          start <- start |>
+            add(quote(VR <- cholQ$solve(R))) |>
+            add(quote(cholRVR$update(crossprod_sym2(R, VR)))) |>
+            add(bquote(p[[.(name)]] <- coef + VR %m*v% cholRVR$solve(r - crossprod_mv(R, coef))))
         }
       } else {
         if (method$method == "softTMVN") {
           if (useV) {
-            start <- add(start, quote(cholRVxR$update(matsum_RVxR(M1=crossprod_sym2(SVR, ch$solve(SVR)), w1=-1))))
-            start <- add(start, quote(temp <- V %m*v% (R %m*v% cholRVxR$solve(r - crossprod_mv(R, coef)))))
-            start <- add(start, bquote(p[[.(name)]] <- coef + temp - V %m*v% (S %m*v% ch$solve(crossprod_mv(S, temp)))))
+            start <- start |>
+              add(quote(cholRVxR$update(matsum_RVxR(M1=crossprod_sym2(SVR, ch$solve(SVR)), w1=-1)))) |>
+              add(quote(temp <- V %m*v% (R %m*v% cholRVxR$solve(r - crossprod_mv(R, coef))))) |>
+              add(bquote(p[[.(name)]] <- coef + temp - V %m*v% (S %m*v% ch$solve(crossprod_mv(S, temp)))))
           } else
             start <- add(start, bquote(p[[.(name)]] <- coef + ch$solve(R) %m*v% cholRVR$solve(r - crossprod_mv(R, coef))))
         } else {
@@ -1069,8 +1081,9 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
       }
     } else {
       if (reduce) {
-        start <- add(start, bquote(p[[.(name.tr)]] <- coef))
-        start <- add(start, bquote(p[[.(name)]] <- untransform(coef)))
+        start <- start |>
+          add(bquote(p[[.(name.tr)]] <- coef)) |>
+          add(bquote(p[[.(name)]] <- untransform(coef)))
       } else {
         start <- add(start, bquote(p[[.(name)]] <- coef))
       }

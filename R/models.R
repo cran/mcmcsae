@@ -4,13 +4,12 @@
 #' @param x vector of names of model components.
 #' @return \code{TRUE} if all names are OK; throws an error otherwise.
 check_mod_names <- function(x) {
-  if (any(duplicated(x))) stop("duplicate model component name '", x[duplicated(x)], "'")
-  firstlast <- c(substring(x, 1L, 1L), substring(x, nchar(x), nchar(x)))
-  if (any("_" == firstlast)) stop("\'_\' as first or last character of a model component name is reserved for internal use")
+  if (any(startsWith(x, "_")) || any(endsWith(x, "_"))) stop("\'_\' as first or last character of a model component name is reserved for internal use")
   # check for names ending with extensions like _sigma, _rho, _xi etc since they might clash
   reserved.exts <- c("_df", "_gl", "_Leroux", "_omega", "_rho", "_sigma", "_xi")
   if (any(grepl(paste0("(", paste(reserved.exts, collapse="|"), ")$"), x)))
-    stop("model component names ending with any of (", paste(reserved.exts, collapse=", "), ") are not allowed")
+    stop("model component names ending with any of ('", paste(reserved.exts, collapse="', '"), "') are not allowed")
+  if (any(duplicated(x))) stop("duplicate model component name(s): '", paste(x[duplicated(x)], collapse="', '"), "'")
   TRUE
 }
 
@@ -43,8 +42,9 @@ check_mod_names <- function(x) {
 computeDesignMatrix <- function(formula=NULL, data=NULL, labels=TRUE) {
   if (!inherits(formula, "formula")) stop("'formula' must be a formula")
   formula <- standardize_formula(formula, data=data)
-  out <- to_mclist(formula)
+  out <- to_mclist(formula, c("gen", "mec", "reg", "bart", "vreg", "vfac"))
   for (m in seq_along(out)) {
+    out[[m]] <- match.call(eval(out[[m]][[1L]]), out[[m]])
     mc <- as.list(out[[m]])[-1L]
     if (is.null(mc$formula))
       mc$formula <- ~ 1
@@ -783,9 +783,7 @@ maximize_log_lh_p <- function(sampler, type=c("llh", "lpost"), method="BFGS", co
 
 make_logposterior_opt <- function(sampler) {
   # logprior for optimization of logposterior = logprior + llh; llh is defined in sampler
-  log_prior <- function(p) {
-    out <- 0
-  }
+  log_prior <- function(p) {out <- 0}
   for (k in seq_along(sampler$mod)) {
     mc <- sampler$mod[[k]]
     switch(mc$type,
@@ -801,9 +799,10 @@ make_logposterior_opt <- function(sampler) {
   assign("log_prior", log_prior, environment(sampler))
   # log-posterior function for optimization: function of a vector instead of list
   f <- function(x) {}
-  f <- add(f, quote(p <- vec2list(x)))
-  f <- add(f, quote(p$e_ <- compute_e(p)))
-  f <- add(f, quote(log_prior(p) + llh(p)))
+  f <- f |>
+    add(quote(p <- vec2list(x))) |>
+    add(quote(p$e_ <- compute_e(p))) |>
+    add(quote(log_prior(p) + llh(p)))
   environment(f) <- environment(sampler)
   f
 }

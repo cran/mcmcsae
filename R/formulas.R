@@ -37,20 +37,11 @@ get_vars <- function(formula, rhs.only=TRUE) {
   vars
 }
 
-get_types <- function(formula, specials=c("gen", "mec", "reg", "bart")) {
-  vars <- get_vars(formula)
-  if (!length(vars)) return(NULL)
-  sapply(vars, function(x) match.arg(as.character(x[[1L]]), specials))
-}
-
-get_coefnames <- function(formula, specials=c("gen", "mec", "reg", "bart"), data=NULL) {
-  vars <- get_vars(formula)
-  if (!length(vars)) return(NULL)
-  parnames <- sapply(vars, function(x) if (is.null(x$name)) NA_character_ else x$name)
-  types <- sapply(vars, function(x) match.arg(as.character(x[[1L]]), specials))
-  parnames[is.na(parnames)] <- paste0(types[is.na(parnames)], which(is.na(parnames)))
-  check_mod_names(parnames)
-  parnames
+get_types <- function(mod, specials=c("gen", "mec", "reg", "bart")) {
+  if (length(mod))
+    sapply(mod, function(x) match.arg(as.character(x[[1L]]), specials))
+  else
+    NULL
 }
 
 has_explicit_intercept <- function(formula) {
@@ -102,25 +93,22 @@ standardize_formula <- function(formula, specials=c("reg", "mec", "gen", "bart")
   formula
 }
 
-to_mclist <- function(formula) {
+# use prefix to prevent duplicate names in automatic naming of
+# model components in different model parts, e.g. mean and variance model
+to_mclist <- function(formula, specials=c("gen", "mec", "reg", "bart"), prefix="") {
   vars <- get_vars(formula)
-  parnames <- get_coefnames(formula)
-  mod <- list()
-  for (m in seq_along(vars)) {
-    mc <- vars[[m]]
-    if (is.null(names(mc)) || names(mc)[2L] == "") names(mc)[2L] <- "formula"  # first argument is formula
-    mod[[parnames[m]]] <- mc
+  if (length(vars)) {
+    parnames <- sapply(vars, function(x) if (is.null(x$name)) NA_character_ else x$name)
+    types <- sapply(vars, function(x) match.arg(as.character(x[[1L]]), specials))
+    if (prefix == "v") {  # backward compatible naming for vfac, vreg components
+      prefix <- ifelse(any(types[is.na(parnames)] == c("reg", "gen")), "v", "")
+    }
+    parnames[is.na(parnames)] <- paste0(prefix, types[is.na(parnames)], which(is.na(parnames)))
+    check_mod_names(parnames)
   }
-  mod
-}
-
-to_Vmclist <- function(formula) {
-  vars <- get_vars(formula)
-  parnames <- get_coefnames(formula, c("vreg", "vfac"))
   mod <- list()
   for (m in seq_along(vars)) {
     mc <- vars[[m]]
-    #if (is.null(mc$factor)) mc$factor <- "local_"  # by default apply a local factor
     mod[[parnames[m]]] <- mc
   }
   mod
