@@ -11,7 +11,7 @@
 #' @param e total squared error stop criterion.
 #' @param verbose whether progress information is shown.
 #' @param ... any parameters passed to \code{A_times} and \code{M_solve}.
-#' @return The (approximated) solution to Ax=b.
+#' @returns The (approximated) solution to Ax=b.
 #' @references
 #'  M.R. Hestenes and E. Stiefel (1952).
 #'    Methods of conjugate gradients for solving linear systems.
@@ -57,14 +57,13 @@ CG <- function(b, env, x=NULL, max.it=NULL, e=NULL, verbose=FALSE, ...) {
 # for N(Q^-1 X' Q0 y, Q^-1)
 # where Q = X' Q0 X + oplus_k QA_k x QV_k is q x q and (for mc_gen) QA_k = DA_k' DA_k may be singular
 # NB experimental feature for now, needs more testing
-#' @export
 #' @keywords internal
 #' @param mbs block component containing several model components.
 #' @param X design matrix.
 #' @param sampler sampler object as created by \code{\link{create_sampler}}.
 #' @param control a list of options for the conjugate gradient algorithm that can be passed
 #'   using function \code{\link{CG_control}}.
-#' @return An environment with precomputed quantities and functions for multiplication
+#' @returns An environment with precomputed quantities and functions for multiplication
 #'   by A and by an (inverse) preconditioning matrix.
 #' @references
 #'  A. Nishimura and M.A. Suchard (2022).
@@ -86,15 +85,11 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
   if (is.null(control$max.it)) control$max.it <- q
   if (is.null(control$stop.criterion)) control$stop.criterion <- 1e-9 * q
 
-  if (sampler$family$family == "gaussian") {
+  if (any(sampler$family$family == c("gaussian", "gaussian_gamma"))) {
     if (sampler$modeled.Q) {
       Q_x <- switch(sampler$Q0.type,
         unit=, diag = function(p, x) p[["Q_"]] * x,
         symm = function(p, x) p[["QM_"]] %m*v% x
-      )
-      cholQ <- switch(sampler$Q0.type,
-        unit=, diag = build_chol(runif(n, 0.9, 1.1)),
-        symm = build_chol(crossprod_sym(Cdiag(runif(0.9, 1.1)), sampler$Q0), control=control$chol.control)
       )
     } else {
       Q_x <- switch(sampler$Q0.type,
@@ -102,19 +97,12 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
         diag = function(p, x) sampler$Q0@x * x,
         symm = function(p, x) sampler$Q0 %m*v% x
       )
-      cholQ <- switch(sampler$Q0.type,
-        unit = build_chol(Diagonal(n)),
-        diag = build_chol(Cdiag(sampler$Q0@x)),
-        symm = build_chol(sampler$Q0, control=control$chol.control)
-      )
     }
   } else {
     if (sampler$family$link == "probit") {
       Q_x <- function(p, x) x
-      cholQ <- build_chol(Diagonal(n))
     } else {
       Q_x <- function(p, x) p[["Q_"]] * x
-      cholQ <- build_chol(runif(n, 0.9, 1.1))
     }
   }
 
@@ -122,15 +110,15 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
   # for gen these factors are updated in each MCMC iteration
   cholQV <- list()
   for (mc in mbs) {
-    if (mc$type == "gen") {
+    if (mc[["type"]] == "gen") {
       if (mc$var == "unstructured")
         cholQV[[mc$name]] <- build_chol(rWishart(1L, mc$q0, diag(mc$q0))[,,1L])
       else
         cholQV[[mc$name]] <- build_chol(runif(mc$q0, 0.5, 1.5))
     } else {
-      if (mc$type != "reg") stop("TBI")
-      # TODO account for b0, and optimize for zero Q0 (default)
-      cholQV[[mc$name]] <- build_chol(mc$Q0, control=control$chol.control)
+      if (mc[["type"]] != "reg") stop("TBI")
+      ## TODO account for b0, and optimize for zero Q0 (default)
+      #cholQV[[mc$name]] <- build_chol(mc$Q0, control=control$chol.control)
     }
   }
 
@@ -143,22 +131,18 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
     A_times <- function(x, X, QT, cholQV, p)
       crossprod_mv(X, Q_x(p, X %m*v% x)) + (QT %m*v% x) * p[["sigma_"]]^2
 
-  # add block index vectors to mbs components
-  n_vec_list <- 0L
   for (mc in mbs) {
-    mc$i.bl <- (n_vec_list + 1L):(n_vec_list + mc[["q"]])
-    n_vec_list <- n_vec_list + mc[["q"]]
-
-    if (mc$type == "gen") {
-      # TODO handle DA in mc_gen
-      if (is.null(mc$DA)) {
-        mc$DA <- mc$QA
-        if (class(mc$DA)[1L] != "ddiMatrix" || mc$DA@diag != "U") stop("cannot derive DA")
-      }
+    if (mc[["type"]] == "gen") {
       # TODO
-      # - duplicate code, see setup_priorGMRFsampler in mc_gen
-      # - cholDD needs update in case of local shrinkage priorA
-      mc$cholDD <- build_chol(tcrossprod(mc$DA), control=chol_control(perm=FALSE))  # sometimes perm=TRUE may be more efficient
+      # - remove duplicate code, see setup_priorGMRFsampler in mc_gen
+      # - update cholDD in case of local shrinkage priorA
+      # cholDD is only used in the GMRF preconditioners
+      if (nrow(mc$DA) <= ncol(mc$DA)) {
+        mc$cholDD <- build_chol(tcrossprod(mc$DA), control=chol_control(perm=FALSE))  # sometimes perm=TRUE may be more efficient
+      } else {
+        # more edges than vertices, as usual in e.g. spatial models --> adjust for non-singularity
+        mc$cholDD <- build_chol(tcrossprod(mc$DA) + 0.1 * Diagonal(nrow(mc$DA)), control=chol_control(perm=FALSE))
+      }
     } else {
       # regression usually uses non- or weakly-informative prior -->
       # use simple regression posterior variances in preconditioner, as suggested in NS paper
@@ -166,19 +150,19 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
       mc$gamma <- 2*diag(solve(crossprod_sym(mc$X, sampler$Q0)))
     }
   }
-  rm(n_vec_list)
 
   switch(control$preconditioner,
     GMRF =
       # multiply by D+ DA x V, the (pseudo-)inverse of preconditioner M
       M_solve <- function(x, X, QT, cholQV, p) {
-        out <- vector("numeric", q)
+        out <- numeric(q)
         for (mc in mbs) {
-          if (mc$type == "gen") {
-            temp <- mc$DA %m*m% t.default(cholQV[[mc$name]]$solve(matrix(x[mc$i.bl], nrow=mc$q0)))
-            out[mc$i.bl] <- as.numeric(t.default(crossprod_mm(mc$DA, mc$cholDD$solve(temp))))
+          ind <- mbs$vec_list[[mc$name]]
+          if (mc[["type"]] == "gen") {
+            temp <- mc$DA %m*m% t.default(cholQV[[mc$name]]$solve(matrix(x[mc$block.i], nrow=mc$q0)))
+            out[mc$block.i] <- as.numeric(t.default(crossprod_mm(mc$DA, mc$cholDD$solve(temp))))
           } else {
-            out[mc$i.bl] <- mc$gamma * x[mc$i.bl]
+            out[mc$block.i] <- mc$gamma * x[mc$block.i]
           }
         }
         out
@@ -186,14 +170,14 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
     GMRF2 =
       # multiply by D+ D+' x QV^-1, cf. Nishimura and Suchard
       M_solve <- function(x, X, QT, cholQV, p) {
-        out <- vector("numeric", q)
+        out <- numeric(q)
         for (mc in mbs) {
-          if (mc$type == "gen") {
-            temp <- mc$DA %m*m% t.default(cholQV[[mc$name]]$solve(matrix(x[mc$i.bl], nrow=mc$q0)))
+          if (mc[["type"]] == "gen") {
+            temp <- mc$DA %m*m% t.default(cholQV[[mc$name]]$solve(matrix(x[mc$block.i], nrow=mc$q0)))
             temp <- mc$cholDD$solve(temp)
-            out[mc$i.bl] <- as.numeric(t.default(crossprod_mm(mc$DA, mc$cholDD$solve(temp))))
+            out[mc$block.i] <- as.numeric(t.default(crossprod_mm(mc$DA, mc$cholDD$solve(temp))))
           } else {
-            out[mc$i.bl] <- mc$gamma * x[mc$i.bl]
+            out[mc$block.i] <- mc$gamma * x[mc$block.i]
           }
         }
         out
@@ -202,14 +186,14 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
       # multiply by D+ D+' x QV^-1, cf. Nishimura and Suchard + scaling
       scale <- control$scale
       M_solve <- function(x, X, QT, cholQV, p) {
-        out <- vector("numeric", q)
+        out <- numeric(q)
         for (mc in mbs) {
-          if (mc$type == "gen") {
-            temp <- mc$DA %m*m% t.default(cholQV[[mc$name]]$solve(matrix(scale * x[mc$i.bl], nrow=mc$q0)))
+          if (mc[["type"]] == "gen") {
+            temp <- mc$DA %m*m% t.default(cholQV[[mc$name]]$solve(matrix(scale * x[mc$block.i], nrow=mc$q0)))
             temp <- mc$cholDD$solve(temp)
-            out[mc$i.bl] <- as.numeric(t.default(crossprod_mm(mc$DA, mc$cholDD$solve(temp))))
+            out[mc$block.i] <- as.numeric(t.default(crossprod_mm(mc$DA, mc$cholDD$solve(temp))))
           } else {
-            out[mc$i.bl] <- mc$gamma * x[mc$i.bl]
+            out[mc$block.i] <- mc$gamma * x[mc$block.i]
           }
         }
         out
@@ -222,27 +206,13 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
   # X, QT passed from block's draw function
   draw <- function(p, Xy, X, QT, sampler, start=NULL) {
     # Xy is rhs, i.e. X' Qn ytilde (+ possibly prior reg term if b0 != 0)
-    y1 <- Crnorm(n)
-    if (sampler$modeled.Q) {
-      if (sampler$Q0.type == "symm")
-        cholQ$update(p[["QM_"]])
-      else
-        cholQ$update(p[["Q_"]])
-    }
     if (is.null(p[["sigma_"]])) sigma <- 1 else sigma <- p[["sigma_"]]
-    u <- Xy + sigma * crossprod_mv(X, cholQ$Ltimes(y1, transpose=FALSE))
+    u <- Xy + sigma * crossprod_mv(X, sampler$drawMVNvarQ(p))
     for (mc in mbs) {
-      if (mc$type == "gen") {
-        y2 <- Crnorm(mc$q0 * nrow(mc$DA))
-        dim(y2) <- c(mc$q0, nrow(mc$DA))
-        cholQV[[mc$name]]$update(sigma^2 * p[[mc$name_Qv]])
-        u[mc$i.bl] <- u[mc$i.bl] + as.numeric(cholQV[[mc$name]]$Ltimes(y2, transpose=FALSE) %m*m% mc$DA)
-      } else {
-        if (mc$informative.prior) {
-          y2 <- Crnorm(mc$q)
-          u[mc$i.bl] <- u[mc$i.bl] + cholQV[[mc$name]]$Ltimes(y2, transpose=FALSE)
-        }
-      }
+      if (mc[["type"]] == "gen")
+        u[mc$block.i] <- u[mc$block.i] + sigma * mc$drawMVNvarQ(p)
+      else
+        u[mc$block.i] <- u[mc$block.i] + mc$drawMVNvarQ(p)
     }
     # solve Qtot v = u using preconditioned conjugate gradients, where Qtot = X'QX + sigma^2 QT
     out <- CG(u, self, start, max.it=control$max.it, e=control$stop.criterion, verbose=control$verbose,
@@ -263,7 +233,7 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
 #' @param scale scale parameter; only used by the "GMRF3" preconditioner.
 #' @param chol.control options for Cholesky decomposition, see \code{\link{chol_control}}.
 #' @param verbose whether diagnostic information about the CG sampler is shown.
-#' @return A list of options used by the conjugate gradients algorithm.
+#' @returns A list of options used by the conjugate gradients algorithm.
 CG_control <- function(max.it=NULL, stop.criterion=NULL,
                        preconditioner=c("GMRF", "GMRF2", "GMRF3", "identity"),
                        scale=1, chol.control=chol_control(),

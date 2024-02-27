@@ -39,7 +39,7 @@ double trnd(const double l, const double u) {
 //’
 //’ @param l lower truncation bound.
 //’ @param u upper truncation bound.
-//’ @return A single draw from the standard univariate truncated normal distribution.
+//’ @returns A single draw from the standard univariate truncated normal distribution.
 // [[Rcpp::export(rng=true)]]
 double Crtuvn(const double l, const double u) {
   double out;
@@ -67,7 +67,7 @@ double Crtuvn(const double l, const double u) {
 //’ @param Ut dense matrix encoding the inequality constrained linear combinations.
 //’ @param ustar vector encoding the (initial) lower bounds corresponding to Ut.
 //’ @param eps small numerical value to stabilize the Gibbs sampler.
-//’ @return A single draw from the standardized multivariate truncated normal distribution.
+//’ @returns A single draw from the standardized multivariate truncated normal distribution.
 //’ @references
 //’  Y. Li and S.K. Ghosh (2015). Efficient sampling methods for truncated multivariate normal
 //’    and student-t distributions subject to linear inequality constraints.
@@ -125,7 +125,7 @@ Eigen::VectorXd Crtmvn_Gibbs_dense(const Eigen::Map<Eigen::VectorXd> & v, const 
 //’ @param Ut sparse matrix encoding the inequality constrained linear combinations.
 //’ @param ustar vector encoding the (initial) lower bounds corresponding to Ut.
 //’ @param eps small numerical value to stabilize the Gibbs sampler.
-//’ @return A single draw from the standardized multivariate truncated normal distribution.
+//’ @returns A single draw from the standardized multivariate truncated normal distribution.
 // [[Rcpp::export(rng=true)]]
 NumericVector Crtmvn_Gibbs_sparse(const NumericVector & v, const SEXP Ut, const NumericVector & ustar, const double eps) {
   double a, b, vi, x, temp;
@@ -181,7 +181,7 @@ NumericVector Crtmvn_Gibbs_sparse(const NumericVector & v, const SEXP Ut, const 
 //’ @param Ut dense matrix encoding the inequality constrained linear combinations.
 //’ @param ustar vector encoding the (initial) lower bounds corresponding to Ut.
 //’ @param eps small numerical value to stabilize the Gibbs sampler.
-//’ @return A single draw from the standardized multivariate truncated normal distribution.
+//’ @returns A single draw from the standardized multivariate truncated normal distribution.
 //’ @references
 //’  Y. Li and S.K. Ghosh (2015). Efficient sampling methods for truncated multivariate normal
 //’    and student-t distributions subject to linear inequality constraints.
@@ -245,7 +245,7 @@ Eigen::VectorXd Crtmvn_slice_Gibbs_dense(const Eigen::Map<Eigen::VectorXd> & v, 
 //’ @param Ut sparse matrix encoding the inequality constrained linear combinations.
 //’ @param ustar vector encoding the (initial) lower bounds corresponding to Ut.
 //’ @param eps small numerical value to stabilize the Gibbs sampler.
-//’ @return A single draw from the standardized multivariate truncated normal distribution.
+//’ @returns A single draw from the standardized multivariate truncated normal distribution.
 // [[Rcpp::export(rng=true)]]
 NumericVector Crtmvn_slice_Gibbs_sparse(const NumericVector & v, const SEXP Ut, const NumericVector & ustar, const double eps) {
   double a, b, vi, x, temp;
@@ -306,7 +306,7 @@ NumericVector Crtmvn_slice_Gibbs_sparse(const NumericVector & v, const SEXP Ut, 
 //’
 //’ @param mu vector of normal means.
 //’ @param y response vector.
-//’ @return A vector of truncated normal variates.
+//’ @returns A vector of truncated normal variates.
 // [[Rcpp::export(rng=true)]]
 NumericVector CrTNprobit(const NumericVector & mu, const NumericVector & y) {
   double l, u;
@@ -336,7 +336,7 @@ NumericVector CrTNprobit(const NumericVector & mu, const NumericVector & y) {
 //’ @param bounces number of bounces off each of the inequality walls.
 //’ @param t_sim simulation time.
 //’ @param max_refl break off the simulation if there are more than so many bounces.
-//’ @return New state x. If diagnostic, then bounces are updated.
+//’ @returns New state x. If diagnostic, then bounces are updated.
 //’ @references
 //’  A. Pakman and L. Paninski (2014).
 //’    Exact Hamiltonian Monte Carlo for truncated multivariate gaussians.

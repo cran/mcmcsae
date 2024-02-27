@@ -5,8 +5,9 @@
 \title{Set computational options for the sampling algorithms}
 \usage{
 sampler_control(
-  add.outer.R = NULL,
+  add.outer.R = TRUE,
   recompute.e = TRUE,
+  expanded.cMVN.sampler = FALSE,
   CG = NULL,
   block = TRUE,
   block.V = TRUE,
@@ -19,12 +20,19 @@ sampler_control(
 )
 }
 \arguments{
-\item{add.outer.R}{whether to add the outer product of the constraint matrix for a better conditioned solve system
-for blocks. This is done by default when using blocked Gibbs sampling for blocks with constraints.}
+\item{add.outer.R}{whether to add the outer product of a constraint matrix for a better conditioned 
+linear system of equations, typically for coefficients sampled in a Gibbs-block. Default is \code{TRUE}.
+If \code{NULL}, a simple heuristic is used to decide whether to add the outer product
+of possibly a submatrix of the constraint matrix.}
 
 \item{recompute.e}{when \code{FALSE}, residuals or linear predictors are only computed at the start of the simulation.
 This may give a modest speedup but in some cases may be less accurate due to round-off error accumulation.
 Default is \code{TRUE}.}
+
+\item{expanded.cMVN.sampler}{whether an expanded linear system including dual variables is used
+for equality constrained multivariate normal sampling. If set to \code{TRUE} this may
+improve the performance of the blocked Gibbs sampler in case of a large number of equality
+constraints, typically identifiability constraints for GMRFs.}
 
 \item{CG}{use a conjugate gradient iterative algorithm instead of Cholesky updates for sampling
 the model's coefficients. This must be a list with possible components \code{max.it},

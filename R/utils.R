@@ -8,12 +8,8 @@ intercept_only <- function(formula) {
   #isTRUE(all.equal(formula, ~ 1))
 }
 
-n_row <- function(data) {
-  if (is.integer(data) && length(data) == 1L)
-    data
-  else
-    nrow(data)
-}
+# if data is a scalar integer it is interpreted as sample size
+n_row <- function(data) if (is.integer(data) && length(data) == 1L) data else nrow(data)
 
 # set up binary file for writing and write header
 write_header <- function(con, n.iter, n.chain, n.par, parnames=NULL, single.prec=FALSE) {
@@ -62,7 +58,7 @@ read_header <- function(con) {
 #' @export
 #' @param n the size of the generated dataset.
 #' @param family sampling distribution family, see \code{\link{create_sampler}}.
-#' @return A \code{list} containing the generated dataset, the values of the model
+#' @returns A \code{list} containing the generated dataset, the values of the model
 #'   parameters, and the model specification as a formula.
 mcmcsae_example <- function(n=100L, family="gaussian") {
   if (n < 3L) stop("choose a size n >= 3")
@@ -93,16 +89,9 @@ add <- function(f, expr) {
 #'
 #' @noRd
 #' @param names character vector of labels of the categories of an interaction term.
-#' @return Names with each component alphabetically ordered by factor label separated by ':'.
+#' @returns Names with each component alphabetically ordered by factor label separated by ':'.
 order_interactions <- function(names) {
   sapply( strsplit(names, ":", fixed=TRUE), function(s) paste(sort.int(s), collapse=":") )
-}
-
-# str2lang was introduced in R 3.6.0
-str2lang_ <- if (getRversion() >= "3.6.0") {
-  function(x) str2lang(x)
-} else {
-  function(x) parse(text=x, keep.source=FALSE)[[1L]]
 }
 
 warn <- function(..., immediate. = TRUE) warning(..., call. = FALSE, immediate. = immediate.)

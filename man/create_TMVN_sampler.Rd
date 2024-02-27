@@ -61,7 +61,7 @@ component-wise Gibbs sampling approach, and "softTMVN" for a data augmentation m
 from a smooth approximation to the truncated MVN. Alternatively, the method setting
 functions \code{m_direct}, \code{m_HMC}, \code{m_HMC_ZigZag}, \code{m_Gibbs} or
 \code{m_softTMVN} can be used to select the method and possibly set some of its
-options to non-default values, see \code{\link{mcmcsae-TMVN-method}}.}
+options to non-default values, see \code{\link{TMVN-methods}}.}
 
 \item{reduce}{whether to a priori restrict the simulation to the subspace defined by the
 equality constraints.}

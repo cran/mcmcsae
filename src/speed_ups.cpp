@@ -7,7 +7,7 @@ using namespace Rcpp;
 //’ Copy an existing numeric vector
 //’ 
 //’ @param x a vector to be copied.
-//’ @return A newly allocated copy of the vector.
+//’ @returns A newly allocated copy of the vector.
 // [[Rcpp::export(rng=false)]]
 NumericVector copy_vector(const NumericVector & x) {
   return clone(x);
@@ -17,7 +17,7 @@ NumericVector copy_vector(const NumericVector & x) {
 //’ 
 //’ @param x a numeric vector.
 //’ @param y a numeric vector.
-//’ @return No return value, but x is updated in-place to x + y.
+//’ @returns No return value, but x is updated in-place to x + y.
 // [[Rcpp::export(rng=false)]]
 void add_vector(Eigen::Map<Eigen::VectorXd> & x, const Eigen::Map<Eigen::VectorXd> & y) {
   if (x.size() != y.size()) stop("incompatible dimensions");
@@ -31,7 +31,7 @@ void add_vector(Eigen::Map<Eigen::VectorXd> & x, const Eigen::Map<Eigen::VectorX
 //’ @param plus whether the matrix-vector product is to be added or subtracted.
 //’ @param M a matrix object.
 //’ @param x a numeric vector.
-//’ @return No return value, but y is updated in-place to y +/- Mx.
+//’ @returns No return value, but y is updated in-place to y +/- Mx.
 // [[Rcpp::export(rng=false)]]
 void mv_update(Eigen::Map<Eigen::VectorXd> & y, const bool plus, const SEXP M, const Eigen::Map<Eigen::VectorXd> & x) {
   if (Rf_isS4(M)) {
@@ -91,7 +91,7 @@ void mv_update(Eigen::Map<Eigen::VectorXd> & y, const bool plus, const SEXP M, c
 //’ Inverse of a symmetric positive definite dense matrix
 //’ 
 //’ @param M a symmetric positive definite matrix.
-//’ @return The inverse of \code{M}.
+//’ @returns The inverse of \code{M}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd inverseSPD(const Eigen::Map<Eigen::MatrixXd> & M) {
   const int d = M.rows();
@@ -102,7 +102,7 @@ Eigen::MatrixXd inverseSPD(const Eigen::Map<Eigen::MatrixXd> & M) {
 //’ Cholesky factor of a symmetric positive definite dense matrix
 //’ 
 //’ @param M a symmetric positive definite matrix.
-//’ @return The upper triangular Cholesky factor of \code{M}.
+//’ @returns The upper triangular Cholesky factor of \code{M}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Ccholesky(const Eigen::Map<Eigen::MatrixXd> M) {
   return M.llt().matrixU();
@@ -112,7 +112,7 @@ Eigen::MatrixXd Ccholesky(const Eigen::Map<Eigen::MatrixXd> M) {
 //’
 //’ @param M an upper triangular matrix, typically the Lt factor of a LLt decomposition.
 //’ @param y a numeric vector.
-//’ @return The solution of \code{Mx=y}.
+//’ @returns The solution of \code{Mx=y}.
 // [[Rcpp::export(rng=false)]]
 Eigen::VectorXd Cbacksolve(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::Map<Eigen::VectorXd> & y) {
   if (M.cols() != y.size()) stop("incompatible dimensions");
@@ -123,7 +123,7 @@ Eigen::VectorXd Cbacksolve(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::M
 //’
 //’ @param M an upper triangular matrix, typically the Lt factor of a LLt decomposition.
 //’ @param y a numeric vector.
-//’ @return The solution of \code{M'x=y}.
+//’ @returns The solution of \code{M'x=y}.
 // [[Rcpp::export(rng=false)]]
 Eigen::VectorXd Cforwardsolve(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::Map<Eigen::VectorXd> & y) {
   if (M.cols() != y.size()) stop("incompatible dimensions");
@@ -134,7 +134,7 @@ Eigen::VectorXd Cforwardsolve(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen
 //’
 //’ @param M an upper triangular matrix, typically the Lt factor of a LLt decomposition.
 //’ @param y a numeric matrix.
-//’ @return The solution of \code{Mx=y}.
+//’ @returns The solution of \code{Mx=y}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd CbacksolveM(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::Map<Eigen::MatrixXd> & y) {
   if (M.cols() != y.rows()) stop("incompatible dimensions");
@@ -145,7 +145,7 @@ Eigen::MatrixXd CbacksolveM(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::
 //’
 //’ @param M an upper triangular matrix, typically the Lt factor of a LLt decomposition.
 //’ @param y a numeric matrix.
-//’ @return The solution of \code{M'x=y}.
+//’ @returns The solution of \code{M'x=y}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd CforwardsolveM(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::Map<Eigen::MatrixXd> & y) {
   if (M.cols() != y.rows()) stop("incompatible dimensions");
@@ -156,7 +156,7 @@ Eigen::MatrixXd CforwardsolveM(const Eigen::Map<Eigen::MatrixXd> & M, const Eige
 //’
 //’ @param x a numeric vector.
 //’ @param y a numeric vector.
-//’ @return The inner product \code{x'y}.
+//’ @returns The inner product \code{x'y}.
 // [[Rcpp::export(rng=false)]]
 double dotprodC(const Eigen::Map<Eigen::VectorXd> & x, const Eigen::Map<Eigen::VectorXd> & y) {
   if (x.size() != y.size()) stop("incompatible dimensions");
@@ -168,7 +168,7 @@ double dotprodC(const Eigen::Map<Eigen::VectorXd> & x, const Eigen::Map<Eigen::V
 //’ @param x a numeric vector.
 //’ @param group an integer vector of the same length as \code{x} defining the groups.
 //’ @param n the number of groups, assumed to be labeled \code{1:n}.
-//’ @return A vector with totals of \code{x} by group.
+//’ @returns A vector with totals of \code{x} by group.
 // [[Rcpp::export(rng=false)]]
 NumericVector fast_aggrC(const NumericVector & x, const IntegerVector & group, const int n) {
   const int xsize = x.size();
@@ -184,7 +184,7 @@ NumericVector fast_aggrC(const NumericVector & x, const IntegerVector & group, c
 //’
 //’ @param A a numeric compressed, sparse, column-oriented matrix.
 //’ @param y a numeric vector.
-//’ @return The matrix product \code{Ay}.
+//’ @returns The matrix product \code{Ay}.
 // [[Rcpp::export(rng=false)]]
 Eigen::VectorXd Csparse_numeric_prod(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::VectorXd> & y) {
   if (A.cols() != y.size()) stop("incompatible dimensions");
@@ -195,7 +195,7 @@ Eigen::VectorXd Csparse_numeric_prod(const Eigen::MappedSparseMatrix<double> & A
 //’
 //’ @param A a numeric symmetric compressed, sparse, column-oriented matrix.
 //’ @param y a numeric vector.
-//’ @return The matrix product \code{Ay}.
+//’ @returns The matrix product \code{Ay}.
 // NB it is assumed that the symmetric matrix is stored in the upper triangular part
 // [[Rcpp::export(rng=false)]]
 Eigen::VectorXd CsparseS_numeric_prod(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::VectorXd> & y) {
@@ -207,7 +207,7 @@ Eigen::VectorXd CsparseS_numeric_prod(const Eigen::MappedSparseMatrix<double> & 
 //’
 //’ @param A a dense matrix.
 //’ @param y a vector.
-//’ @return The product \code{Ay}.
+//’ @returns The product \code{Ay}.
 // [[Rcpp::export(rng=false)]]
 Eigen::VectorXd Cdense_numeric_prod(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::Map<Eigen::VectorXd> & y) {
   if (A.cols() != y.size()) stop("incompatible dimensions");
@@ -218,7 +218,7 @@ Eigen::VectorXd Cdense_numeric_prod(const Eigen::Map<Eigen::MatrixXd> & A, const
 //’
 //’ @param A a dense matrix.
 //’ @param y a vector.
-//’ @return The product \code{A'y}.
+//’ @returns The product \code{A'y}.
 // [[Rcpp::export(rng=false)]]
 Eigen::VectorXd Cdense_numeric_crossprod(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::Map<Eigen::VectorXd> & y) {
   if (A.rows() != y.size()) stop("incompatible dimensions");
@@ -229,7 +229,7 @@ Eigen::VectorXd Cdense_numeric_crossprod(const Eigen::Map<Eigen::MatrixXd> & A, 
 //’
 //’ @param A a numeric compressed, sparse, column-oriented matrix.
 //’ @param y a numeric vector.
-//’ @return The crossproduct \code{A'y}.
+//’ @returns The crossproduct \code{A'y}.
 // [[Rcpp::export(rng=false)]]
 Eigen::VectorXd Csparse_numeric_crossprod(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::VectorXd> & y) {
   if (A.rows() != y.size()) stop("incompatible dimensions");
@@ -240,7 +240,7 @@ Eigen::VectorXd Csparse_numeric_crossprod(const Eigen::MappedSparseMatrix<double
 //’
 //’ @param A a numeric matrix.
 //’ @param B a numeric matrix.
-//’ @return The matrix product \code{AB}.
+//’ @returns The matrix product \code{AB}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Cdense_dense_prod(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::Map<Eigen::MatrixXd> & B) {
   int n = A.cols();
@@ -252,7 +252,7 @@ Eigen::MatrixXd Cdense_dense_prod(const Eigen::Map<Eigen::MatrixXd> & A, const E
 //’
 //’ @param A a numeric compressed, sparse, column-oriented matrix.
 //’ @param y a matrix.
-//’ @return The matrix product \code{Ay}.
+//’ @returns The matrix product \code{Ay}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Csparse_dense_prod(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::MatrixXd> & y) {
   if (A.cols() != y.rows()) stop("incompatible dimensions");
@@ -263,7 +263,7 @@ Eigen::MatrixXd Csparse_dense_prod(const Eigen::MappedSparseMatrix<double> & A, 
 //’
 //’ @param A a matrix.
 //’ @param B a numeric compressed, sparse, column-oriented matrix.
-//’ @return The matrix product \code{AB}.
+//’ @returns The matrix product \code{AB}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Cdense_sparse_prod(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::MappedSparseMatrix<double> & B) {
   if (A.cols() != B.rows()) stop("incompatible dimensions");
@@ -274,7 +274,7 @@ Eigen::MatrixXd Cdense_sparse_prod(const Eigen::Map<Eigen::MatrixXd> & A, const 
 //’
 //’ @param A a numeric symmetric compressed, sparse, column-oriented matrix.
 //’ @param y a matrix.
-//’ @return The matrix product \code{Ay}.
+//’ @returns The matrix product \code{Ay}.
 // NB it is assumed that the symmetric matrix is stored in the upper triangular part
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd CsparseS_dense_prod(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::MatrixXd> & y) {
@@ -286,7 +286,7 @@ Eigen::MatrixXd CsparseS_dense_prod(const Eigen::MappedSparseMatrix<double> & A,
 //’
 //’ @param M a matrix.
 //’ @param Q a numeric symmetric compressed, sparse, column-oriented matrix.
-//’ @return The matrix product \code{MQ}.
+//’ @returns The matrix product \code{MQ}.
 // NB it is assumed that the symmetric matrix is stored in the upper triangular part
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Cdense_sparseS_prod(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::MappedSparseMatrix<double> & Q) {
@@ -298,7 +298,7 @@ Eigen::MatrixXd Cdense_sparseS_prod(const Eigen::Map<Eigen::MatrixXd> & M, const
 //’
 //’ @param M a dense matrix.
 //’ @param d a numeric vector representing a diagonal matrix.
-//’ @return The matrix product \code{M diag(d)}.
+//’ @returns The matrix product \code{M diag(d)}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Cdense_diag_prod(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::Map<Eigen::VectorXd> & d) {
   if (M.cols() != d.size()) stop("incompatible dimensions");
@@ -309,7 +309,7 @@ Eigen::MatrixXd Cdense_diag_prod(const Eigen::Map<Eigen::MatrixXd> & M, const Ei
 //’
 //’ @param A a numeric matrix.
 //’ @param B a numeric matrix.
-//’ @return The matrix product \code{A'B}.
+//’ @returns The matrix product \code{A'B}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Cdense_dense_crossprod(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::Map<Eigen::MatrixXd> & B) {
   int n = A.rows();
@@ -321,7 +321,7 @@ Eigen::MatrixXd Cdense_dense_crossprod(const Eigen::Map<Eigen::MatrixXd> & A, co
 //’
 //’ @param A a numeric compressed, sparse, column-oriented matrix.
 //’ @param B a matrix.
-//’ @return The matrix product \code{A'B}.
+//’ @returns The matrix product \code{A'B}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Csparse_dense_crossprod(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::MatrixXd> & B) {
   if (A.rows() != B.rows()) stop("incompatible dimensions");
@@ -332,7 +332,7 @@ Eigen::MatrixXd Csparse_dense_crossprod(const Eigen::MappedSparseMatrix<double> 
 //’
 //’ @param A a matrix.
 //’ @param B a numeric compressed, sparse, column-oriented matrix.
-//’ @return The matrix product \code{A'B}.
+//’ @returns The matrix product \code{A'B}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Cdense_sparse_crossprod(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::MappedSparseMatrix<double> & B) {
   if (A.rows() != B.rows()) stop("incompatible dimensions");
@@ -343,7 +343,7 @@ Eigen::MatrixXd Cdense_sparse_crossprod(const Eigen::Map<Eigen::MatrixXd> & A, c
 //’
 //’ @param M a dense matrix.
 //’ @param d a numeric vector representing a diagonal matrix.
-//’ @return The matrix product \code{M diag(d)}.
+//’ @returns The matrix product \code{M diag(d)}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Cdense_diag_crossprod(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::Map<Eigen::VectorXd> & d) {
   if (M.rows() != d.size()) stop("incompatible dimensions");
@@ -354,7 +354,7 @@ Eigen::MatrixXd Cdense_diag_crossprod(const Eigen::Map<Eigen::MatrixXd> & M, con
 //’
 //’ @param y a (dense) matrix.
 //’ @param A a numeric compressed, sparse, column-oriented matrix.
-//’ @return The tcrossproduct \code{yA'}.
+//’ @returns The tcrossproduct \code{yA'}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Cdense_sparse_tcrossprod(const Eigen::Map<Eigen::MatrixXd> & y, const Eigen::MappedSparseMatrix<double> & A) {
   if (y.cols() != A.cols()) stop("incompatible dimensions");
@@ -365,7 +365,7 @@ Eigen::MatrixXd Cdense_sparse_tcrossprod(const Eigen::Map<Eigen::MatrixXd> & y, 
 //’
 //’ @param x a numeric vector, representing a diagonal matrix.
 //’ @param A a numeric compressed, sparse, column-oriented matrix.
-//’ @return The product \code{diag(x) A}.
+//’ @returns The product \code{diag(x) A}.
 // [[Rcpp::export(rng=false)]]
 Eigen::SparseMatrix<double> Cdiag_sparse_prod(const Eigen::Map<Eigen::VectorXd> & x, const Eigen::MappedSparseMatrix<double> & A) {
   if (x.size() != A.rows()) stop("incompatible dimensions");
@@ -408,7 +408,7 @@ NumericVector sparse_sum_x(const int n,
 //’ Extract the diagonal of a dense matrix
 //’
 //’ @param A a numeric dense matrix.
-//’ @return The diagonal of A as a vector.
+//’ @returns The diagonal of A as a vector.
 // [[Rcpp::export(rng=false)]]
 Eigen::VectorXd diagC(const Eigen::Map<Eigen::MatrixXd> & A) {
   return A.diagonal();
@@ -418,7 +418,7 @@ Eigen::VectorXd diagC(const Eigen::Map<Eigen::MatrixXd> & A) {
 //’
 //’ @param A a numeric dense matrix.
 //’ @param d a numeric vector.
-//’ @return Matrix A with x added to its diagonal.
+//’ @returns Matrix A with x added to its diagonal.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd add_diagC(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::Map<Eigen::VectorXd> & d) {
   if (d.size() != A.rows()) stop("incompatible dimensions");
@@ -430,7 +430,7 @@ Eigen::MatrixXd add_diagC(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::Ma
 //’ Compute the symmetric crossprod \code{M'M} for dense matrix \code{M}
 //’
 //’ @param M a numeric dense matrix.
-//’ @return The product \code{M'M}.
+//’ @returns The product \code{M'M}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Cdense_crossprod_sym0(const Eigen::Map<Eigen::MatrixXd> & M) {
   const int n = M.cols();
@@ -441,7 +441,7 @@ Eigen::MatrixXd Cdense_crossprod_sym0(const Eigen::Map<Eigen::MatrixXd> & M) {
 //’
 //’ @param M a numeric dense matrix.
 //’ @param q a numeric vector.
-//’ @return The product \code{M'diag(q)M}.
+//’ @returns The product \code{M'diag(q)M}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Cdense_crossprod_sym(const Eigen::Map<Eigen::MatrixXd> & M, const Eigen::Map<Eigen::VectorXd> & q) {
   if (M.rows() != q.size()) stop("incompatible input");
@@ -455,7 +455,7 @@ Eigen::MatrixXd Cdense_crossprod_sym(const Eigen::Map<Eigen::MatrixXd> & M, cons
 //’
 //’ @param Q a symmetric sparse matrix, represented by its upper triangle.
 //’ @param p an integer vector representing a permutation matrix P.
-//’ @return The product \code{P'QP}.
+//’ @returns The product \code{P'QP}.
 // [[Rcpp::export(rng=false)]]
 Eigen::SparseMatrix<double> Csparse_sym_twist(const Eigen::MappedSparseMatrix<double> Q, const Eigen::Map<Eigen::VectorXi> & p) {
   if (Q.rows() != p.size()) stop("incompatible dimensions");
@@ -468,7 +468,7 @@ Eigen::SparseMatrix<double> Csparse_sym_twist(const Eigen::MappedSparseMatrix<do
 //’
 //’ @param A a numeric dense matrix.
 //’ @param B a numeric dense matrix, assumed to be of the form \code{QA} where \code{Q} is symmetric.
-//’ @return The product \code{A'B}.
+//’ @returns The product \code{A'B}.
 // [[Rcpp::export(rng=false)]]
 NumericMatrix Cdense_crossprod_sym2(const NumericMatrix & A, const NumericMatrix & B) {
   const int n = A.ncol();
@@ -497,7 +497,7 @@ NumericMatrix Cdense_crossprod_sym2(const NumericMatrix & A, const NumericMatrix
 //’ Create a unit Diagonal Matrix
 //’
 //’ @param n an integer representing the dimension.
-//’ @return The unit diagonal matrix of class \code{ddiMatrix} and dimension \code{n}.
+//’ @returns The unit diagonal matrix of class \code{ddiMatrix} and dimension \code{n}.
 // [[Rcpp::export(rng=false)]]
 SEXP CdiagU(const int n) {
   S4 out("ddiMatrix");
@@ -509,7 +509,7 @@ SEXP CdiagU(const int n) {
 //’ Create a Diagonal Matrix
 //’
 //’ @param x a numeric vector representing the matrix diagonal.
-//’ @return The diagonal matrix of class \code{ddiMatrix} with diagonal \code{x}.
+//’ @returns The diagonal matrix of class \code{ddiMatrix} with diagonal \code{x}.
 // [[Rcpp::export(rng=false)]]
 SEXP Cdiag(const NumericVector x) {
   S4 out("ddiMatrix");
@@ -523,7 +523,7 @@ SEXP Cdiag(const NumericVector x) {
 //’
 //’ @param A a (dense) square matrix.
 //’ @param d a vector of size the number of rows or columns of \code{A}, or a scalar.
-//’ @return The sparse matrix \code{DAD} with \code{D=diag(d)}.
+//’ @returns The sparse matrix \code{DAD} with \code{D=diag(d)}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Cscale_dense(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen::Map<Eigen::VectorXd> & d) {
   if (d.size() == 1) {
@@ -537,7 +537,7 @@ Eigen::MatrixXd Cscale_dense(const Eigen::Map<Eigen::MatrixXd> & A, const Eigen:
 //’
 //’ @param A a sparse matrix.
 //’ @param d a vector of size the number of rows or columns of \code{A}, or a scalar.
-//’ @return The sparse matrix \code{D'AD} with \code{D=diag(d)}.
+//’ @returns The sparse matrix \code{D'AD} with \code{D=diag(d)}.
 // [[Rcpp::export(rng=false)]]
 Eigen::SparseMatrix<double> Cscale_sparse(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::VectorXd> & d) {
   if (d.size() == 1) {
@@ -551,7 +551,7 @@ Eigen::SparseMatrix<double> Cscale_sparse(const Eigen::MappedSparseMatrix<double
 //’
 //’ @param A a sparse matrix.
 //’ @param Q a dense matrix, assumed to be symmetric.
-//’ @return The (dense) matrix \code{A'QA}.
+//’ @returns The (dense) matrix \code{A'QA}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Csparse_dense_crossprod_sym(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::MatrixXd> & Q) {
   if (A.rows() != Q.rows()) stop("incompatible dimensions");
@@ -562,7 +562,7 @@ Eigen::MatrixXd Csparse_dense_crossprod_sym(const Eigen::MappedSparseMatrix<doub
 //’
 //’ @param A a sparse matrix.
 //’ @param Q a sparse matrix, assumed to be symmetric.
-//’ @return The sparse matrix \code{A'QA}, in upper triangular view.
+//’ @returns The sparse matrix \code{A'QA}, in upper triangular view.
 // [[Rcpp::export(rng=false)]]
 Eigen::SparseMatrix<double> Csparse_crossprod_sym(const Eigen::MappedSparseMatrix<double> & A, const Eigen::MappedSparseMatrix<double> & Q) {
   if (A.rows() != Q.rows()) stop("incompatible dimensions");
@@ -573,7 +573,7 @@ Eigen::SparseMatrix<double> Csparse_crossprod_sym(const Eigen::MappedSparseMatri
 //’
 //’ @param A a sparse matrix.
 //’ @param Q a vector, representing a diagonal matrix.
-//’ @return The sparse matrix \code{A'diag(Q)A}, in upper triangular view.
+//’ @returns The sparse matrix \code{A'diag(Q)A}, in upper triangular view.
 // NB here it seems faster to first assign QA to a temporary sparse matrix
 // [[Rcpp::export(rng=false)]]
 Eigen::SparseMatrix<double> Csparse_diag_crossprod_sym(const Eigen::MappedSparseMatrix<double> & A, const Eigen::Map<Eigen::VectorXd> & Q) {
@@ -586,7 +586,7 @@ Eigen::SparseMatrix<double> Csparse_diag_crossprod_sym(const Eigen::MappedSparse
 //’
 //’ @param A a sparse matrix.
 //’ @param B a sparse matrix, assumed to be the product of a symmetric matrix with \code{A}.
-//’ @return The sparse matrix \code{A'B}, in upper triangular view.
+//’ @returns The sparse matrix \code{A'B}, in upper triangular view.
 // [[Rcpp::export(rng=false)]]
 Eigen::SparseMatrix<double> Csparse_crossprod_sym2(const Eigen::MappedSparseMatrix<double> & A, const Eigen::MappedSparseMatrix<double> & B) {
   if (A.rows() != B.rows()) stop("incompatible dimensions");
@@ -613,7 +613,7 @@ Rcpp::List prec2se_cor(const Eigen::Map<Eigen::MatrixXd> & Q) {
 //’ Compute log(1 + exp(x)) in a numerically robust way
 //’
 //’ @param x input vector.
-//’ @return The computed vector log(1 + exp(x)).
+//’ @returns The computed vector log(1 + exp(x)).
 //’ @references
 //’   M. Maechler (2012)
 //’     Accurately Computing log(1 − exp(− |a|)) Assessed by the Rmpfr package.
@@ -640,7 +640,7 @@ NumericVector log1pexpC(const NumericVector & x) {
 //’
 //’ @param M1 numeric dense matrix.
 //’ @param M2 numeric dense matrix.
-//’ @return The Kronecker product of M1 and M2 as a dense matrix.
+//’ @returns The Kronecker product of M1 and M2 as a dense matrix.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Cdense_kron(const Eigen::Map<Eigen::MatrixXd> & M1, const Eigen::Map<Eigen::MatrixXd> & M2) {
   return kroneckerProduct(M1, M2);  //.selfadjointView<Eigen::Lower>() for symmetric matrices --> slower
@@ -651,7 +651,7 @@ Eigen::MatrixXd Cdense_kron(const Eigen::Map<Eigen::MatrixXd> & M1, const Eigen:
 //’ @param v numeric vector.
 //’ @param n integer vector.
 //’ @param M2 numeric vector.
-//’ @return A vector with replicated multiples of v's elements.
+//’ @returns A vector with replicated multiples of v's elements.
 // [[Rcpp::export(rng=false)]]
 Eigen::VectorXd Crepgen(const Eigen::Map<Eigen::VectorXd> & v, const Eigen::Map<Eigen::VectorXi> & n, const Eigen::Map<Eigen::VectorXd> & M2) {
   const int q = M2.size();
@@ -681,7 +681,7 @@ Eigen::VectorXd Crepgen(const Eigen::Map<Eigen::VectorXd> & v, const Eigen::Map<
 //’ @param X a sparse (dgC) matrix.
 //’ @param j1_ind integer vector containing row indices of nonzero elements in X'QX.
 //’ @param j2_ind integer vector containing column indices of nonzero elements in X'QX.
-//’ @return An integer vector containing the number of non-zeros per column of a
+//’ @returns An integer vector containing the number of non-zeros per column of a
 //’  sparse template matrix for fast updating of the weighted symmetric crossproduct
 //’  of X.
 // [[Rcpp::export(rng=false)]]
@@ -721,7 +721,7 @@ Eigen::VectorXi Cnnz_per_col_scps_template(
 //’ @param j2_ind integer vector containing column indices of nonzero elements in X'QX.
 //’ @param nnz_per_col integer vector containing the number of non-zeros per column
 //’  of the sparse template matrix.
-//’ @return A sparse matrix containing the nonzero products of columns of X.
+//’ @returns A sparse matrix containing the nonzero products of columns of X.
 // [[Rcpp::export(rng=false)]]
 Eigen::SparseMatrix<double> Ccreate_sparse_crossprod_sym_template(
     const Eigen::MappedSparseMatrix<double> & X,

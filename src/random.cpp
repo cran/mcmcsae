@@ -17,7 +17,7 @@ static const double EPS = 10.0 * std::numeric_limits<double>::epsilon();
 //’ @param m integer scalar or vector of size n specifying the number of explicit gamma draws
 //’  used in the approximation. A -1 value indicates that a normal moment matching approximation
 //’  is to be used. For a value less than -1 a default choice for the approximation will be used.
-//’ @return A vector of size n with (approximate) Polya-Gamma draws.
+//’ @returns A vector of size n with (approximate) Polya-Gamma draws.
 // [[Rcpp::export(rng=true)]]
 NumericVector CrPGapprox(const int n, const NumericVector & b, const NumericVector & z, const IntegerVector & m) {
   double bi, hzi, th, mu, Sigma, dninv, rgs;
@@ -91,7 +91,7 @@ NumericVector CrPGapprox(const int n, const NumericVector & b, const NumericVect
 //’ @param n the size of the vector.
 //’ @param mean scalar mean.
 //’ @param sd scalar standard deviation.
-//’ @return A vector of size n with draws from a normal distribution.
+//’ @returns A vector of size n with draws from a normal distribution.
 // [[Rcpp::export(rng=true)]]
 NumericVector Crnorm(const int n, const double mean = 0, const double sd = 1) {
   return rnorm(n, mean, sd);
@@ -111,7 +111,7 @@ double do_rgig1(double lambda, double chi, double psi) {
 //’ @param p (vector of) shape parameters.
 //’ @param a (vector of) shape/scale parameters.
 //’ @param b (vector of) shape/scale parameters.
-//’ @return A vector of size n with draws from a GiG distribution.
+//’ @returns A vector of size n with draws from a GiG distribution.
 // [[Rcpp::export(rng=true)]]
 NumericVector Crgig(const int n, const NumericVector & p, const NumericVector & a, const NumericVector & b) {
   NumericVector out = no_init(n);
@@ -153,12 +153,12 @@ NumericVector Crgig(const int n, const NumericVector & p, const NumericVector & 
 // Used in a Gibbs sampler for negative binomial model with modeled dispersion parameter.
 // The approximation is based on Le Cam's theorem, i.e. the approximation of a convolution
 // of Bernoulli random variables by a Poisson distribution. The sampling is exact for all
-// values of \code{y} less than or equal to \code{2*m}. 
+// values of \code{y} less than or equal to \code{2*m}.
 //’
 //’ @param y data vector.
 //’ @param r dispersion parameter, can be scalar or vector.
 //’ @param m positive integer; larger values give more accuracy but slower performance.
-//’ @return A vector of (approximate) CRT variates.
+//’ @returns A vector of (approximate) CRT variates.
 // [[Rcpp::export(rng=true)]]
 IntegerVector CrCRT(const NumericVector & y, const NumericVector & r, const int m=20) {
   double prob, lambda;

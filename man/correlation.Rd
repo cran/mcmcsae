@@ -2,11 +2,66 @@
 % Please edit documentation in R/models.R
 \name{correlation}
 \alias{correlation}
-\title{Correlation structures}
+\alias{iid}
+\alias{RW1}
+\alias{RW2}
+\alias{AR1}
+\alias{season}
+\alias{spatial}
+\alias{spline}
+\alias{custom}
+\title{Correlation factor structures in generic model components}
+\usage{
+iid(name)
+
+RW1(name, circular = FALSE, w = NULL)
+
+RW2(name)
+
+AR1(name, phi, w = NULL)
+
+season(name, period)
+
+spatial(name, poly.df, snap = sqrt(.Machine$double.eps), queen = TRUE)
+
+spline(name, knots, degree)
+
+custom(name, D = NULL, Q = NULL, R = NULL, derive.constraints = NULL)
+}
+\arguments{
+\item{name}{name of a variable, unquoted.}
+
+\item{circular}{whether the random walk is circular.}
+
+\item{w}{a vector of weights.}
+
+\item{phi}{value of an autoregressive parameter.}
+
+\item{period}{a positive integer specifying the seasonal period.}
+
+\item{poly.df}{a spatial data frame.}
+
+\item{snap}{passed to \code{\link[spdep]{poly2nb}}.}
+
+\item{queen}{passed to \code{\link[spdep]{poly2nb}}.}
+
+\item{knots}{passed to \code{\link[splines]{splineDesign}}.}
+
+\item{degree}{passed to \code{\link[splines]{splineDesign}}.}
+
+\item{D}{custom incidence matrix.}
+
+\item{Q}{custom precision matrix.}
+
+\item{R}{custom restriction matrix.}
+
+\item{derive.constraints}{whether to derive the constraint matrix for an
+IGMRF model component numerically from the precision matrix.}
+}
 \description{
 Element 'factor' of a model component created using function
 \code{\link{gen}} is a formula composed of several possible terms described
-below. It is used to derive a (sparse) precision matrix for a set of
+below. It is used to derive a (typically sparse) precision matrix for a set of
 coefficients, and possibly a matrix representing a set of linear constraints
 to be imposed on the coefficient vector.
 \describe{

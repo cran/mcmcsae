@@ -5,11 +5,11 @@
 #' @param mean scalar or vector mean parameter.
 #' @param precision scalar, vector or matrix precision parameter.
 #' @param labels optional character vector with coefficient labels. If specified,
-#'  it should have the same size of at least one of \code{mean} and \code{precision},
+#'  it should have the same length as at least one of \code{mean} and \code{precision},
 #'  and in that case the normal prior with these parameters is assigned to these coefficients,
 #'  while any coefficients not present in labels will be assigned a non-informative
 #'  prior with mean 0 and precision 0.
-#' @return An environment representing the specified prior, for internal use.
+#' @returns An environment representing the specified prior, for internal use.
 # TODO allow to not implicitly include a factor of 1/sigma_^2 in precision for gaussian model
 #      including this factor only has a computational advantage in case of gaussian variance sigma^2 Sigma0, where Sigma0 is fixed
 pr_normal <- function(mean=0, precision=0, labels=NULL) {
@@ -43,11 +43,11 @@ pr_normal <- function(mean=0, precision=0, labels=NULL) {
       if (length(coefnames) != n) stop("'coefnames' must have length 'n'")
       m <- match(labels, coefnames)
       if (anyNA(m)) stop("non-matching labels: ", paste(labels[is.na(m)], collapse=", "))
-      temp <- rep.int(0, n)
+      temp <- numeric(n)
       temp[m] <- mean
       mean <<- temp
       if (is.vector(precision)) {
-        temp <- rep.int(0, n)
+        temp <- numeric(n)
         temp[m] <- precision
         precision <- Cdiag(temp)
       } else {
@@ -96,14 +96,14 @@ pr_normal <- function(mean=0, precision=0, labels=NULL) {
 #'  large \code{a} limit, when the distribution approaches a normal
 #'  distribution.
 #' @param labels optional character vector with coefficient labels. If specified,
-#'  it should have the same length of at least one of \code{mean} and \code{precision},
+#'  it should have the same length as at least one of \code{mean} and \code{precision},
 #'  and in that case the MLiG prior with these parameters is assigned to these coefficients,
 #'  while any coefficients not present in labels will be assigned a non-informative
 #'  prior with mean 0 and precision 0.
 #' @param a scalar parameter that controls how close the prior is to independent
 #'  normal priors with \code{mean} and \code{precision} parameters. The larger
 #'  this value (default is 1000), the closer.
-#' @return An environment representing the specified prior, for internal use.
+#' @returns An environment representing the specified prior, for internal use.
 #' @references
 #'  J.R. Bradley, S.H. Holan and C.K. Wikle (2018).
 #'    Computationally efficient multivariate spatio-temporal models for
@@ -125,10 +125,10 @@ pr_MLiG <- function(mean=0, precision=0, labels=NULL, a=1000) {
       if (all(length(precision) != c(1L, length(labels)))) stop("parameter 'precision' has wrong length")
       m <- match(labels, coefnames)
       if (anyNA(m)) stop("non-matching coefficient names: ", paste(labels[is.na(m)], collapse=", "))
-      temp <- rep.int(0, n)
+      temp <- numeric(n)
       temp[m] <- mean
       mean <<- temp
-      temp <- rep.int(0, n)
+      temp <- numeric(n)
       temp[m] <- precision
       precision <<- temp
     }
@@ -143,7 +143,7 @@ pr_MLiG <- function(mean=0, precision=0, labels=NULL, a=1000) {
 #'
 #' @export
 #' @param value scalar or vector value parameter.
-#' @return An environment representing the specified prior, for internal use.
+#' @returns An environment representing the specified prior, for internal use.
 pr_fixed <- function(value=1) {
   value <- as.numeric(value)
   n <- NULL
@@ -164,7 +164,7 @@ pr_fixed <- function(value=1) {
 #'
 #' @export
 #' @param scale scalar or vector scale parameter.
-#' @return An environment representing the specified prior, for internal use.
+#' @returns An environment representing the specified prior, for internal use.
 # TODO sample precision instead of variance parameters; the default value
 #      for p then leads to inverse Gaussian posterior, which may be faster
 #      to sample from
@@ -192,7 +192,7 @@ pr_exp <- function(scale=1) {
 #' @export
 #' @param shape scalar or vector shape parameter.
 #' @param rate scalar or vector rate, i.e. inverse scale, parameter.
-#' @return An environment representing the specified prior, for internal use.
+#' @returns An environment representing the specified prior, for internal use.
 # TODO pr_exp as special case
 pr_gamma <- function(shape=1, rate=1) {
   if (!all(shape > 0 & rate > 0)) stop("shape and rate parameters must be positive")
@@ -213,7 +213,7 @@ pr_gamma <- function(shape=1, rate=1) {
 #' @param a scalar or vector parameter.
 #' @param b scalar or vector parameter.
 #' @param p scalar or vector parameter.
-#' @return An environment representing the specified prior, for internal use.
+#' @returns An environment representing the specified prior, for internal use.
 pr_gig <- function(a, b, p) {
   if (any(a < 0)) stop("parameter 'a' must be nonnegative")
   if (any(b < 0)) stop("parameter 'b' must be nonnegative")
@@ -264,7 +264,7 @@ pr_gig <- function(a, b, p) {
 #'    \item{common}{whether the modeled scale parameter of the inverse chi-squared
 #'      distribution is (a scalar parameter) common to all \code{n} parameters.}
 #'  }
-#' @return An environment representing the specified prior, for internal use.
+#' @returns An environment representing the specified prior, for internal use.
 # TODO sample precisions instead of variances
 pr_invchisq <- function(df=1, scale=1) {
   if (is.character(df) && any(df == c("modeled", "modelled"))) df <- list()
@@ -372,7 +372,7 @@ pr_invchisq <- function(df=1, scale=1) {
 #'    \item{common}{whether the modeled scale parameter of the inverse chi-squared
 #'      distribution is (a scalar parameter) common to all \code{n} diagonal elements.}
 #'  }
-#' @return An environment representing the specified prior, for internal use.
+#' @returns An environment representing the specified prior, for internal use.
 #' @references
 #'  A. Huang and M.P. Wand (2013).
 #'    Simple marginally noninformative prior

@@ -7,7 +7,7 @@
 #' @param n.cores the number of cpu cores to use.
 #' @param seed optional random seed for reproducibility.
 #' @param export a character vector with names of objects to export to the workers.
-#' @return an object representing the cluster.
+#' @returns An object representing the cluster.
 setup_cluster <- function(n.cores=NULL, seed=NULL, export=NULL) {
   if (is.null(n.cores)) {
     n.cores <- max(1L, parallel::detectCores() - 1L)
@@ -31,7 +31,7 @@ setup_cluster <- function(n.cores=NULL, seed=NULL, export=NULL) {
 #'
 #' @export
 #' @param cl the cluster object.
-#' @return \code{NULL}.
+#' @returns \code{NULL}.
 stop_cluster <- function(cl) {
   parallel::stopCluster(cl)
 }
@@ -42,7 +42,7 @@ stop_cluster <- function(cl) {
 #'
 #' @export
 #' @param ... objects of class \code{mcdraws}.
-#' @return A combined object of class \code{mcdraws} where the number of stored
+#' @returns A combined object of class \code{mcdraws} where the number of stored
 #'  chains equals the sum of the numbers of chains in the input objects.
 combine_chains <- function(...) {
   dotargs <- list(...)
@@ -70,6 +70,11 @@ combine_chains <- function(...) {
     out[[v]] <- do.call("c", lapply(dotargs, `[[`, v))
     if (!is.null(attr(dotargs[[1L]][[v]], "labels"))) attr(out[[v]], "labels") <- attr(dotargs[[1L]][[v]], "labels")
     class(out[[v]]) <- "dc"
+  }
+  if (!is.null(dotargs[[1L]][["_info"]][["list.pars"]])) {
+    for (v in dotargs[[1L]][["_info"]][["list.pars"]]) {
+      out[[v]] <- do.call("c", lapply(dotargs, `[[`, v))
+    }
   }
   class(out) <- "mcdraws"
   out
@@ -139,7 +144,7 @@ split_chains <- function(obj, parts=NULL) {
 #'
 #' @export
 #' @param ... objects of class \code{mcdraws}
-#' @return A combined object of class \code{mcdraws} where the number of stored
+#' @returns A combined object of class \code{mcdraws} where the number of stored
 #'  draws equals the sum of the numbers of draws in the input objects.
 combine_iters <- function(...) {
   dotargs <- list(...)
@@ -223,6 +228,8 @@ split_iters <- function(obj, iters=NULL, parts=NULL) {
       out[[k]][["_model"]] <- obj[["_model"]]
       for (v in par_names(obj))
         out[[k]][[v]] <- get_from(obj[[v]], draws=its[[k]])
+      if (!is.null(obj[["_info"]][["list.pars"]]))
+        for (v in obj[["_info"]][["list.pars"]]) out[[k]][[v]] <- lapply(obj[[v]], function(x) x[its[[k]]])
     } else {
       out[[k]] <- get_from(obj, draws=its[[k]])
     }

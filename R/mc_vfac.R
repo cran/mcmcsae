@@ -19,7 +19,7 @@
 #'  term attached.
 #' @param debug If \code{TRUE} a breakpoint is set at the beginning of the posterior
 #'  draw function associated with this model component. Mainly intended for developers.
-#' @return An object with precomputed quantities and functions for sampling from
+#' @returns An object with precomputed quantities and functions for sampling from
 #'  prior or conditional posterior distributions for this model component. Intended
 #'  for internal use by other package functions.
 # TODO generalize inverse chi-squared (including beta-prime) and exponential priors to generalized hyperbolic
@@ -33,12 +33,12 @@ vfac <- function(factor="local_",
 
   switch(factor,
     local_ = {
-      X <- CdiagU(e$n)
+      X <- CdiagU(e[["n"]])
       nh <- 1
     },
     global_ = {
-      X <- aggrMatrix(rep.int(1L, e$n))
-      nh <- e$n
+      X <- aggrMatrix(rep.int(1L, e[["n"]]))
+      nh <- e[["n"]]
     },
     {
       X <- aggrMatrix(e$data[[factor]])
@@ -144,7 +144,7 @@ vfac <- function(factor="local_",
         # create list with blocks of Q0 corresponding to the subdivision by factor
         Q0.list <- list()
         X.ind <- list()
-        fac <- rep.int(0, q)
+        fac <- numeric(q)
         for (i in seq_len(q)) {
           X.ind[[i]] <- which(X@perm == i - 1L)  # NB tabMatrix 0-based
           Q0.list[[i]] <- e$Q0[X.ind[[i]], X.ind[[i]]]

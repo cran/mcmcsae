@@ -89,7 +89,7 @@
 #'  with the number of the model term attached.
 #' @param debug if \code{TRUE} a breakpoint is set at the beginning of the posterior
 #'  draw function associated with this model component. Mainly intended for developers.
-#' @return an object with precomputed quantities and functions for sampling from
+#' @returns An object with precomputed quantities and functions for sampling from
 #'  prior or conditional posterior distributions for this model component. Intended
 #'  for internal use by other package functions.
 #' @references
@@ -133,7 +133,7 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
   } else {
     V.in.formula <- FALSE
   }
-  if (nrow(X) != e$n) stop("design matrix with incompatible number of rows")
+  if (nrow(X) != e[["n"]]) stop("design matrix with incompatible number of rows")
   e$coef.names[[name]] <- colnames(X)
   X <- unname(X)
   q <- ncol(X)
@@ -145,7 +145,7 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
       if (q != 1L) stop("'V' should be a matrix")
       V <- matrix(V, ncol=1L)
     }
-    if (nrow(V) != e$n || ncol(V) != q) stop("wrong size of variance matrix 'V'")
+    if (nrow(V) != e[["n"]] || ncol(V) != q) stop("wrong size of variance matrix 'V'")
     # TODO allow n x q matrix (uncorrelated measurement errors), or list of n q x q symmetric matrices
   }
   # determine units with measurement error
@@ -153,7 +153,7 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
   if (any(V < 0)) stop("negative measurement error variance(s)")
   i.me <- which(apply(V, 1L, function(x) all(x > 0)))  # TODO add tolerance + allow list of matrix
   nme <- length(i.me)
-  if (nme == e$n) i.me <- 1:e$n  # use ALTREP (?)
+  if (nme == e[["n"]]) i.me <- 1:e[["n"]]  # use ALTREP (?)
   if (q == 1L) {
     QME <- 1 / V[i.me, ]
     rm(V)
@@ -226,7 +226,7 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
 
   rprior <- function(p) {}
   # X, QME are assumed to be part of the prior information
-  if (nme == e$n)
+  if (nme == e[["n"]])
     rprior <- add(rprior, bquote(p[[.(name_X)]] <- X + sqrt(.(if (q == 1L) quote(1/QME) else quote(V))) * Crnorm(.(length(QME)))))
   else {
     rprior <- rprior |>
@@ -257,7 +257,7 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
     draw <- add(draw, bquote(scale <- .(if (e$sigma.fixed) quote(v0) else quote(v0 * p[["sigma_"]]^2))))
     if (q == 1L) {
       draw <- add(draw, bquote(Vscaled <- 1 / (QME * scale + p[[.(name)]]^2)))
-      if (nme == e$n) {
+      if (nme == e[["n"]]) {
         draw <- add(draw, bquote(p[[.(name_X)]] <- X + Vscaled * p[[.(name)]] * (p[["e_"]] - p[[.(name)]] * X) + sqrt(scale * Vscaled) * Crnorm(.(nme))))
       } else {
         draw <- add(draw, bquote(p[[.(name_X)]][i.me] <- X[i.me] + Vscaled * p[[.(name)]] * (p[["e_"]][i.me] - p[[.(name)]] * X[i.me]) + sqrt(scale * Vscaled) * Crnorm(.(nme))))
@@ -300,15 +300,15 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
       if (informative.prior) {
         # TODO instead of runif(n, ...) account for the structure in Qmod; lambda may not vary per unit!
         # TODO here we need M1 to be dense without zeros
-        mat_sum <- make_mat_sum(M0=Q0, M1=crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e$n, 0.9, 1.1)), e$Q0)))
+        mat_sum <- make_mat_sum(M0=Q0, M1=crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e[["n"]], 0.9, 1.1)), e$Q0)))
         MVNsampler <- create_TMVN_sampler(
-          Q=mat_sum(crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e$n, 0.9, 1.1)), e$Q0))),
+          Q=mat_sum(crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e[["n"]], 0.9, 1.1)), e$Q0))),
           update.Q=TRUE, name=name, R=R, r=r, S=S, s=s, lower=lower, upper=upper
         )
         draw <- add(draw, bquote(p[[.(name)]] <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])), Q=mat_sum(XX), Xy=Xy)[[.(name)]]))
       } else {
         MVNsampler <- create_TMVN_sampler(
-          Q=crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e$n, 0.9, 1.1)), e$Q0)),
+          Q=crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e[["n"]], 0.9, 1.1)), e$Q0)),
           update.Q=TRUE, name=name, R=R, r=r, S=S, s=s, lower=lower, upper=upper
         )
         draw <- add(draw, bquote(p[[.(name)]] <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])), Q=XX, Xy=Xy)[[.(name)]]))

@@ -14,7 +14,7 @@ setup_cluster(n.cores = NULL, seed = NULL, export = NULL)
 \item{export}{a character vector with names of objects to export to the workers.}
 }
 \value{
-an object representing the cluster.
+An object representing the cluster.
 }
 \description{
 The cluster is set up for a number of workers by loading the \pkg{mcmcsae}

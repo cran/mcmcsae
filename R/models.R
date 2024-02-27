@@ -1,8 +1,11 @@
+
+.mod.specials <- c("reg", "gen", "mec", "brt", "vreg", "vfac")
+
 #' Check names of model components
 #' 
 #' @noRd
 #' @param x vector of names of model components.
-#' @return \code{TRUE} if all names are OK; throws an error otherwise.
+#' @returns \code{TRUE} if all names are OK; throws an error otherwise.
 check_mod_names <- function(x) {
   if (any(startsWith(x, "_")) || any(endsWith(x, "_"))) stop("\'_\' as first or last character of a model component name is reserved for internal use")
   # check for names ending with extensions like _sigma, _rho, _xi etc since they might clash
@@ -38,11 +41,11 @@ check_mod_names <- function(x) {
 #' @param formula model formula.
 #' @param data data frame to be used in deriving the design matrices.
 #' @param labels if \code{TRUE}, column names are assigned.
-#' @return A list of design matrices.
+#' @returns A list of design matrices.
 computeDesignMatrix <- function(formula=NULL, data=NULL, labels=TRUE) {
   if (!inherits(formula, "formula")) stop("'formula' must be a formula")
   formula <- standardize_formula(formula, data=data)
-  out <- to_mclist(formula, c("gen", "mec", "reg", "bart", "vreg", "vfac"))
+  out <- to_mclist(formula)
   for (m in seq_along(out)) {
     out[[m]] <- match.call(eval(out[[m]][[1L]]), out[[m]])
     mc <- as.list(out[[m]])[-1L]
@@ -81,7 +84,7 @@ computeDesignMatrix <- function(formula=NULL, data=NULL, labels=TRUE) {
 #' @param drop.empty.levels whether to remove factor levels without observations.
 #' @param sparse whether the design matrix based on \code{formula} alone should be in a sparse matrix format.
 #' @param data data frame to be used in deriving the design matrix.
-#' @return A design matrix including column names.
+#' @returns A design matrix including column names.
 compute_X <- function(formula=~1, factor=NULL,
                       remove.redundant=TRUE, drop.empty.levels=FALSE,
                       sparse=NULL, data=NULL) {
@@ -123,11 +126,7 @@ combine_X0_XA <- function(X0, XA) {
     )
   } else {
     # use Matrix::KhatriRao as it is more memory-efficient
-    if (isUnitDiag(XA)) XA <- expandUnitDiag(XA)  # KhatriRao currently fails for unit-ddiMatrix
-    if (isUnitDiag(X0)) X0 <- expandUnitDiag(X0)
     out <- t(KhatriRao(t(XA), t(X0)))  # a dgCMatrix
-    attr(out@i, "names") <- NULL  # KhatriRao result somehow has names on i and x slots
-    attr(out@x, "names") <- NULL
   }
   if (q0 > 1L) {
     if (ncol(XA) * q0 > 1e6L) {
@@ -216,11 +215,14 @@ eval_in <- function(text, data, enclos=.GlobalEnv) {
   if (is.environment(data)) {
     # if data is not a (pair)list/data.frame enclos is not searched, so do it manually if needed
     tryCatch(
-      eval(substitute(evalq(expr, data, enclos), list(expr=str2lang_(text)))),
-      error = function(e) eval(substitute(evalq(expr, enclos), list(expr=str2lang_(text))))
+      eval(substitute(evalq(expr, data, enclos), list(expr=str2lang(text)))),
+      error = function(e) eval(substitute(evalq(expr, enclos), list(expr=str2lang(text))))
     )
-  } else
-    eval(substitute(evalq(expr, data, enclos), list(expr=str2lang_(text))))
+  } else if (is.integer(data) && length(data) == 1L) {
+    eval(substitute(evalq(expr, NULL, enclos), list(expr=str2lang(text))))
+  } else {
+    eval(substitute(evalq(expr, data, enclos), list(expr=str2lang(text))))
+  }
 }
 
 #' Compute (I)GMRF incidence, precision and restriction matrices corresponding to a generic model component
@@ -255,7 +257,7 @@ eval_in <- function(text, data, enclos=.GlobalEnv) {
 #' @param n.parent for internal use; in case of custom factor, the number of frames up
 #'   the calling stack in which to evaluate any custom matrices
 #' @param ... further arguments passed to \code{economizeMatrix}.
-#' @return A list containing some or all of the components \code{D} (incidence matrix),
+#' @returns A list containing some or all of the components \code{D} (incidence matrix),
 #'  \code{Q} (precision matrix) and \code{R} (restriction matrix).
 compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2remove=NULL,
                                   remove.redundant.R.cols=TRUE, enclos=.GlobalEnv, n.parent=1L, ...) {
@@ -418,11 +420,12 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
 # functions to compute sparse precision matrices Q_, incidence matrices D_
 #   and for IGMRFs associated constraint matrices R_
 
-#' Correlation structures
+
+#' Correlation factor structures in generic model components
 #'
 #' Element 'factor' of a model component created using function
 #' \code{\link{gen}} is a formula composed of several possible terms described
-#' below. It is used to derive a (sparse) precision matrix for a set of
+#' below. It is used to derive a (typically sparse) precision matrix for a set of
 #' coefficients, and possibly a matrix representing a set of linear constraints
 #' to be imposed on the coefficient vector.
 #' \describe{
@@ -490,6 +493,22 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
 #' }
 #' }
 #'
+#' @param name name of a variable, unquoted.
+#' @param circular whether the random walk is circular.
+#' @param w a vector of weights.
+#' @param phi value of an autoregressive parameter.
+#' @param period a positive integer specifying the seasonal period.
+#' @param poly.df a spatial data frame.
+#' @param snap passed to \code{\link[spdep]{poly2nb}}.
+#' @param queen passed to \code{\link[spdep]{poly2nb}}.
+#' @param derive.constraints whether to derive the constraint matrix for an
+#'  IGMRF model component numerically from the precision matrix.
+#' @param knots passed to \code{\link[splines]{splineDesign}}.
+#' @param degree passed to \code{\link[splines]{splineDesign}}.
+#' @param D custom incidence matrix.
+#' @param Q custom precision matrix.
+#' @param R custom restriction matrix.
+#'
 #' @name correlation
 #' @references
 #'  B. Allevius (2018).
@@ -500,6 +519,39 @@ compute_GMRF_matrices <- function(factor, data, D=TRUE, Q=TRUE, R=TRUE, cols2rem
 #'    Gaussian Markov Random Fields.
 #'    Chapman & Hall/CRC.
 NULL
+
+#' @export
+#' @rdname correlation
+iid <- function(name) stop("this function is not intended to be called")
+
+#' @export
+#' @rdname correlation
+RW1 <- function(name, circular=FALSE, w=NULL) stop("this function is not intended to be called")
+
+#' @export
+#' @rdname correlation
+RW2 <- function(name) stop("this function is not intended to be called")
+
+#' @export
+#' @rdname correlation
+AR1 <- function(name, phi, w=NULL) stop("this function is not intended to be called")
+
+#' @export
+#' @rdname correlation
+season <- function(name, period) stop("this function is not intended to be called")
+
+#' @export
+#' @rdname correlation
+spatial <- function(name, poly.df, snap=sqrt(.Machine$double.eps), queen=TRUE) stop("this function is not intended to be called")
+
+#' @export
+#' @rdname correlation
+spline <- function(name, knots, degree) stop("this function is not intended to be called")
+
+#' @export
+#' @rdname correlation
+custom <- function(name, D=NULL, Q=NULL, R=NULL, derive.constraints=NULL) stop("this function is not intended to be called")
+
 
 D_iid <- Q_iid <- function(n) CdiagU(n)
 
@@ -514,7 +566,7 @@ Q_AR1 <- function(n, phi, w=NULL) {
     if (any(w <= 0) || length(w) != n-1L) stop("w must be a positive vector of length n-1")
     phi2 <- phi^2
     iw <- 1/w
-    d0 <- vector("numeric", n)
+    d0 <- numeric(n)
     d0[1L] <- (1 - phi2) / (1 - phi2^iw[1L])
     d0[2:(n-1L)] <- (1 - phi2)*(1 - phi2^(iw[1:(n-2L)] + iw[2:(n-1L)])) / ((1 - phi2^iw[1:(n-2L)])*(1 - phi2^iw[2:(n-1L)]))
     d0[n] <- (1 - phi2) / (1 - phi2^iw[n-1L])
@@ -596,25 +648,19 @@ R_RW2 <- function(n) {
 }
 
 Q_season <- function(n, period) {
-  # TODO: check whether this works correctly if the length of the sequence is not a multiple of the period
-  if (n < 2L * (period - 1L)) stop(paste("Seasonal component with period", period, "needs a sequence of at least", 2L * (period - 1L), "periods"))
-  # create list of bands of sparse precision matrix for Seasonal(nP) component
+  if (n < 2L * period) stop(paste("Seasonal component with period", period, "needs a sequence of at least", 2L * period, "periods"))
   band_list <- list()
-  for (b in seq_len(period)) {
-    band_list <- c(band_list, list(c(seq_len(period - b + 1L), rep.int(period - (b - 1), n - 2L * period + b - 1L), (period - b + 1L):1L)))
-  }
+  for (b in seq_len(period))
+    band_list <- c(band_list, list(c(seq_len(period - b + 1L), rep.int(period - b + 1L, n - 2L * period + b - 1L), (period - b + 1L):1L)))
   bandSparse(n, n, 0:(period - 1L), band_list, symmetric=TRUE)
 }
 
 D_season <- function(n, period) {
-  # TODO: check whether this works correctly if the length of the sequence is not a multiple of the period
-  if (n < 2L * (period - 1L)) stop(paste("Seasonal component with period", period, "needs a sequence of at least", 2L * (period - 1L), "periods"))
-  # create list of bands of sparse precision matrix for Seasonal(nP) component
+  if (n < 2L * period) stop(paste("Seasonal component with period", period, "needs a sequence of at least", 2L * period, "periods"))
   band_list <- list()
-  for (b in seq_len(period)) {
-    band_list <- c(band_list, list(rep.int(1, n - (period - 1L))))
-  }
-  bandSparse(n - (period - 1L), n, 0:(period - 1L), band_list)
+  for (b in seq_len(period))
+    band_list <- c(band_list, list(rep.int(1, n - period + 1L)))
+  bandSparse(n - period + 1L, n, 0:(period - 1L), band_list)
 }
 
 R_season <- function(n, period) {
@@ -702,7 +748,7 @@ nb2D <- function(nb) {
 #' @noRd
 #' @param Q l x l precision matrix.
 #' @param tol tolerance in regarding a small eigenvalue to be zero.
-#' @return l x r Matrix with r the number of singular values.
+#' @returns An l x r Matrix with r the number of singular values.
 derive_constraints <- function(Q, tol=.Machine$double.eps^0.5) {
   test <- eigen(Q)
   zeros <- which(test$values < tol)
@@ -716,7 +762,7 @@ derive_constraints <- function(Q, tol=.Machine$double.eps^0.5) {
 is_proper_GMRF <- function(mc) {
   if (is.null(mc$factor)) return(TRUE)
   Qtypes <- sapply(attr(terms(mc$factor), "variables")[-1L], function(x) if (is.symbol(x)) "iid" else as.character(x[[1L]]))
-  (mc$type == "reg") || (mc$Leroux_type != "none") || all(Qtypes %in% c("iid", "AR1"))
+  (mc[["type"]] == "reg") || (mc$Leroux_type != "none") || all(Qtypes %in% c("iid", "AR1"))
 }
 
 # fast GMRF prior not possible for spatial as typically n_edges > n_vertices
@@ -761,7 +807,7 @@ allow_fastGMRFprior <- function(mc) {
 #' @param method optimization method, passed to \code{\link[stats]{optim}}.
 #' @param control control parameters, passed to \code{\link[stats]{optim}}.
 #' @param ... other parameters passed to \code{\link[stats]{optim}}.
-#' @return A list of parameter values that, provided the optimization was successful, maximize the (log-)likelihood
+#' @returns A list of parameter values that, provided the optimization was successful, maximize the (log-)likelihood
 #'  or (log-)posterior.
 maximize_log_lh_p <- function(sampler, type=c("llh", "lpost"), method="BFGS", control=list(fnscale=-1), ...) {
   type <- match.arg(type)
@@ -786,7 +832,7 @@ make_logposterior_opt <- function(sampler) {
   log_prior <- function(p) {out <- 0}
   for (k in seq_along(sampler$mod)) {
     mc <- sampler$mod[[k]]
-    switch(mc$type,
+    switch(mc[["type"]],
       reg = {
         mc$prior$setup_logprior(mc$name)
         log_prior <- add(log_prior, bquote(out <- out + mod[[.(k)]]$prior$logprior(p)))

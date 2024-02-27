@@ -79,7 +79,7 @@ Each named parameter is written to a separate file, named \code{filename_paramet
 
 \item{verbose}{if \code{FALSE} no output is sent to the screen during the simulation. \code{TRUE} by default.}
 
-\item{n.progress}{print iteration number and diagnostics and update plots after so many iterations.}
+\item{n.progress}{update diagnostics and plots after so many iterations.}
 
 \item{trace.convergence}{vector of names of parameters for which Gelman-Rubin R-hat diagnostics are printed to the screen every \code{n.progress} iterations.}
 
@@ -98,7 +98,7 @@ otherwise a new plot (with new scales) is created after every \code{n.progress} 
 
 \item{plot.type}{default is "l" (lines).}
 
-\item{n.cores}{the number of cpu cores to use. Default is one, i.e. no parallel computation.
+\item{n.cores}{the number of cpu cores to use. Default is 1, i.e. no parallel computation.
 If an existing cluster \code{cl} is provided, \code{n.cores} will be set to the number
 of workers in that cluster.}
 

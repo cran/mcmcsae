@@ -11,7 +11,12 @@ SBC_test(
   n.sim = 20L * n.draws,
   burnin = 25L,
   thin = 2L,
-  show.progress = TRUE
+  show.progress = TRUE,
+  verbose = TRUE,
+  n.cores = 1L,
+  cl = NULL,
+  seed = NULL,
+  export = NULL
 )
 }
 \arguments{
@@ -27,6 +32,23 @@ is passed to argument \code{pred} of \code{\link{MCMCsim}}.}
 \item{burnin}{burnin to use in posterior simulations, passed to \code{\link{MCMCsim}}.}
 
 \item{thin}{thinning to use in posterior simulations, passed to \code{\link{MCMCsim}}.}
+
+\item{show.progress}{whether a progress bar should be shown.}
+
+\item{verbose}{set to \code{FALSE} to suppress messages.}
+
+\item{n.cores}{the number of cpu cores to use. Default is one, i.e. no parallel computation.
+If an existing cluster \code{cl} is provided, \code{n.cores} will be set to the number
+of workers in that cluster.}
+
+\item{cl}{an existing cluster can be passed for parallel computation. If \code{NULL} and
+\code{n.cores > 1}, a new cluster is created.}
+
+\item{seed}{a random seed (integer). For parallel computation it is used to independently
+seed RNG streams for all workers.}
+
+\item{export}{a character vector with names of objects to export to the workers. This may
+be needed for parallel execution if expressions in the model formulae depend on global variables.}
 }
 \value{
 A matrix with ranks.
@@ -36,20 +58,22 @@ Simulation based calibration
 }
 \examples{
 \dontrun{
-# this example takes a long time
-n <- 10L  # data size
+# this example may take a long time
+n <- 10L
 dat <- data.frame(x=runif(n))
-SBC_test(~ reg(~ 1 + x, prior=pr_normal(mean=c(0.25, 1), precision=1), name="beta"),
+ranks <- SBC_test(~ reg(~ 1 + x, prior=pr_normal(mean=c(0.25, 1), precision=1), name="beta"),
   sigma.mod=pr_invchisq(df=1, scale=list(df=1, scale=1)), data=dat,
   pars=list(mu="beta[1]", beta_x="beta[2]", sigma="sigma_"),
-  n.draws=25L, n.sim=100L*25L, thin=3L, burnin=50L
+  n.draws=9L, n.sim=10L*20L, thin=2L, burnin=20L
 )
+ranks
 }
 
 }
 \references{
-S. Talts, M. Betancourt, D. Simpson, A. Vehtari and A. Gelman (2018).
-    Validating Bayesian inference algorithms with simulation-based calibration.
-    arXiv:1804.06788.
+M. Modrak, A.H. Moon, S. Kim, P. Buerkner, N. Huurre, K. Faltejskova,
+    A. Gelman and A. Vehtari (2023).
+    Simulation-based calibration checking for Bayesian computation:
+    The choice of test quantities shapes sensitivity.
+    Bayesian Analysis, 1(1), 1-28.
 }
-\keyword{internal}

@@ -28,7 +28,7 @@
 \item{drop}{whether to return a vector in case of a single selected row or column.}
 }
 \value{
-the selected rows/columns as a tabMatrix or a vector.
+The selected rows/columns as a tabMatrix or a vector.
 }
 \description{
 S4 method for row and column subsetting a 'tabMatrix'

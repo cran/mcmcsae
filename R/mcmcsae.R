@@ -18,7 +18,6 @@
 #'
 #' @name mcmcsae-package
 #' @aliases mcmcsae
-#' @docType package
 NULL
 
 #' @importFrom Rcpp evalCpp

@@ -5,7 +5,7 @@
 #' @param xy numeric vector, defaults to 0. The mean of the multivariate
 #'           normal distribution is computed as Q^{-1} xy.
 #' @param sd scalar standard deviation factor passed to \code{rnorm}.
-#' @return A draw from the multivariate normal distribution N(Q^{-1} xy, sd^2 Q^{-1}).
+#' @returns A draw from the multivariate normal distribution N(Q^{-1} xy, sd^2 Q^{-1}).
 drawMVN_cholQ <- function(ch, xy=NULL, sd=1) {
   z <- Crnorm(ch$size, sd=sd)  # NB sd must be scalar in Crnorm
   if (is.null(xy))
@@ -55,7 +55,7 @@ draw_betaprime <- function(n, a, b, q=1) {
 #' @param n vector of numbers of trials.
 #' @param y vector of numbers of successes.
 #' @param log whether to compute the log binomial coefficient (default).
-#' @return Vector of binomial coefficients 'n over y'.
+#' @returns Vector of binomial coefficients 'n over y'.
 binomial_coef <- function(n, y, log=TRUE) {
   bc <- lgamma(n + 1) - lgamma(y + 1) - lgamma(n - y + 1)
   if (log) bc else exp(bc)
@@ -67,7 +67,7 @@ binomial_coef <- function(n, y, log=TRUE) {
 #' @param r vector of dispersion parameters.
 #' @param y vector of numbers of successes.
 #' @param log whether to compute the log binomial coefficient (default).
-#' @return Vector of negative binomial coefficients 'y+r-1 over y'.
+#' @returns Vector of negative binomial coefficients 'y+r-1 over y'.
 negbinomial_coef <- function(r, y, log=TRUE) {
   bc <- lgamma(y + r) - lgamma(y + 1) - lgamma(r)
   if (log) bc else exp(bc)
@@ -81,7 +81,7 @@ negbinomial_coef <- function(r, y, log=TRUE) {
 #' @param kappa another (vector) parameter.
 #' @param log.kappa logarithm of \code{kappa}. This can be specified instead of
 #'  \code{kappa} if numerical computation of the latter would overflow.
-#' @return a draw from the MLiG distribution.
+#' @returns A draw from the MLiG distribution.
 rMLiG <- function(m, alpha, kappa, log.kappa) {
   if (missing(kappa)) {
     # version where log.kappa is specified; useful in case kappa overflows

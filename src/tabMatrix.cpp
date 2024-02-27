@@ -11,7 +11,7 @@ using namespace Rcpp;
 //’  non-zero entry per row.
 //’ @param num whether the non-zeros can be different from 1.
 //’ @param x in case num is true, the numeric vector of nonzero values.
-//’ @return A matrix of class \code{tabMatrix}.
+//’ @returns A matrix of class \code{tabMatrix}.
 // [[Rcpp::export(rng=false)]]
 SEXP Ctab(const IntegerVector & Dim, const bool reduced, const IntegerVector & perm, const bool num, const NumericVector & x) {
   if (reduced && num) stop("'reduced' and 'num' should not both be true");
@@ -29,7 +29,7 @@ SEXP Ctab(const IntegerVector & Dim, const bool reduced, const IntegerVector & p
 //’ @param A a tabMatrix.
 //’ @param y a numeric vector.
 //’ @param ignore_x whether to use only the indicator part of the tabMatrix (for expansion).
-//’ @return The vector \code{Ay}.
+//’ @returns The vector \code{Ay}.
 // [[Rcpp::export(rng=false)]]
 NumericVector Ctab_numeric_prod(const SEXP A, const NumericVector & y, const bool ignore_x = false) {
   if (!Rf_isS4(A) || !Rf_inherits(A, "tabMatrix")) stop("A is not a tabMatrix");
@@ -61,7 +61,7 @@ NumericVector Ctab_numeric_prod(const SEXP A, const NumericVector & y, const boo
 //’
 //’ @param A a tabMatrix.
 //’ @param y a matrix.
-//’ @return The matrix product \code{Ay}.
+//’ @returns The matrix product \code{Ay}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Ctab_dense_prod(const SEXP A, const Eigen::Map<Eigen::MatrixXd> & y) {
   if (!Rf_isS4(A) || !Rf_inherits(A, "tabMatrix")) stop("A is not a tabMatrix");
@@ -97,7 +97,7 @@ Eigen::MatrixXd Ctab_dense_prod(const SEXP A, const Eigen::Map<Eigen::MatrixXd> 
 //’
 //’ @param y a matrix.
 //’ @param A a tabMatrix.
-//’ @return The matrix product \code{yA'}.
+//’ @returns The matrix product \code{yA'}.
 // [[Rcpp::export(rng=false)]]
 Eigen::MatrixXd Cdense_tab_tcrossprod(const Eigen::Map<Eigen::MatrixXd> & y, const SEXP A) {
   if (!Rf_isS4(A) || !Rf_inherits(A, "tabMatrix")) stop("A is not a tabMatrix");
@@ -133,7 +133,7 @@ Eigen::MatrixXd Cdense_tab_tcrossprod(const Eigen::Map<Eigen::MatrixXd> & y, con
 //’
 //’ @param A a tabMatrix.
 //’ @param y a numeric vector.
-//’ @return The vector \code{A'y}.
+//’ @returns The vector \code{A'y}.
 // [[Rcpp::export(rng=false)]]
 NumericVector Ctab_numeric_crossprod(const SEXP A, const NumericVector & y) {
   if (!Rf_isS4(A) || !Rf_inherits(A, "tabMatrix")) stop("A is not a tabMatrix");
@@ -167,7 +167,7 @@ NumericVector Ctab_numeric_crossprod(const SEXP A, const NumericVector & y) {
 //’
 //’ @param A a tabMatrix.
 //’ @param y a numeric matrix.
-//’ @return The vector \code{A'y}.
+//’ @returns The vector \code{A'y}.
 // [[Rcpp::export(rng=false)]]
 NumericMatrix Ctab_dense_crossprod(const SEXP A, const NumericMatrix & y) {
   if (!Rf_isS4(A) || !Rf_inherits(A, "tabMatrix")) stop("A is not a tabMatrix");
@@ -207,7 +207,7 @@ NumericMatrix Ctab_dense_crossprod(const SEXP A, const NumericMatrix & y) {
 //’ Values of unary crossprod of tabMatrix
 //’
 //’ @param A a tabMatrix.
-//’ @return The entries of the diagonal matrix representing the unary cross-product of A.
+//’ @returns The entries of the diagonal matrix representing the unary cross-product of A.
 // [[Rcpp::export(rng=false)]]
 NumericVector Ctab_unary_crossprod(const SEXP A) {
   if (!Rf_isS4(A) || !Rf_inherits(A, "tabMatrix")) stop("A is not a tabMatrix");
@@ -239,7 +239,7 @@ NumericVector Ctab_unary_crossprod(const SEXP A) {
 //’ Coerce a \code{tabMatrix} to a \code{dgCMatrix}
 //’
 //’ @param M a \code{tabMatrix} object.
-//’ @return The same matrix as a \code{dgCMatrix}.
+//’ @returns The same matrix as a \code{dgCMatrix}.
 // [[Rcpp::export(rng=false)]]
 SEXP Ctab2dgC(const SEXP M) {
   if (!Rf_isS4(M) || !Rf_inherits(M, "tabMatrix")) stop("M is not a tabMatrix");
@@ -306,7 +306,7 @@ SEXP Ctab2dgC(const SEXP M) {
 //’ Coerce a \code{tabMatrix} to a \code{matrix}
 //’
 //’ @param M a \code{tabMatrix} object.
-//’ @return The same matrix as an ordinary dense matrix.
+//’ @returns The same matrix as an ordinary dense matrix.
 // [[Rcpp::export(rng=false)]]
 NumericMatrix Ctab2mat(const SEXP M) {
   if (!Rf_isS4(M) || !Rf_inherits(M, "tabMatrix")) stop("M is not a tabMatrix");

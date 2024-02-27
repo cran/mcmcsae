@@ -9,7 +9,7 @@
 #' The right hand side of the \code{formula} argument to \code{create_sampler} can be used to specify
 #' additive model components. Currently four model components are supported: \code{\link{reg}(...)}
 #' for regression or 'fixed' effects, \code{\link{gen}(...)} for generic random effects,
-#' \code{\link{mec}(...)} for measurement in covariates effects, and \code{\link{bart}(...)}
+#' \code{\link{mec}(...)} for measurement in covariates effects, and \code{\link{brt}(...)}
 #' for a Bayesian additive regression trees component. Note that an offset can be added
 #' separately, in the usual way using \code{\link{offset}(...)}.
 #'
@@ -42,16 +42,17 @@
 #'  An offset can be specified as \code{offset(...)}.
 #'  Other terms in the formula are collectively interpreted as ordinary regression effects,
 #'  treated in the same way as a \code{reg(...)} term, but without the option to change the prior.
-#' @param data data frame with n rows in which the variables specified in model components (if any) can be found.
+#' @param data data frame with n rows in which the variables specified in model components can be found.
 #' @param family character string describing the data distribution. The default is 'gaussian'.
-#'  Other options are 'binomial' for the binomial distribution, 'negbinomial' for the negative binomial distribution,
-#'  and "poisson" for the Poisson distribution. See \link{mcmcsae-family} for the
-#'  functional way of specifying \code{family} and associated settings.
+#'  Other options are 'binomial', 'multinomial', 'negbinomial' for the negative binomial distribution,
+#'  'poisson', and 'gamma'. See \link{mcmcsae-family} for the related functions
+#'  that can be used to specify \code{family} and associated parameters and controls.
 #'  For the binomial distribution logistic and probit link functions are supported, the latter only
-#'  for binary data. For the negative binomial and Poisson distributions a log link function is assumed.
-#'  Note that posterior inferences for \code{family = 'poisson'} are only approximate,
-#'  as they are implemented using the negative binomial distribution with its
-#'  (reciprocal) overdispersion parameter set to a very large value.
+#'  for binary data. For the negative binomial, Poisson and gamma sampling distributions
+#'  a log link function is assumed.
+#'  Note that currently \code{family = 'poisson'} is implemented using the negative
+#'  binomial distribution with its (reciprocal) overdispersion parameter set
+#'  to a very large value.
 #'  For categorical or multinomial data, \code{family = "multinomial"} can be used. The implementation
 #'  is based on a stick-breaking representation of the multinomial distribution, and the logistic link
 #'  function relates each category except the last to a linear predictor. The categories can be
@@ -115,7 +116,7 @@
 #'  distribution.
 #' @param control a list with further computational options. These options can
 #'  be specified using function \code{\link{sampler_control}}.
-#' @return A sampler object, which is the main input for the MCMC simulation
+#' @returns A sampler object, which is the main input for the MCMC simulation
 #'  function \code{\link{MCMCsim}}. The sampler object is an environment with
 #'  precomputed quantities and functions. The main functions are \code{rprior},
 #'  which returns a sample from the prior distributions, \code{draw},
@@ -160,29 +161,37 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
                            prior.only=FALSE,
                            control=sampler_control()) {
 
-  if (!is.null(data) & !inherits(data, "data.frame")) data <- as.data.frame(data)
+  if (!is.null(data) && !inherits(data, "data.frame")) data <- as.data.frame(data)
 
   if (is.character(family)) {
-    family <- match.arg(family, c("gaussian", "binomial", "negbinomial", "poisson", "multinomial", "gamma"))
+    family <- match.arg(family, c("gaussian", "binomial", "negbinomial", "poisson", "multinomial", "gamma", "Gamma", "gaussian_gamma"))
+    if (family == "Gamma") family <- "gamma"  # allow "Gamma" alias as used in stats
     family <- eval(call(paste0("f_", family)))
   }
-  if (family$family == "gamma") family$init(data)
+  if (any(family$family == c("gamma", "gaussian_gamma"))) family$init(data)
 
   if (missing(formula)) stop("a formula specifying response and linear predictor model components must be specified")
   if (!inherits(formula, "formula")) stop("'formula' must be a formula")
   formula <- standardize_formula(formula, data=data)  # pass data to interpret '.' in formula
+  mod <- to_mclist(formula)
+  if (!length(mod)) stop("empty 'formula'")
+  types <- get_types(mod)
+  if (any(types %in% c("vreg", "vfac"))) stop("'vreg' and 'vfac' can only be used in variance model specification")
+
+  control <- check_sampler_control(control)
+
   if (has_response(formula)) {
     y <- get_response(formula, data)
     if (family$family == "multinomial") {
       if (is.matrix(y)) {
         cats <- colnames(y)
+        if (is.null(cats)) cats <- as.character(seq_len(ncol(y)))
       } else {  # categorical/multinoulli
         if (is.numeric(y) && any(round(y) != y)) stop("respons variable does not seem to be multinomial")
         y <- as.factor(y)
         cats <- levels(y)
         y <- model_matrix(~ 0 + y, sparse=FALSE)
       }
-      if (is.null(cats)) cats <- as.character(seq_len(ncol(y)))
       if (is.null(family$K)) {
         family$K <- length(cats)
       } else {
@@ -232,13 +241,9 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
       n <- n * Km1
     }
   }
-
   if (n < 1L) stop("empty data")
 
-  mod <- to_mclist(formula)
-  if (!length(mod)) stop("empty 'formula'")
-
-  if (family$family == "gaussian") {
+  if (any(family$family == c("gaussian", "gaussian_gamma"))) {
     if (!is.null(ny)) warn("argument 'ny' ignored for family 'gaussian'")
     if (prior.only || n == 1L) {
       scale_e <- 1
@@ -277,7 +282,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
       if (!prior.only && any(y < 0)) stop("negative response value(s)")
     } else {  # negative binomial, Poisson or gamma likelihood
       if (!is.null(ny)) warn("argument 'ny' ignored for negative binomial, Poisson, or gamma family")
-      if (!prior.only && family$family %in% c("negbinomial", "poisson") && any(y < 0)) {
+      if (!prior.only && any(family$family == c("negbinomial", "poisson")) && any(y < 0)) {
         # NB the algorithm still runs with negative responses, but it probably makes no sense
         stop("negative response values")
       }
@@ -313,12 +318,12 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
           f_mean <- function(eta) ry * exp(eta)  # mean function acting on linear predictor
         }
       } else if (family$family == "poisson") {  # Poisson family; posterior inference approximated using negative binomial
-        if (!is.null(ry)) {
-          if (!is.numeric(ry) || length(ry) != 1L || is.na(ry) || ry <= 0) stop("'ry' must be a positive scalar")
-        } else {
+        if (is.null(ry)) {
           # choose a default value large enough for negligible overdispersion, but not so large
           #   that MCMC mixing becomes too slow
           ry <- 100
+        } else {
+          if (!is.numeric(ry) || length(ry) != 1L || is.na(ry) || ry <= 0) stop("'ry' must be a positive scalar")
         }
         if (!prior.only) ny <- y + ry  # used in Polya-Gamma full conditional
         f_mean <- function(eta) ry * exp(eta)  # mean function acting on linear predictor
@@ -369,12 +374,15 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
   # data-level variance model
   if (is.null(formula.V)) {
     Vmod <- NULL
-    if (family$family == "gaussian") modeled.Q <- FALSE
+    if (family$family == "gaussian") 
+      modeled.Q <- FALSE
+    else if (family$family == "gaussian_gamma")
+      stop("'gaussian_gamma' model requires specification of a variance model through the formula.V argument")
   } else {
     if (!inherits(formula.V, "formula")) stop("'formula.V' must be a formula")
-    formula.V <- standardize_formula(formula.V, c("vreg", "vfac", "reg", "gen"), "vreg", data=data)  # pass data to interpret '.'
+    formula.V <- standardize_formula(formula.V, "reg", data=data)  # pass data to interpret '.'
     # TODO deal with offset: divide Q0 by offset (and then set Q0.type)
-    Vmod <- to_mclist(formula.V, c("vreg", "vfac", "reg", "gen"), prefix="v")
+    Vmod <- to_mclist(formula.V, prefix="v")
     if (!length(Vmod)) stop("empty 'formula.V'")
     if (any(names(mod) %in% names(Vmod))) stop("names used in 'formula' and 'formula.V' should be unique")
     modeled.Q <- TRUE
@@ -409,46 +417,49 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
   # check Gibbs blocks
   if (!is.null(block)) {
     warn("'block' argument of create_sampler is deprecated; ",
-      "instead, please use argument 'control' to change settings for a blocked Gibbs sampler")
+      "instead, please use argument 'control' to specify the Gibbs sampling blocks; ",
+      "by default a maximal blocking strategy is used so that coefficients are sampled together whenever possible")
     control$block <- block
   }
   # check Gibbs blocks for mean model specification
-  types <- get_types(mod)
-  if (family$family == "gamma" && !all(types %in% c("reg", "gen"))) stop("only 'reg' and 'gen' components supported for gamma regression")
+  if (family$family == "gamma" && !all(types %in% c("reg", "gen"))) stop("only 'reg' and 'gen' components supported for family 'gamma'")
   if (is.logical(control$block)) {
     if (control$block) {
       # all components of type reg, gen and mec in a single block
-      block <- list(names(mod)[types != "bart"])
+      block <- list(names(mod)[types != "brt"])
       # single component by default not handled as a block, unless compute.weights is TRUE
       if (!length(block[[1L]]) || (length(block[[1L]]) == 1L && !compute.weights)) block <- list()
     } else
       block <- list()
   } else {
     block <- control$block
-    for (b in seq_along(block)) {
-      if (!all(block[[b]] %in% names(mod))) {
-        stop("invalid name(s) '", paste(setdiff(block[[b]], names(mod)), collapse="', '"), "' in 'block'")
-      }
-      if (any(types[block[[b]]] == "bart")) stop("'bart' component cannot be part of a Gibbs block")
-      if (length(block[[b]]) < 2L) warn("Gibbs block in 'block' with only one model component")
+    for (k in seq_along(block)) {
+      if (!all(block[[k]] %in% names(mod)))
+        stop("invalid name(s) '", paste(setdiff(block[[k]], names(mod)), collapse="', '"), "' in 'block'")
+      if (any(types[block[[k]]] == "brt")) stop("'brt' model component cannot be part of a Gibbs block")
+      if (length(block[[k]]) < 2L) warn("Gibbs block in 'block' with only one model component")
     }
     if (any(duplicated(unlist(block, use.names=FALSE)))) stop("duplicate model component name(s) in 'block'")
   }
   single.block <- any(length(mod) == c(1L, length(unlist(block, use.names=FALSE))))
 
   if (!prior.only) {
-    control <- check_sampler_control(control)
-    if (is.null(control$add.outer.R)) control$add.outer.R <- length(block) > 0L
-    # TODO allow to specify the block(s) in which the CG sampler should be used, or even different control$CG per block
-    if (is.list(control$CG) && !length(block))
-      warn("conjugate gradient algorithm currently only used inside blocks; see argument 'block'")
+    if (control$expanded.cMVN.sampler || !is.null(control$CG)) {
+      if (family$family == "gamma")
+        stop("conjugate gradients and 'expanded.cMVN.sampler' algorithms not supported for 'gamma' family")
+      if (!length(block)) {
+        warn("conjugate gradients and 'expanded.cMVN.sampler' algorithms currently only used for blocked Gibbs sampler")
+        control$expanded.cMVN.sampler <- FALSE
+        control$CG <- NULL
+      }
+    }
     if (single.block) {  # computation of working response may simplify
       control$recompute.e <- FALSE  # already computed in the coefficient sampling function
       y <- as.numeric(y)  # some C++ matrix algebra functions expect double
     }
 
     # function Q_e computes matrix-vector product of Q and working response e_
-    if (family$family == "gaussian") {
+    if (any(family$family == c("gaussian", "gaussian_gamma"))) {
       if (modeled.Q) {
         Q_e <- switch(Q0.type,
           unit=, diag = function(p) p[["Q_"]] * p[["e_"]],
@@ -462,7 +473,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
           symm = function(p) Q0 %m*v% p[["e_"]]
         )
       }
-    } else {  # binomial or negative binomial
+    } else if (family$family != "gamma") {
       # in this case Q0 is ignored
       if (family$link == "probit") {
         if (single.block && !use.offset)
@@ -485,11 +496,44 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
           Q_e <- function(p) y_shifted - p[["Q_"]] * p[["e_"]]
       }
     }
+    if (!is.null(control$CG) || control$expanded.cMVN.sampler) {
+      # set up a function that multiplies by L Chol factor of Q, for sampling from N(., Q)
+      if (any(family$family == c("gaussian", "gaussian_gamma"))) {
+        if (modeled.Q) {
+          cholQ <- switch(Q0.type,
+            unit=, diag = build_chol(runif(n, 0.9, 1.1)),
+            symm = build_chol(crossprod_sym(Cdiag(runif(0.9, 1.1)), Q0), control=control$chol.control)
+          )
+        } else {
+          cholQ <- switch(Q0.type,
+            unit = build_chol(Diagonal(n)),
+            diag = build_chol(Cdiag(Q0@x)),
+            symm = build_chol(Q0, control=control$chol.control)
+          )
+        }
+      } else {
+        if (family$link == "probit") {
+          cholQ <- build_chol(Diagonal(n))
+        } else {
+          cholQ <- build_chol(runif(n, 0.9, 1.1))
+        }
+      }
+      # draw from MVN with variance(!) Q
+      drawMVNvarQ <- function(p) {
+        y1 <- Crnorm(n)
+        if (modeled.Q) {
+          if (Q0.type == "symm")
+            cholQ$update(p[["QM_"]])
+          else
+            cholQ$update(p[["Q_"]])
+        }
+        cholQ$Ltimes(y1, transpose=FALSE)
+      }
+    }
   }  # END if (!prior.only)
 
   coef.names <- vector(mode="list", length(mod))
   names(coef.names) <- names(mod)
-  has_BART_component <- any(types == "bart")
   for (k in seq_along(mod)) {
     mc <- mod[[k]]
     mc$name <- names(mod)[k]
@@ -522,16 +566,17 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
   # rprior: function to draw parameters from their priors
   # start: function to create starting values (including for residuals/linear predictor e_)
   rprior <- function(p) {p <- list()}
-  if (family$family == "negbinomial" && modeled.r)
-    rprior <- add(rprior, quote(p[["negbin_r_"]] <- 1 / r.mod$rprior()))
-  else if (family$family == "gamma" && !family$alpha.fixed)
-    rprior <- add(rprior, quote(p[["gamma_shape_"]] <- family$prior$rprior()))
+  switch(family$family,
+    negbinomial = if (modeled.r) rprior <- add(rprior, quote(p[["negbin_r_"]] <- 1 / r.mod$rprior())),
+    gamma=, gaussian_gamma = if (!family$alpha.fixed) rprior <- add(rprior, quote(p[["gamma_shape_"]] <- family$shape.prior$rprior()))
+  )
 
   if (is.null(Vmod)) {
     block.V <- NULL
   } else {
     # check Gibbs blocks for variance model specification
-    types <- get_types(Vmod, c("vreg", "vfac", "reg", "gen"))
+    types <- get_types(Vmod)
+    if (any(types %in% c("mec", "brt"))) stop("'mec' and 'brt' can only be used in mean model specification")
     if (is.logical(control$block.V)) {
       if (control$block.V) {
         # all components of type reg and gen in a single block
@@ -542,12 +587,11 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
         block.V <- NULL
     } else {
       block.V <- control$block.V
-      for (b in seq_along(block.V)) {
-        if (!all(block.V[[b]] %in% names(Vmod))) {
-          stop("invalid name(s) '", paste(setdiff(block.V[[b]], names(Vmod)), collapse="', '"), "' in 'block.V'")
-        }
-        if (any(types[block.V[[b]]] %in% c("vreg", "vfac"))) stop("'vreg' and 'vfac' components cannot be part of a Gibbs block")
-        if (length(block[[b]]) < 2L) warn("Gibbs block in 'block' with only one model component")
+      for (k in seq_along(block.V)) {
+        if (!all(block.V[[k]] %in% names(Vmod)))
+          stop("invalid name(s) '", paste(setdiff(block.V[[k]], names(Vmod)), collapse="', '"), "' in 'block.V'")
+        if (any(types[block.V[[k]]] %in% c("vreg", "vfac"))) stop("'vreg' and 'vfac' components cannot be part of a Gibbs block")
+        if (length(block[[k]]) < 2L) warn("Gibbs block in 'block' with only one model component")
       }
       if (any(duplicated(unlist(block.V, use.names=FALSE)))) stop("duplicate model component name in 'block.V'")
     }
@@ -593,14 +637,14 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
 
   for (k in seq_along(mod)) {
     mc <- mod[[k]]
-    switch(mc$type,
+    switch(mc[["type"]],
       reg = rprior <- add(rprior, bquote(p[[.(mc$name)]] <- mod[[.(k)]]$rprior(p))),
       mec = rprior <- add(rprior, bquote(p <- mod[[.(k)]]$rprior(p))),
       gen = rprior <- add(rprior, bquote(p <- mod[[.(k)]]$rprior(p)))
     )
   }
 
-  if (!has_BART_component) {
+  if (all(types != "brt")) {
     # build a list of indices for vector representation of all likelihood parameters (for optimization)
     vec_list <- list()
     n_vec_list <- 0L
@@ -619,10 +663,16 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
         n_vec_list <- n_vec_list + Vmod[[k]][["q"]]
       }
     }
-    if (family$family == "negbinomial" && modeled.r) {
-      vec_list[["negbin_r_"]] <- n_vec_list + 1L
-      n_vec_list <- n_vec_list + 1L
-    }
+    switch(family$family,
+      negbinomial = if (modeled.r) {
+        vec_list[["negbin_r_"]] <- n_vec_list + 1L
+        n_vec_list <- n_vec_list + 1L
+      },
+      gamma=, gaussian_gamma = if (!family$alpha.fixed) {
+        vec_list[["gamma_shape_"]] <- n_vec_list + 1L
+        n_vec_list <- n_vec_list + 1L
+      }
+    )
     vec2list <- function(x) {
       pars <- names(vec_list)
       out <- list()
@@ -744,25 +794,28 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
     out <- if (prior.sampler) NULL else "llh_"
     if (!sigma.fixed) out <- c(out, "sigma_")
     if (do.linpred) out <- c(out, "linpred_")
-    if (family$family == "negbinomial" && modeled.r) out <- c(out, "negbin_r_")
-    if (family$family == "gamma" && !family$alpha.fixed) out <- c(out, "gamma_shape_")
+    switch(family$family,
+      negbinomial = if (modeled.r) out <- c(out, "negbin_r_"),
+      gamma=, gaussian_gamma = if (!family$alpha.fixed) out <- c(out, "gamma_shape_")
+    )
     for (mc in mod)
-      switch(mc$type,
-        reg = out <- c(out, mc$name),
-        mec = out <- c(out, mc$name),
+      switch(mc[["type"]],
+        reg = out <- c(out, mc[["name"]]),
+        mec = out <- c(out, mc[["name"]]),
         gen = {
-          out <- c(out, mc$name_sigma)
-          if (mc$var == "unstructured") out <- c(out, mc$name_rho)
-          if (mc$gl) out <- c(out, mc$name_gl)
-          if (mc$Leroux_update) out <- c(out, mc$name_Leroux)
-          if (!is.null(mc$priorA) && is.list(mc$priorA$df)) out <- c(out, mc$name_df)
-        }
+          out <- c(out, mc[["name_sigma"]])
+          if (mc$var == "unstructured") out <- c(out, mc[["name_rho"]])
+          if (mc$gl) out <- c(out, mc[["name_gl"]])
+          if (mc$Leroux_update) out <- c(out, mc[["name_Leroux"]])
+          if (!is.null(mc$priorA) && is.list(mc$priorA$df)) out <- c(out, mc[["name_df"]])
+        },
+        brt = if (mc$keepTrees) out <- c(out, mc[["name_trees"]])
       )
     for (mc in Vmod)
-      switch(mc$type,
-        vreg=, reg = out <- c(out, mc$name),
-        vfac = if (mc$prior$type == "invchisq" && is.list(mc$prior$df)) out <- c(out, mc$name_df),
-        gen = out <- c(out, mc$name_sigma)
+      switch(mc[["type"]],
+        vreg=, reg = out <- c(out, mc[["name"]]),
+        vfac = if (mc$prior$type == "invchisq" && is.list(mc$prior$df)) out <- c(out, mc[["name_df"]]),
+        gen = out <- c(out, mc[["name_sigma"]])
       )
     out
   }
@@ -771,7 +824,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
       out <- NULL
     } else {
       out <- "e_"
-      if (family$family == "gaussian" && modeled.Q) out <- c(out, "Q_")
+      if (modeled.Q && any(family$family == c("gaussian", "gaussian_gamma"))) out <- c(out, "Q_")
       if (compute.weights) out <- c(out, "weights_")
     }
     out
@@ -779,9 +832,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
 
   rm(types, mc, k)
 
-  if (prior.only) {
-    return(environment())  # environment including rprior(), but not draw() and start()
-  }
+  if (prior.only) return(environment())
 
 
   if (compute.weights) {
@@ -792,14 +843,12 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
 
   if (length(block)) {
     mbs <- list()
-    for (b in seq_along(block)) mbs[[b]] <- create_mc_block(mod[block[[b]]])
-    rm(b)
+    for (k in seq_along(block)) mbs[[k]] <- create_mc_block(mod[block[[k]]])
   }
 
   if (length(block.V)) {
     mbs.V <- list()
-    for (b in seq_along(block.V)) mbs.V[[b]] <- create_mc_block(Vmod[block.V[[b]]])
-    rm(b)
+    for (k in seq_along(block.V)) mbs.V[[k]] <- create_mc_block(Vmod[block.V[[k]]])
   }
 
   # compute residuals/linear predictor e_ for state p
@@ -825,17 +874,39 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
         # residuals, any offset is already accounted for by y_eff()
         e_i <- matrix(rep_each(y_eff()[i], nr), nr, length(i))
         for (mc in mod) {
-          if (all.units) Xi <- mc$X else Xi <- mc$X[i, , drop=FALSE]
-          e_i <- e_i - tcrossprod(as.matrix.dc(draws[[mc$name]], colnames=FALSE), Xi)
+          if (mc[["type"]] == "brt") {
+            if (is.null(draws[[mc$name]])) stop("no fitted values for 'brt' component; please re-run MCMCsim with 'store.all=TRUE'")
+            if (all.units)
+              e_i <- e_i - as.matrix.dc(draws[[mc$name]])
+            else
+              e_i <- e_i - as.matrix.dc(draws[[mc$name]])[, i, drop=FALSE]
+          } else {
+            if (all.units) Xi <- mc$X else Xi <- mc$X[i, , drop=FALSE]
+            e_i <- e_i - tcrossprod(as.matrix.dc(draws[[mc$name]], colnames=FALSE), Xi)
+          }
         }
-      } else {
-        # fitted values
+      } else {  # fitted values
         mc <- mod[[1L]]
-        if (all.units) Xi <- mc$X else Xi <- mc$X[i, , drop=FALSE]
-        e_i <- tcrossprod(as.matrix.dc(draws[[mc$name]], colnames=FALSE), Xi)
-        for (mc in mod[-1L]) {
+        if (mc[["type"]] == "brt") {
+          if (is.null(draws[[mc$name]])) stop("no fitted values for 'brt' component; please re-run MCMCsim with 'store.all=TRUE'")
+          if (all.units)
+            e_i <- as.matrix.dc(draws[[mc$name]])
+          else
+            e_i <- as.matrix.dc(draws[[mc$name]])[, i, drop=FALSE]
+        } else {
           if (all.units) Xi <- mc$X else Xi <- mc$X[i, , drop=FALSE]
-          e_i <- e_i + tcrossprod(as.matrix.dc(draws[[mc$name]], colnames=FALSE), Xi)
+          e_i <- tcrossprod(as.matrix.dc(draws[[mc$name]], colnames=FALSE), Xi)
+        }
+        for (mc in mod[-1L]) {
+          if (mc[["type"]] == "brt") {
+            if (all.units)
+              e_i <- e_i + as.matrix.dc(draws[[mc$name]])
+            else
+              e_i <- e_i + as.matrix.dc(draws[[mc$name]])[, i, drop=FALSE]
+          } else {
+            if (all.units) Xi <- mc$X else Xi <- mc$X[i, , drop=FALSE]
+            e_i <- e_i + tcrossprod(as.matrix.dc(draws[[mc$name]], colnames=FALSE), Xi)
+          }
         }
         if (use.offset)
           e_i <- e_i + if (length(offset) == 1L) offset else rep_each(offset[i], nr)
@@ -863,86 +934,14 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
   MHpars <- NULL
   adapt <- function(ar) {}
 
-  if (family$family == "negbinomial" && modeled.r) {
-    if (r.mod$type == "fixed") {
-      start <- add(start, quote(if (is.null(p[["negbin_r_"]])) p$negbin_r_ <- 1/r.mod$rprior()))
-    } else {
-      # draw latent L_i (i=1:n) from its CRT f.c.
-      mCRT <- control$CRT.approx.m
-      draw <- add(draw, quote(L <- CrCRT(y, ry*p[["negbin_r_"]], mCRT)))
-      start <- add(start, quote(
-        if (is.null(p[["negbin_r_"]])) p$negbin_r_ <- runif(1L, 0.1, 10)
-        else {
-          if (length(p[["negbin_r_"]]) != 1L) stop("wrong length for 'negbin_r_' start value")
-          p[["negbin_r_"]] <- as.numeric(p[["negbin_r_"]])
-          if (is.na(p[["negbin_r_"]]) || p[["negbin_r_"]] <= 0) stop("'negbin_r_' start value must be a positive number")
-        }
-      ))
-    }
-    # draw dispersion parameter r
-    switch(r.mod$type,
-      fixed = draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$value)),
-      invchisq = {
-        # TODO check ry appearance in modeled scale inv-chi2 and gig cases
-        if (is.list(r.mod$scale))
-          if (length(ry) == 1L)
-            draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(2*sum(L), 2*ry*sum(log1pexpC(p[["e_"]])), p[["negbin_r_"]])))
-          else
-            draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(2*sum(L), 2*sum(ry*log1pexpC(p[["e_"]])), p[["negbin_r_"]])))
-        else
-          if (length(ry) == 1L)
-            draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(2*sum(L), 2*ry*sum(log1pexpC(p[["e_"]])))))
-          else
-            draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(2*sum(L), 2*sum(ry*log1pexpC(p[["e_"]])))))
-      },
-      gig = {
-        if (length(ry) == 1L)
-          draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(p = r.mod[["p"]] - sum(L), a = r.mod[["a"]], b = r.mod[["b"]] + 2*ry*sum(log1pexpC(p[["e_"]])))))
-        else
-          draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(p = r.mod[["p"]] - sum(L), a = r.mod[["a"]], b = r.mod[["b"]] + 2*sum(ry*log1pexpC(p[["e_"]])))))
-      }
-    )
-    draw <- add(draw, quote(ny <- y + ry*p[["negbin_r_"]]))  # used in Polya-Gamma full conditional for latent precision vector
-    start <- add(start, quote(ny <- y + ry*p[["negbin_r_"]]))
-  }
-
-  if (family$family == "gamma") {
-    llh <- family$make_llh(y)
-    draw <- add(draw, quote(p$llh_ <- llh(p)))
-    if (!family$alpha.fixed) {
-      draw_shape <- family$make_draw_shape(y)
-      draw <- add(draw, quote(p$gamma_shape_ <- draw_shape(p)))
-      start <- add(start, quote(if (is.null(p[["gamma_shape_"]])) p$gamma_shape_ <- family$shape.prior$rprior()))
-      MHpars <- c(MHpars, "gamma_shape_")
-      if (family$shape.MH.type == "RW") {
-        shape_adapt <- environment(draw_shape)$adapt
-        adapt <- add(adapt, bquote(shape_adapt(ar)))
-      }
-    }
-  }
-
-  if (any(family$family == c("binomial", "multinomial", "negbinomial", "poisson")) && family$link != "probit") {
-    draw <- draw |>
-      add(quote(p[["Q_"]] <- rPolyaGamma(ny, p[["e_"]]))) |>
-      add(quote(p$llh_ <- llh(p)))
-    start <- start |>
-      add(quote(if (is.null(p[["Q_"]])) p$Q_ <- rPolyaGamma(ny, p[["e_"]]))) |>
-      add(quote(if (length(p[["Q_"]]) != n) stop("wrong length for 'Q_' start value")))
-  } else if (family$family == "binomial" && family$link == "probit") {
-    draw <- draw |>
-      add(quote(p[["z_"]] <- CrTNprobit(p[["e_"]], y))) |>
-      add(quote(p$llh_ <- llh(p)))
-    start <- start |>
-      add(quote(if (is.null(p[["z_"]])) p$z_ <- CrTNprobit(p[["e_"]], y))) |>
-      add(quote(if (length(p[["z_"]]) != n) stop("wrong length for 'z_' start value")))
-  } else if (family$family == "gaussian") {
-    if (modeled.Q) {
+  if (any(family$family == c("gaussian", "gamma", "gaussian_gamma"))) {
+    if (modeled.Q) {  # gaussian, gaussian_gamma
       if (!single.V.block) {
         # recompute precision Q for numerical stability
         draw <- add(draw, quote(p <- compute_Q(p)))
       }
       for (mc in Vmod) {
-        switch(mc$type, 
+        switch(mc[["type"]],
           vreg = MHpars <- c(MHpars, mc$name),
           vfac = {
             if (mc$prior$type == "invchisq" && is.list(mc$prior$df)) {
@@ -950,9 +949,14 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
               if (mc$prior$df$adapt)
                 adapt <- add(adapt, bquote(Vmod[[.(mc$name)]]$adapt(ar)))
             }
+          },
+          gen = {
+            MHpars <- c(MHpars, if (mc$usePX) mc$name_sigma_raw else mc$name_sigma)
+            if (mc$control$MHprop == "LNRW")
+              adapt <- add(adapt, bquote(Vmod[[.(mc$name)]]$adapt(ar)))
           }
         )
-        if (!(mc$type == "reg" && mc$in_block)) {
+        if (!(mc[["type"]] == "reg" && mc$in_block)) {
           draw <- add(draw, bquote(p <- Vmod[[.(mc$name)]]$draw(p)))
           start <- add(start, bquote(p <- Vmod[[.(mc$name)]]$start(p)))
         }
@@ -965,10 +969,94 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
       }
       start <- add(start, quote(p <- compute_Q(p)))
     }  # END if (modeled.Q)
-    draw <- draw |>
-      add(quote(SSR <- dotprodC(p[["e_"]], Q_e(p)))) |>
-      add(quote(p$llh_ <- llh(p, SSR)))
-  }  # END if (family$family == "gaussian")
+    if (family$family == "gaussian" || family$family == "gaussian_gamma") {
+      draw <- draw |>
+        add(quote(SSR <- dotprodC(p[["e_"]], Q_e(p)))) |>
+        add(quote(p$llh_ <- llh(p, SSR)))
+      if (family$family == "gaussian_gamma") {
+        llh_gamma <- family$make_llh_gamma(y)
+        draw <- add(draw, quote(p$llh_ <- p[["llh_"]] + llh_gamma(p)))
+      }
+    } else {  # gamma
+      llh <- family$make_llh(y)
+      draw <- add(draw, quote(p$llh_ <- llh(p)))
+    }
+    if (family$family == "gamma" || family$family == "gaussian_gamma") {
+      if (!family$alpha.fixed) {
+        if (family$family == "gamma")
+          draw_shape <- family$make_draw_shape(y)
+        else  # gaussian_gamma
+          draw_shape <- family$make_draw_shape(family$sigmasq)
+        draw <- add(draw, quote(p$gamma_shape_ <- draw_shape(p)))
+        # shape start value should not be too small
+        start <- add(start, quote(if (is.null(p[["gamma_shape_"]])) p$gamma_shape_ <- exp(runif(1L, -3, 4))))
+        MHpars <- c(MHpars, "gamma_shape_")
+        if (family$shape.MH.type == "RW") {
+          shape_adapt <- environment(draw_shape)$adapt
+          adapt <- add(adapt, bquote(shape_adapt(ar)))
+        }
+      }
+    }
+  } else {  # binomial, multinomial, negbinomial, poisson
+    if (modeled.r) {  # negbinomial
+      if (r.mod$type == "fixed") {
+        start <- add(start, quote(if (is.null(p[["negbin_r_"]])) p$negbin_r_ <- 1/r.mod$rprior()))
+      } else {
+        # draw latent L_i (i=1:n) from its CRT f.c.
+        mCRT <- control$CRT.approx.m
+        draw <- add(draw, quote(L <- CrCRT(y, ry*p[["negbin_r_"]], mCRT)))
+        start <- add(start, quote(
+          if (is.null(p[["negbin_r_"]])) p$negbin_r_ <- runif(1L, 0.1, 10)
+          else {
+            if (length(p[["negbin_r_"]]) != 1L) stop("wrong length for 'negbin_r_' start value")
+            p[["negbin_r_"]] <- as.numeric(p[["negbin_r_"]])
+            if (is.na(p[["negbin_r_"]]) || p[["negbin_r_"]] <= 0) stop("'negbin_r_' start value must be a positive number")
+          }
+        ))
+      }
+      # draw dispersion parameter r
+      switch(r.mod$type,
+        fixed = draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$value)),
+        invchisq = {
+          # TODO check ry appearance in modeled scale inv-chi2 and gig cases
+          if (is.list(r.mod$scale))
+            if (length(ry) == 1L)
+              draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(2*sum(L), 2*ry*sum(log1pexpC(p[["e_"]])), p[["negbin_r_"]])))
+            else
+              draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(2*sum(L), 2*sum(ry*log1pexpC(p[["e_"]])), p[["negbin_r_"]])))
+          else
+            if (length(ry) == 1L)
+              draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(2*sum(L), 2*ry*sum(log1pexpC(p[["e_"]])))))
+            else
+              draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(2*sum(L), 2*sum(ry*log1pexpC(p[["e_"]])))))
+        },
+        gig = {
+          if (length(ry) == 1L)
+            draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(p = r.mod[["p"]] - sum(L), a = r.mod[["a"]], b = r.mod[["b"]] + 2*ry*sum(log1pexpC(p[["e_"]])))))
+          else
+            draw <- add(draw, quote(p$negbin_r_ <- 1 / r.mod$draw(p = r.mod[["p"]] - sum(L), a = r.mod[["a"]], b = r.mod[["b"]] + 2*sum(ry*log1pexpC(p[["e_"]])))))
+        }
+      )
+      draw <- add(draw, quote(ny <- y + ry*p[["negbin_r_"]]))  # used in Polya-Gamma full conditional for latent precision vector
+      start <- add(start, quote(ny <- y + ry*p[["negbin_r_"]]))
+    }
+    if (family$link == "probit") {
+      if (family$family != "binomial") stop("probit link currently only supported for binomial family")
+      draw <- draw |>
+        add(quote(p[["z_"]] <- CrTNprobit(p[["e_"]], y))) |>
+        add(quote(p$llh_ <- llh(p)))
+      start <- start |>
+        add(quote(if (is.null(p[["z_"]])) p$z_ <- CrTNprobit(p[["e_"]], y))) |>
+        add(quote(if (length(p[["z_"]]) != n) stop("wrong length for 'z_' start value")))
+    } else {
+      draw <- draw |>
+        add(quote(p[["Q_"]] <- rPolyaGamma(ny, p[["e_"]]))) |>
+        add(quote(p$llh_ <- llh(p)))
+      start <- start |>
+        add(quote(if (is.null(p[["Q_"]])) p$Q_ <- rPolyaGamma(ny, p[["e_"]]))) |>
+        add(quote(if (length(p[["Q_"]]) != n) stop("wrong length for 'Q_' start value")))
+    }
+  }
 
   if (!sigma.fixed) {
     draw_sigma <- function(p, SSR) {}
@@ -976,7 +1064,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
     df.data <- n
     for (k in seq_along(mod)) {
       mc <- mod[[k]]
-      switch(mc$type,
+      switch(mc[["type"]],
         reg=, mec = {
           if (mc$prior$type == "normal" && mc$informative.prior) {
             if (is.null(mc$R))
@@ -1003,7 +1091,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
               add(bquote(SSR <- SSR + dotprodC(delta.beta, mod[[.(k)]]$glp[["Q0"]] %m*v% delta.beta)))
           }
         },
-        bart = {},
+        brt = {},
         stop("unrecognized model type")
       )
     }
@@ -1042,7 +1130,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
 
   for (k in seq_along(mod)) {
     mc <- mod[[k]]
-    switch(mc$type,
+    switch(mc[["type"]],
       reg = {
         if (!mc$in_block) {
           start <- add(start, bquote(p <- mod[[.(k)]]$start(p)))
@@ -1056,14 +1144,14 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
       gen = {
         if (mc$gl && mc$usePX) MHpars <- c(MHpars, mc$name_xi)
         if (mc$Leroux_update) MHpars <- c(MHpars, mc$name_Leroux)
-        if (family$family == "gamma") {
+        if (family$family == "gamma" && mc$control$MHprop == "LNRW") {
           MHpars <- c(MHpars, if (mc$usePX) mc$name_sigma_raw else mc$name_sigma)
           adapt <- add(adapt, bquote(mod[[.(mc$name)]]$adapt(ar)))
         }
         start <- add(start, bquote(p <- mod[[.(k)]]$start(p)))
         draw <- add(draw, bquote(p <- mod[[.(k)]]$draw(p)))
       },
-      bart = {
+      brt = {
         start <- add(start, bquote(p <- mod[[.(k)]]$start(p)))
         draw <- add(draw, bquote(p <- mod[[.(k)]]$draw(p)))
       }
@@ -1077,9 +1165,8 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
     }
   }
 
-  if (do.linpred) {
+  if (do.linpred)
     draw <- add(draw, quote(p$linpred_ <- lin_predict(p, linpred)))
-  }
 
   draw <- add(draw, quote(p))  # return state p
 
@@ -1099,7 +1186,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
     if (anyNA(logJacobian)) stop("missing values in 'logJacobian'")
   }
   switch(family$family,
-    gaussian = {
+    gaussian=, gaussian_gamma = {
       # constant term llh_0 of log-likelihood
       llh_0 <- -0.5 * n * log(2*pi)
       if (!is.null(logJacobian)) llh_0 <- llh_0 + sum(logJacobian)
@@ -1132,7 +1219,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
           q <- matrix(q, nr, length(i))
           for (mc in Vmod) {
             if (all.units) Xi <- mc[["X"]] else Xi <- mc[["X"]][i, , drop=FALSE]
-            if (mc$type == "vfac")
+            if (mc[["type"]] == "vfac")
               q <- q * tcrossprod(1 / as.matrix.dc(draws[[mc$name]], colnames=FALSE), Xi)
             else
               q <- q * exp(-tcrossprod(as.matrix.dc(draws[[mc$name]], colnames=FALSE), Xi))
@@ -1218,13 +1305,13 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
       }
     },
     gamma = {
-      gamma_llh_i <- family$make_llh_i(y)
+      fam_llh_i <- family$make_llh_i(y)
       llh_i <- function(draws, i=seq_len(n)) {
         fitted_i <- compute_e_i(draws, i)
-        gamma_llh_i(draws, i, fitted_i)
+        fam_llh_i(draws, i, fitted_i)
       }
     }
-  )  # END switch(family$family,
+  )
 
   # log-likelihood function for optimization: function of a vector instead of list
   llh_opt <- function(x) {
@@ -1244,11 +1331,17 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
 #' Set computational options for the sampling algorithms
 #'
 #' @export
-#' @param add.outer.R whether to add the outer product of the constraint matrix for a better conditioned solve system
-#'  for blocks. This is done by default when using blocked Gibbs sampling for blocks with constraints.
+#' @param add.outer.R whether to add the outer product of a constraint matrix for a better conditioned 
+#'  linear system of equations, typically for coefficients sampled in a Gibbs-block. Default is \code{TRUE}.
+#'  If \code{NULL}, a simple heuristic is used to decide whether to add the outer product
+#'  of possibly a submatrix of the constraint matrix.
 #' @param recompute.e when \code{FALSE}, residuals or linear predictors are only computed at the start of the simulation.
 #'  This may give a modest speedup but in some cases may be less accurate due to round-off error accumulation.
 #'  Default is \code{TRUE}.
+#' @param expanded.cMVN.sampler whether an expanded linear system including dual variables is used
+#'  for equality constrained multivariate normal sampling. If set to \code{TRUE} this may
+#'  improve the performance of the blocked Gibbs sampler in case of a large number of equality
+#'  constraints, typically identifiability constraints for GMRFs.
 #' @param CG use a conjugate gradient iterative algorithm instead of Cholesky updates for sampling
 #'  the model's coefficients. This must be a list with possible components \code{max.it},
 #'  \code{stop.criterion}, \code{verbose}, \code{preconditioner} and \code{scale}.
@@ -1279,7 +1372,7 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
 #' @param CRT.approx.m scalar integer specifying the degree of approximation to sampling
 #'  from a Chinese Restaurant Table distribution. The approximation is based on Le Cam's theorem.
 #'  Larger values yield a slower but more accurate sampler.
-#' @return A list with specified computational options used by various sampling functions.
+#' @returns A list with specified computational options used by various sampling functions.
 #' @references
 #'  D. Bates, M. Maechler, B. Bolker and S.C. Walker (2015).
 #'    Fitting Linear Mixed-Effects Models Using lme4.
@@ -1288,12 +1381,14 @@ create_sampler <- function(formula, data=NULL, family="gaussian",
 #'  Y. Chen, T.A. Davis, W.W. Hager and S. Rajamanickam (2008).
 #'    Algorithm 887: CHOLMOD, supernodal sparse Cholesky factorization and update/downdate.
 #'    ACM Transactions on Mathematical Software 35(3), 1-14.
-sampler_control <- function(add.outer.R=NULL, recompute.e=TRUE, CG=NULL,
+sampler_control <- function(add.outer.R=TRUE, recompute.e=TRUE,
+                            expanded.cMVN.sampler=FALSE, CG=NULL,
                             block=TRUE, block.V=TRUE, auto.order.block=TRUE,
                             chol.control=chol_control(),
                             max.size.cps.template=100,
                             PG.approx=TRUE, PG.approx.m=-2L, CRT.approx.m=20L) {
-  list(add.outer.R=add.outer.R, recompute.e=recompute.e, CG=CG,
+  list(add.outer.R=add.outer.R, recompute.e=recompute.e,
+       expanded.cMVN.sampler=expanded.cMVN.sampler, CG=CG,
        block=block, block.V=block.V, auto.order.block=auto.order.block,
        chol.control = chol.control,
        max.size.cps.template=max.size.cps.template,
@@ -1323,8 +1418,11 @@ check_sampler_control <- function(control) {
   control$chol.control <- check_chol_control(control$chol.control)
   if (isTRUE(control$CG)) {
     control$CG <- CG_control()
+  } else if (isFALSE(control$CG)) {
+    control$CG <- NULL
   } else if (!is.null(control$CG)) {
     control$CG <- check_CG_control(control$CG)
   }
+  if (control$expanded.cMVN.sampler && is.list(control$CG)) stop("'expanded.cMVN.sampler' and 'CG' cannot currently be combined")
   control
 }

@@ -5,8 +5,8 @@
 # define R function to set defaults
 # ordering=1L (AMD only) seems to give same permutations as Matrix::Cholesky
 # ordering=0L is the cholmod default and also tries nested dissection
-Cholesky_dsC <- function(A, perm=TRUE, super=NA, Imult=0, ordering=0L)
-  cCHM_dsC_Cholesky(A, perm, super, Imult, ordering)
+Cholesky_dsC <- function(A, perm=TRUE, super=NA, Imult=0, ordering=0L, LDL=FALSE)
+  cCHM_dsC_Cholesky(A, perm, super, Imult, ordering, LDL)
 
 #' Set options for Cholesky decomposition
 #'
@@ -20,7 +20,7 @@ Cholesky_dsC <- function(A, perm=TRUE, super=NA, Imult=0, ordering=0L)
 #' @param ordering an integer scalar passed to CHOLMOD routines determining which reordering
 #'  schemes are tried to limit sparse Cholesky fill-in.
 #' @param inplace whether sparse Cholesky updates should re-use the same memory location.
-#' @return A list with specified options used for Cholesky decomposition.
+#' @returns A list with specified options used for Cholesky decomposition.
 chol_control <- function(perm=NULL, super=NA, ordering=0L, inplace=TRUE)
   list(perm=perm, super=super, ordering=ordering, inplace=inplace)
 
@@ -36,17 +36,19 @@ check_chol_control <- function(control) {
 }
 
 # in case of permutation/pivoting, the decomposition is PtLLtP
-build_chol <- function(M, Imult=0, control=chol_control()) {
+build_chol <- function(M, Imult=0, control=chol_control(), LDL=FALSE) {
   type <- class(M)[1L]
   if (all(type != c("numeric", "matrix", "ddiMatrix", "dsCMatrix"))) stop("'", type, "' is not a supported matrix class")
   size <- if (type == "numeric") length(M) else dim(M)[1L]
 
   if (type == "dsCMatrix") {
+    if (LDL) control$super <- FALSE  # not supported by Matrix/CHOLMOD
     if (is.null(control$perm)) {
       # TODO find better decision rule for use of permutation in cholesky factorization
       control$perm <- size > 100L
     }
   } else {
+    if (LDL) stop("LDL only supported for dsCMatrix")
     control$perm <- FALSE
   }
 
@@ -103,7 +105,7 @@ build_chol <- function(M, Imult=0, control=chol_control()) {
       }
     },
     dsCMatrix = {
-      cholM <- Cholesky_dsC(M, perm=control$perm, super=control$super, Imult=Imult, ordering=control$ordering)
+      cholM <- Cholesky_dsC(M, perm=control$perm, super=control$super, Imult=Imult, ordering=control$ordering, LDL=LDL)
       perm <- is.unsorted(cholM@perm, strictly = TRUE)
       if (perm) {  # permutation matrix unaffected by updates
         P <- cholM@perm + 1L
@@ -116,6 +118,7 @@ build_chol <- function(M, Imult=0, control=chol_control()) {
         # for forked parallel processing cholM should probably be stored in the state list p
         update <- function(parent, mult=0) cholM <<- .updateCHMfactor(cholM, parent, mult)
       }
+      # TODO(?) Ltimes for LDL and solve for systems other than "A" for LDL 
       if (perm) {
         # TODO check whether the permutation is handled correctly in the transpose=FALSE case
         Ltimes <- function(x, transpose=TRUE) {

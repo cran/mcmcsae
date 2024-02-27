@@ -33,7 +33,7 @@
 #'  (the default), and "response" for fitted values on the response scale. Returned residuals are
 #'  always on the response scale.
 #' @param ... currently not used.
-#' @return Either a draws component object or a matrix with draws of fitted values or residuals.
+#' @returns Either a draws component object or a matrix with draws of fitted values or residuals.
 #'  The residuals are always on the response scale, whereas fitted values can
 #'  be on the scale of the linear predictor or the response depending on \code{type}.
 #'  If \code{mean.only=TRUE}, a vector of posterior means.
@@ -75,27 +75,46 @@ fitted_res <- function(obj, mean.only=FALSE, units=NULL, chains=seq_len(nchains(
   }
   if (is.null(obj[["e_"]])) {
     mc <- smplr$mod[[1L]]
-    if (all.units) Xi <- mc$X else Xi <- mc$X[units, , drop=FALSE]
-    if (matrix) {
-      out <- tcrossprod(as.matrix.dc(get_from(obj[[mc$name]], chains=chains, draws=draws), colnames=FALSE), Xi)
+    if (mc[["type"]] == "brt") {
+      if (is.null(obj[[mc$name]])) stop("no fitted values for 'brt' component; please re-run MCMCsim with 'store.all=TRUE'")
+      if (matrix) {
+        out <- as.matrix.dc(get_from(obj[[mc$name]], chains=chains, draws=draws))[, units, drop=FALSE]
+      } else {
+        out <- list()
+        for (ch in seq_along(chains))
+          out[[ch]] <- obj[[mc$name]][[chains[ch]]][draws, units, drop=FALSE]
+      }
     } else {
-      out <- list()
-      for (ch in seq_along(chains))
-        out[[ch]] <- tcrossprod(obj[[mc$name]][[chains[ch]]][draws, , drop=FALSE], Xi)
+      if (all.units) Xi <- mc$X else Xi <- mc$X[units, , drop=FALSE]
+      if (matrix) {
+        out <- tcrossprod(as.matrix.dc(get_from(obj[[mc$name]], chains=chains, draws=draws), colnames=FALSE), Xi)
+      } else {
+        out <- list()
+        for (ch in seq_along(chains))
+          out[[ch]] <- tcrossprod(obj[[mc$name]][[chains[ch]]][draws, , drop=FALSE], Xi)
+      }
     }
     for (mc in smplr$mod[-1L]) {
-      if (all.units) Xi <- mc$X else Xi <- mc$X[units, , drop=FALSE]
-      if (matrix)
-        out <- out + tcrossprod(as.matrix.dc(get_from(obj[[mc$name]], chains=chains, draws=draws), colnames=FALSE), Xi)
-      else
-        for (ch in seq_along(chains))
-          out[[ch]] <- out[[ch]] + tcrossprod(obj[[mc$name]][[chains[ch]]][draws, , drop=FALSE], Xi)
+      if (mc[["type"]] == "brt") {
+        if (matrix)
+          out <- out + as.matrix.dc(get_from(obj[[mc$name]], chains=chains, draws=draws))[, units, drop=FALSE]
+        else
+          for (ch in seq_along(chains))
+            out[[ch]] <- out[[ch]] + obj[[mc$name]][[chains[ch]]][draws, units, drop=FALSE]
+      } else {
+        if (all.units) Xi <- mc$X else Xi <- mc$X[units, , drop=FALSE]
+        if (matrix)
+          out <- out + tcrossprod(as.matrix.dc(get_from(obj[[mc$name]], chains=chains, draws=draws), colnames=FALSE), Xi)
+        else
+          for (ch in seq_along(chains))
+            out[[ch]] <- out[[ch]] + tcrossprod(obj[[mc$name]][[chains[ch]]][draws, , drop=FALSE], Xi)
+      }
     }
     if (smplr$use.offset) {
       if (matrix)
         out <- out + rep_each(smplr$offset[units], nrow(out))
       else
-        out <- lapply(out, function(x) {x + rep_each(smplr$offset[units], nrow(x))})
+        out <- lapply(out, function(x) x + rep_each(smplr$offset[units], nrow(x)))
     }
   } else {
     out <- get_from(obj[["e_"]], chains=chains, draws=draws, vars=units)
@@ -165,7 +184,7 @@ fitted_res <- function(obj, mean.only=FALSE, units=NULL, chains=seq_len(nchains(
 ## @method weights mcdraws
 #' @param object an object of class \code{mcdraws}.
 #' @param ... currently not used.
-#' @return A vector with (simulation means of) weights.
+#' @returns A vector with (simulation means of) weights.
 weights.mcdraws <- function(object, ...) get_means(object, "weights_")[[1L]]
 
 
@@ -210,7 +229,7 @@ weights.mcdraws <- function(object, ...) get_means(object, "weights_")[[1L]]
 #'  \code{n.cores > 1}, a new cluster is created.
 #' @param ... Other arguments, passed to \code{\link[loo]{loo}}. Not currently
 #'  used by \code{waic.mcdraws}.
-#' @return For \code{compute_DIC} a vector with the deviance information criterion and
+#' @returns For \code{compute_DIC} a vector with the deviance information criterion and
 #'  effective number of model parameters. For \code{compute_WAIC} a vector with the
 #'  WAIC model selection criterion and WAIC effective number of model parameters.
 #'  Method \code{waic} returns an object of class \code{waic, loo}, see the
@@ -256,7 +275,7 @@ compute_DIC <- function(x, use.pV=FALSE) {
   post.means <- get_means(x)
   if (is.null(post.means[["e_"]]))
     stop("cannot compute DIC: missing simulation means of ", if (x[["_model"]]$e.is.res) "residuals" else "linear predictor", "'e_'")
-  if (x[["_model"]]$modeled.Q && x[["_model"]]$family$family == "gaussian") {
+  if (x[["_model"]]$modeled.Q && any(x[["_model"]]$family$family == c("gaussian", "gaussian_gamma"))) {
     if (is.null(post.means[["Q_"]])) stop("cannot compute DIC: missing simulation means of 'Q_'")
     if (x[["_model"]]$Q0.type == "symm") {
       # reconstruct mean sparse precision matrix

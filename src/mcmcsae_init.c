@@ -7,89 +7,88 @@
 
 cholmod_common c;
 
-
 /* .Call calls */
-extern SEXP _mcmcsae_add_diagC(void *, void *);
-extern SEXP _mcmcsae_add_vector(void *, void *);
-extern SEXP _mcmcsae_Cbacksolve(void *, void *);
-extern SEXP _mcmcsae_CbacksolveM(void *, void *);
-extern SEXP _mcmcsae_cCHM_dsC_Cholesky(void *, void *, void *, void *, void *);
-extern SEXP _mcmcsae_cCHM_update_inplace(void *, void *, void *);
-extern SEXP _mcmcsae_cCHMf_solve(void *, void *, void *);
-extern SEXP _mcmcsae_cCHMf_solve_matrix(void *, void *, void *);
-extern SEXP _mcmcsae_cCHMf_spsolve(void *, void *, void *);
-extern SEXP _mcmcsae_Ccholesky(void *);
-extern SEXP _mcmcsae_Ccreate_sparse_crossprod_sym_template(void *, void *, void *, void *);
-extern SEXP _mcmcsae_Cdense_crossprod_sym(void *, void *);
-extern SEXP _mcmcsae_Cdense_crossprod_sym0(void *);
-extern SEXP _mcmcsae_Cdense_crossprod_sym2(void *, void *);
-extern SEXP _mcmcsae_Cdense_dense_crossprod(void *, void *);
-extern SEXP _mcmcsae_Cdense_dense_prod(void *, void *);
-extern SEXP _mcmcsae_Cdense_diag_crossprod(void *, void *);
-extern SEXP _mcmcsae_Cdense_diag_prod(void *, void *);
-extern SEXP _mcmcsae_Cdense_kron(void *, void *);
-extern SEXP _mcmcsae_Cdense_numeric_crossprod(void *, void *);
-extern SEXP _mcmcsae_Cdense_numeric_prod(void *, void *);
-extern SEXP _mcmcsae_Cdense_sparse_crossprod(void *, void *);
-extern SEXP _mcmcsae_Cdense_sparse_prod(void *, void *);
-extern SEXP _mcmcsae_Cdense_sparse_tcrossprod(void *, void *);
-extern SEXP _mcmcsae_Cdense_sparseS_prod(void *, void *);
-extern SEXP _mcmcsae_Cdense_tab_tcrossprod(void *, void *);
-extern SEXP _mcmcsae_Cdiag(void *);
-extern SEXP _mcmcsae_Cdiag_sparse_prod(void *, void *);
-extern SEXP _mcmcsae_CdiagU(void *);
-extern SEXP _mcmcsae_Cforwardsolve(void *, void *);
-extern SEXP _mcmcsae_CforwardsolveM(void *, void *);
-extern SEXP _mcmcsae_Cnnz_per_col_scps_template(void *, void *, void *);
-extern SEXP _mcmcsae_copy_vector(void *);
-extern SEXP _mcmcsae_CrCRT(void *, void *, void *);
-extern SEXP _mcmcsae_Crepgen(void *, void *, void *);
-extern SEXP _mcmcsae_Crgig(void *, void *, void *, void *);
-extern SEXP _mcmcsae_Crnorm(void *, void *, void *);
-extern SEXP _mcmcsae_CrPGapprox(void *, void *, void *, void *);
-extern SEXP _mcmcsae_Crtmvn_Gibbs_dense(void *, void *, void *, void *);
-extern SEXP _mcmcsae_Crtmvn_Gibbs_sparse(void *, void *, void *, void *);
-extern SEXP _mcmcsae_Crtmvn_slice_Gibbs_dense(void *, void *, void *, void *);
-extern SEXP _mcmcsae_Crtmvn_slice_Gibbs_sparse(void *, void *, void *, void *);
-extern SEXP _mcmcsae_CrTNprobit(void *, void *);
-extern SEXP _mcmcsae_Crtuvn(void *, void *);
-extern SEXP _mcmcsae_Cscale_dense(void *, void *);
-extern SEXP _mcmcsae_Cscale_sparse(void *, void *);
-extern SEXP _mcmcsae_Csparse_crossprod_sym(void *, void *);
-extern SEXP _mcmcsae_Csparse_crossprod_sym2(void *, void *);
-extern SEXP _mcmcsae_Csparse_dense_crossprod(void *, void *);
-extern SEXP _mcmcsae_Csparse_dense_crossprod_sym(void *, void *);
-extern SEXP _mcmcsae_Csparse_dense_prod(void *, void *);
-extern SEXP _mcmcsae_Csparse_diag_crossprod_sym(void *, void *);
-extern SEXP _mcmcsae_Csparse_numeric_crossprod(void *, void *);
-extern SEXP _mcmcsae_Csparse_numeric_prod(void *, void *);
-extern SEXP _mcmcsae_Csparse_sym_twist(void *, void *);
-extern SEXP _mcmcsae_CsparseS_dense_prod(void *, void *);
-extern SEXP _mcmcsae_CsparseS_numeric_prod(void *, void *);
-extern SEXP _mcmcsae_Ctab(void *, void *, void *, void *, void *);
-extern SEXP _mcmcsae_Ctab_dense_crossprod(void *, void *);
-extern SEXP _mcmcsae_Ctab_dense_prod(void *, void *);
-extern SEXP _mcmcsae_Ctab_numeric_crossprod(void *, void *);
-extern SEXP _mcmcsae_Ctab_numeric_prod(void *, void *, void *);
-extern SEXP _mcmcsae_Ctab_unary_crossprod(void *);
-extern SEXP _mcmcsae_Ctab2dgC(void *);
-extern SEXP _mcmcsae_Ctab2mat(void *);
-extern SEXP _mcmcsae_diagC(void *);
-extern SEXP _mcmcsae_dotprodC(void *, void *);
-extern SEXP _mcmcsae_fast_aggrC(void *, void *, void *);
-extern SEXP _mcmcsae_inverseSPD(void *);
-extern SEXP _mcmcsae_log1pexpC(void *);
-extern SEXP _mcmcsae_mv_update(void *, void *, void *, void *);
-extern SEXP _mcmcsae_prec2se_cor(void *);
-extern SEXP _mcmcsae_sparse_sum_x(void *, void *, void *, void *, void *, void *, void *, void *, void *);
-extern SEXP _mcmcsae_TMVN_HMC_C(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
+extern SEXP _mcmcsae_add_diagC(SEXP, SEXP);
+extern SEXP _mcmcsae_add_vector(SEXP, SEXP);
+extern SEXP _mcmcsae_Cbacksolve(SEXP, SEXP);
+extern SEXP _mcmcsae_CbacksolveM(SEXP, SEXP);
+extern SEXP _mcmcsae_cCHM_dsC_Cholesky(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_cCHM_update_inplace(SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_cCHMf_solve(SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_cCHMf_solve_matrix(SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_cCHMf_spsolve(SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_Ccholesky(SEXP);
+extern SEXP _mcmcsae_Ccreate_sparse_crossprod_sym_template(SEXP, SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_crossprod_sym(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_crossprod_sym0(SEXP);
+extern SEXP _mcmcsae_Cdense_crossprod_sym2(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_dense_crossprod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_dense_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_diag_crossprod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_diag_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_kron(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_numeric_crossprod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_numeric_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_sparse_crossprod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_sparse_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_sparse_tcrossprod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_sparseS_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdense_tab_tcrossprod(SEXP, SEXP);
+extern SEXP _mcmcsae_Cdiag(SEXP);
+extern SEXP _mcmcsae_Cdiag_sparse_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_CdiagU(SEXP);
+extern SEXP _mcmcsae_Cforwardsolve(SEXP, SEXP);
+extern SEXP _mcmcsae_CforwardsolveM(SEXP, SEXP);
+extern SEXP _mcmcsae_Cnnz_per_col_scps_template(SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_copy_vector(SEXP);
+extern SEXP _mcmcsae_CrCRT(SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_Crepgen(SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_Crgig(SEXP, SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_Crnorm(SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_CrPGapprox(SEXP, SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_Crtmvn_Gibbs_dense(SEXP, SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_Crtmvn_Gibbs_sparse(SEXP, SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_Crtmvn_slice_Gibbs_dense(SEXP, SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_Crtmvn_slice_Gibbs_sparse(SEXP, SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_CrTNprobit(SEXP, SEXP);
+extern SEXP _mcmcsae_Crtuvn(SEXP, SEXP);
+extern SEXP _mcmcsae_Cscale_dense(SEXP, SEXP);
+extern SEXP _mcmcsae_Cscale_sparse(SEXP, SEXP);
+extern SEXP _mcmcsae_Csparse_crossprod_sym(SEXP, SEXP);
+extern SEXP _mcmcsae_Csparse_crossprod_sym2(SEXP, SEXP);
+extern SEXP _mcmcsae_Csparse_dense_crossprod(SEXP, SEXP);
+extern SEXP _mcmcsae_Csparse_dense_crossprod_sym(SEXP, SEXP);
+extern SEXP _mcmcsae_Csparse_dense_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_Csparse_diag_crossprod_sym(SEXP, SEXP);
+extern SEXP _mcmcsae_Csparse_numeric_crossprod(SEXP, SEXP);
+extern SEXP _mcmcsae_Csparse_numeric_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_Csparse_sym_twist(SEXP, SEXP);
+extern SEXP _mcmcsae_CsparseS_dense_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_CsparseS_numeric_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_Ctab(SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_Ctab_dense_crossprod(SEXP, SEXP);
+extern SEXP _mcmcsae_Ctab_dense_prod(SEXP, SEXP);
+extern SEXP _mcmcsae_Ctab_numeric_crossprod(SEXP, SEXP);
+extern SEXP _mcmcsae_Ctab_numeric_prod(SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_Ctab_unary_crossprod(SEXP);
+extern SEXP _mcmcsae_Ctab2dgC(SEXP);
+extern SEXP _mcmcsae_Ctab2mat(SEXP);
+extern SEXP _mcmcsae_diagC(SEXP);
+extern SEXP _mcmcsae_dotprodC(SEXP, SEXP);
+extern SEXP _mcmcsae_fast_aggrC(SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_inverseSPD(SEXP);
+extern SEXP _mcmcsae_log1pexpC(SEXP);
+extern SEXP _mcmcsae_mv_update(SEXP, SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_prec2se_cor(SEXP);
+extern SEXP _mcmcsae_sparse_sum_x(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_TMVN_HMC_C(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
     {"_mcmcsae_add_diagC",                             (DL_FUNC) &_mcmcsae_add_diagC,                              2},
     {"_mcmcsae_add_vector",                            (DL_FUNC) &_mcmcsae_add_vector,                             2},
     {"_mcmcsae_Cbacksolve",                            (DL_FUNC) &_mcmcsae_Cbacksolve,                             2},
     {"_mcmcsae_CbacksolveM",                           (DL_FUNC) &_mcmcsae_CbacksolveM,                            2},
-    {"_mcmcsae_cCHM_dsC_Cholesky",                     (DL_FUNC) &_mcmcsae_cCHM_dsC_Cholesky,                      5},
+    {"_mcmcsae_cCHM_dsC_Cholesky",                     (DL_FUNC) &_mcmcsae_cCHM_dsC_Cholesky,                      6},
     {"_mcmcsae_cCHM_update_inplace",                   (DL_FUNC) &_mcmcsae_cCHM_update_inplace,                    3},
     {"_mcmcsae_cCHMf_solve",                           (DL_FUNC) &_mcmcsae_cCHMf_solve,                            3},
     {"_mcmcsae_cCHMf_solve_matrix",                    (DL_FUNC) &_mcmcsae_cCHMf_solve_matrix,                     3},

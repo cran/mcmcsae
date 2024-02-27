@@ -12,7 +12,7 @@
 \item{recursive}{not used.}
 }
 \value{
-whether the tabMatrix object contains missings or not.
+Whether the tabMatrix object contains missings or not.
 }
 \description{
 S4 method for generic 'anyNA' and signature 'tabMatrix'

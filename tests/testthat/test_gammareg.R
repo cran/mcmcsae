@@ -17,6 +17,7 @@ df$y <- rgamma(n, shape=alpha, rate=alpha/mu)
 test_that("gamma regression works", {
   sampler <- create_sampler(y ~ reg(~ x1+x2), family="gamma", data=df)
   expect_equal(sampler$family$shape.prior$type, "gamma")
+  expect_true("gamma_shape_" %in% names(sampler$rprior()))
   sim <- MCMCsim(sampler, n.iter=600, burnin=250, n.chain=2, verbose=FALSE)
   summ <- summary(sim)
   expect_between(summ$reg1[, "Mean"], 0.2 * b, 5 * b)
@@ -28,7 +29,8 @@ test_that("gamma regression works", {
 })
 
 test_that("gamma regression prediction works", {
-  sampler <- create_sampler(y ~ reg(~ x1+x2), family="gamma", data=df[1:900, ])
+  sampler <- create_sampler(y ~ reg(~ x1+x2), family="Gamma", data=df[1:900, ])
+  # both "gamma" and "Gamma" (as used in stats) are allowed
   sim <- MCMCsim(sampler, n.iter=600, burnin=250, n.chain=2, verbose=FALSE)
   summ <- summary(sim)
   expect_equal(unname(summ$reg1[, "Mean"]), b, tolerance=1)

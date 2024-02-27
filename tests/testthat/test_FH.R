@@ -16,6 +16,7 @@ test_that("single block Gibbs sampler for FH model runs", {
     y ~ reg(~ 1 + x, name="beta") + gen(factor = ~ area, name="v"),
     Q0=1/psi, sigma.fixed=TRUE, data=df
   )
+  expect_identical(sampler$block[[1L]], c("beta", "v"))
   expect_true(sampler$mod[["v"]]$usePX)
   expect_length(sampler$mbs, 1L)
   sim <- MCMCsim(sampler, n.iter=500, burnin=100, n.chain=2, verbose=FALSE)
@@ -35,6 +36,7 @@ test_that("separate Gibbs block sampler, shortcut '_local' for area indicator, a
   sim <- MCMCsim(sampler, n.iter=500, burnin=100, n.chain=2, verbose=FALSE, store.all=TRUE)
   expect_is(sim$v, "dc")
   summ <- summary(sim)
+  expect_identical(nrow(summ$v), m)
   expect_named(compute_DIC(sim))
   expect_named(compute_WAIC(sim))
 })

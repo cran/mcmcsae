@@ -36,7 +36,7 @@
 #' @param by a vector by which to aggregate the result.
 #' @param tabM if \code{TRUE} return a list of tabMatrix objects.
 #' @param enclos enclosure to look for objects not found in \code{data}.
-#' @return Design matrix X, either an ordinary matrix or a sparse \code{dgCMatrix}.
+#' @returns Design matrix X, either an ordinary matrix or a sparse \code{dgCMatrix}.
 model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
                          drop.unused.levels=FALSE, sparse=NULL, drop0=TRUE, catsep="",
                          by=NULL, tabM=FALSE, enclos=.GlobalEnv) {
@@ -159,7 +159,7 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
     # allocate memory for i, x slots
     i <- integer(n * (ncol(tmat) + has_intercept))
     x <- numeric(length(i))
-    p <- rep.int(0L, q + 1L)
+    p <- integer(q + 1L)
   } else {
     out <- matrix(NA_real_, n, q)
   }

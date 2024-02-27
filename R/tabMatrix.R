@@ -54,6 +54,9 @@ setAs("factor", "tabMatrix",
   }
 )
 
+# index matrix has exactly one 1 in each row and otherwise 0s
+is_ind_matrix <- function(X) class(X)[1L] == "tabMatrix" && !X@num && !X@reduced
+
 setMethod("colSums", "tabMatrix", function(x, na.rm=FALSE, dims=1, ...)
   if (x@num)
     fast_aggrC(x@x, x@perm + 1L, x@Dim[2L])
@@ -83,9 +86,9 @@ setMethod("diag", "tabMatrix", function(x=1, nrow, ncol) {
   d <- x@Dim
   if (d[1L] <= d[2L]) {
     if (x@num)
-      out <- ifelse(x@perm == 0:(x@d[1L] - 1L), x@x, 0)
+      out <- ifelse(x@perm == 0:(d[1L] - 1L), x@x, 0)
     else
-      out <- ifelse(x@perm == 0:(x@d[1L] - 1L), 1, 0)
+      out <- ifelse(x@perm == 0:(d[1L] - 1L), 1, 0)
   } else {
     if (x@num)
       out <- ifelse(x@perm[seq_len(d[2L])] == 0:(d[2L] - 1L), x@x[seq_len(d[2L])], 0)
@@ -166,7 +169,7 @@ setMethod("coerce", c("matrix", "tabMatrix"), function(from, to="tabMatrix", str
 
 setMethod("coerce", c("dgCMatrix", "tabMatrix"), function(from, to="tabMatrix", strict=TRUE) {
   perm <- rep.int(-1L, nrow(from))
-  x <- vector("double", nrow(from))
+  x <- numeric(nrow(from))
   nnz <- from@p[-1L] - from@p[-length(from@p)]
   ind <- 1L
   for (co in seq_along(nnz)) {
@@ -211,7 +214,7 @@ tab_isPermutation <- function(M) {
 #' @param j integer vector indicating the columns to select. Not used for row subsetting.
 #' @param ... not used.
 #' @param drop whether to return a vector in case of a single selected row or column.
-#' @return the selected rows/columns as a tabMatrix or a vector.
+#' @returns The selected rows/columns as a tabMatrix or a vector.
 #' @name tabMatrix-indexing
 NULL
 
@@ -238,7 +241,7 @@ get_ind <- function(index, M, type="row") {
 tab_row_select <- function(M, i, drop) {
   i <- get_ind(i, M, "row")
   if (drop && length(i) == 1L) {
-    out <- rep.int(0, M@Dim[2L])
+    out <- numeric(M@Dim[2L])
     if (M@perm[i] >= 0L)
       out[M@perm[i] + 1L] <- if (M@num) M@x[i] else 1
     out
@@ -353,7 +356,7 @@ setMethod("nnzero", "tabMatrix", function(x, na.counted=NA) {
 #' @keywords internal
 #' @param x a tabMatrix object.
 #' @param recursive not used.
-#' @return whether the tabMatrix object contains missings or not.
+#' @returns Whether the tabMatrix object contains missings or not.
 setMethod("anyNA", "tabMatrix", function(x, recursive=FALSE)
   if (x@num) anyNA(x@x) else FALSE
 )
@@ -434,7 +437,7 @@ tables2tabM <- function(formula, data, ...) {
   tmat <- terms_matrix(trms)
   if (!length(tmat)) {
     if (intercept_only(formula))
-      return(list(new("tabMatrix", perm=rep.int(0L, n), reduced=FALSE, num=TRUE, x=rep.int(1, n), Dim=c(n, 1L))))
+      return(list(new("tabMatrix", perm=integer(n), reduced=FALSE, num=TRUE, x=rep.int(1, n), Dim=c(n, 1L))))
     else
       stop("empty formula")
   }
@@ -467,11 +470,11 @@ tables2tabM <- function(formula, data, ...) {
       }
     } else {
       if (length(countvars)) {
-        fk <- new("tabMatrix", perm=rep.int(0L, n), reduced=FALSE, num=TRUE,
+        fk <- new("tabMatrix", perm=integer(n), reduced=FALSE, num=TRUE,
                   x=xk, xlab=labk, Dim=c(n, 1L), Dimnames=list(NULL, labk))
       } else {
         # this should not happen, as the intercept only case is handled above
-        fk <- new("tabMatrix", perm=rep.int(0L, n), reduced=FALSE, num=TRUE,
+        fk <- new("tabMatrix", perm=integer(n), reduced=FALSE, num=TRUE,
                   x=rep.int(1, n), Dim=c(n, 1L))
       }
     }

@@ -12,7 +12,10 @@ vf <- rnorm(m, sd=0.4)
 
 df$y <- with(df, vf[f] + rnorm(n))
 test_that("gaussian model with just a single gen component works", {
+  sampler <- create_sampler(y ~ 1 + gen(factor = ~ f, name="v"), data=df)
+  expect_identical(names(sampler$mod), c("reg1", "v"))  # explicit intercept
   sampler <- create_sampler(y ~ gen(factor = ~ f, name="v"), data=df)
+  expect_identical(names(sampler$mod), "v")
   sim <- MCMCsim(sampler, n.chain = 2, n.iter=500, store.all=TRUE, verbose=FALSE)
   summ <- summary(sim)
   expect_between(summ$v_sigma[, "Mean"], 0.3 * 0.4, 3 * 0.4)

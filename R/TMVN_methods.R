@@ -36,25 +36,25 @@
 #' @param PG.approx.m see \code{\link{sampler_control}}.
 #' @param debug if \code{TRUE} a breakpoint is set at the beginning of the TMVN sampling
 #'  function. Mainly intended for developers.
-#' @return A method object, for internal use only.
-#' @name mcmcsae-TMVN-method
+#' @returns A method object, for internal use only.
+#' @name TMVN-methods
 NULL
 
 
 #' @export
-#' @rdname mcmcsae-TMVN-method
+#' @rdname TMVN-methods
 m_direct <- function() {
   list(method = "direct")
 }
 
 #' @export
-#' @rdname mcmcsae-TMVN-method
+#' @rdname TMVN-methods
 m_Gibbs <- function(slice=FALSE, diagnostic=FALSE, debug=FALSE) {
   list(method = "Gibbs", slice=slice, diagnostic=diagnostic, debug=debug)
 }
 
 #' @export
-#' @rdname mcmcsae-TMVN-method
+#' @rdname TMVN-methods
 m_HMC <- function(Tsim=pi/2, max.events=.Machine$integer.max, diagnostic=FALSE, debug=FALSE) {
   if (is.function(Tsim)) {
     Tsim_value <- Tsim()
@@ -69,7 +69,7 @@ m_HMC <- function(Tsim=pi/2, max.events=.Machine$integer.max, diagnostic=FALSE, 
 }
 
 #' @export
-#' @rdname mcmcsae-TMVN-method
+#' @rdname TMVN-methods
 m_HMCZigZag <- function(Tsim=1, rate=1, prec.eq=NULL, diagnostic=FALSE,
                         max.events=.Machine$integer.max, adapt=FALSE, debug=FALSE) {
   if (is.function(Tsim)) {
@@ -87,7 +87,7 @@ m_HMCZigZag <- function(Tsim=1, rate=1, prec.eq=NULL, diagnostic=FALSE,
 }
 
 #' @export
-#' @rdname mcmcsae-TMVN-method
+#' @rdname TMVN-methods
 m_softTMVN <- function(sharpness=100, useV=FALSE, CG=NULL, PG.approx=TRUE, PG.approx.m=-2L, debug=FALSE) {
   if (!is.null(CG)) {
     if (useV) stop("conjugate gradients algorithm not supported in combination with 'useV=TRUE'")

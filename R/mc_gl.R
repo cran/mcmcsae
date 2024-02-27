@@ -25,7 +25,7 @@
 #' @param name the name of the model component. This name is used in the output of the
 #'  MCMC simulation function \code{\link{MCMCsim}}. By default this name will be
 #'  the name of the corresponding generic random effects component appended by '_gl'.
-#' @return An object with precomputed quantities for sampling from
+#' @returns An object with precomputed quantities for sampling from
 #'  prior or conditional posterior distributions for this model component. Only intended
 #'  for internal use by other package functions.
 glreg <- function(formula=NULL, remove.redundant=FALSE, prior=NULL, Q0=NULL,
@@ -77,7 +77,7 @@ glreg <- function(formula=NULL, remove.redundant=FALSE, prior=NULL, Q0=NULL,
   prior$init(q, e$e$coef.names[[name]], sparse=e$e$modeled.Q, sigma=!e$e$sigma.fixed)
   informative.prior <- prior$informative
   Q0 <- prior$precision
-  Q0b0 <- rep.int(0, q)  # need this in draw function, even though only b0=0 is supported
+  Q0b0 <- numeric(q)  # need this in draw function, even though only b0=0 is supported
 
   # for modeled Q, the XX block of XX.ext is updated -> choose sparse
   XX.ext <- economizeMatrix(bdiag(e$XX, Q0), symmetric=TRUE, sparse=if (e$e$modeled.Q) TRUE else NULL)

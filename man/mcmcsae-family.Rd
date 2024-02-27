@@ -8,6 +8,7 @@
 \alias{f_poisson}
 \alias{f_multinomial}
 \alias{f_gamma}
+\alias{f_gaussian_gamma}
 \title{Functions for specifying a sampling distribution and link function}
 \usage{
 f_gaussian(link = "identity")
@@ -23,9 +24,11 @@ f_multinomial(link = "logit", K = NULL)
 f_gamma(
   link = "log",
   shape.vec = ~1,
-  shape.prior = pr_gamma(1, 1),
+  shape.prior = pr_gamma(0.1, 0.1),
   shape.MH.type = c("RW", "gamma")
 )
+
+f_gaussian_gamma(link = "identity", var.data, ...)
 }
 \arguments{
 \item{link}{the name of a link function. Currently the only allowed link functions are:
@@ -48,6 +51,10 @@ and "gamma" for an approximating gamma proposal, found using an iterative
 algorithm. In the latter case, a Metropolis-Hastings accept-reject step is
 currently omitted, so the sampling algorithm is an approximate one,
 though one that is usually quite accurate and efficient.}
+
+\item{var.data}{the (variance) data for the gamma part of family \code{gaussian_gamma}.}
+
+\item{...}{further arguments passed to \code{f_gamma}.}
 }
 \value{
 A family object.

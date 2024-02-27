@@ -8,7 +8,7 @@
 #'  a default value depending on \code{method} is used.
 # NB a negative tol value for method "chol" -->
 #   default RELATIVE tolerance of ncol(X) * .Machine$double.eps * max(diag(X))
-#' @return For function \code{detect_redundancy} an integer vector indicating columns of \code{X}
+#' @returns For function \code{detect_redundancy} an integer vector indicating columns of \code{X}
 #'  that are numerically redundant, and \code{NULL} in case no redundancy is detected.
 #'  For function \code{remove_redundancy} the matrix object with redundant columns,
 #'  if any, removed.
@@ -67,7 +67,7 @@ is_zero_matrix <- function(x) {
 
 # create a dgCMatrix of zeros
 zeroMatrix <- function(nr, nc)
-  new("dgCMatrix", p=rep.int(0L, nc + 1L), Dim=c(as.integer(nr), as.integer(nc)))
+  new("dgCMatrix", p=integer(nc + 1L), Dim=c(as.integer(nr), as.integer(nc)))
 
 
 ################################################################################
@@ -95,7 +95,7 @@ zeroMatrix <- function(nr, nc)
 #'
 #' @param M a matrix of class 'matrix', 'dgCMatrix', 'dsCMatrix', 'tabMatrix', or 'ddiMatrix'.
 #' @param v a numeric vector.
-#' @return For \code{\%m*v\%} the vector \eqn{Mv} and for \code{crossprod_mv} the vector
+#' @returns For \code{\%m*v\%} the vector \eqn{Mv} and for \code{crossprod_mv} the vector
 #'  \eqn{M'v} where \eqn{M'} denotes the transpose of \eqn{M}.
 #' @name matrix-vector
 NULL
@@ -105,7 +105,7 @@ NULL
 `%m*v%` <- function(M, v) {
   switch(class(M)[1L],
     matrix = Cdense_numeric_prod(M, v),
-    ddiMatrix = if (length(M@x)) M@x * v else v,
+    ddiMatrix = if (length(M@x)) M@x * v else copy_vector(v),
     tabMatrix = Ctab_numeric_prod(M, v),
     dgCMatrix = Csparse_numeric_prod(M, v),
     dsCMatrix = {
@@ -122,7 +122,7 @@ NULL
 crossprod_mv <- function(M, v) {
   switch(class(M)[1L],
     matrix = Cdense_numeric_crossprod(M, v),
-    ddiMatrix = if (length(M@x)) M@x * v else v,
+    ddiMatrix = if (length(M@x)) M@x * v else copy_vector(v),
     tabMatrix = Ctab_numeric_crossprod(M, v),
     dgCMatrix = Csparse_numeric_crossprod(M, v),
     dsCMatrix = {
@@ -251,7 +251,7 @@ crossprod_sym <- function(M, Q) {
       switch(classQ,
         matrix = Cdense_crossprod_sym2(M, Cdense_dense_prod(Q, M)),
         dsCMatrix = Cdense_crossprod_sym2(M, Q %m*m% M),
-        ddiMatrix = 
+        ddiMatrix =
           if (Q@diag == "U")
             Cdense_crossprod_sym0(M)
           else
@@ -389,7 +389,7 @@ commutator <- function(M1, M2) M1 %*% M2 - M2 %*% M1
 #' @keywords internal
 #' @param x a matrix object.
 #' @param y a matrix object.
-#' @return A matrix object. In case one of the arguments is a regular (dense) \code{matrix}
+#' @returns A matrix object. In case one of the arguments is a regular (dense) \code{matrix}
 #'  the result is a \code{matrix} as well.
 #' @name Matrix-methods
 NULL
@@ -550,8 +550,9 @@ economizeDiagMatrix <- function(M, strip.names=TRUE, vec.diag=FALSE) {
 
 #' Transform a matrix into an efficient representation, if possible.
 #'
-#' Supported matrix representations are ddiMatrix (unit or not), tabMatrix,
-#' dgCMatrix (dsCMatrix if symmetric) and matrix.
+#' Supported matrix representations are \code{ddiMatrix} (unit or not),
+#' tabMatrix (only if \code{symmetric=FALSE}), \code{dgCMatrix}
+#' (\code{dsCMatrix} if \code{symmetric=TRUE}) and matrix.
 #' For sparse matrices the order of decreasing efficiency is: unit-ddi,
 #' ddi, tab, dgC/dsC.
 # TODO add option tol to pass to drop0 to set numerically very small coefficients to zero (or zapsmall for relative criterion)
@@ -569,7 +570,7 @@ economizeDiagMatrix <- function(M, strip.names=TRUE, vec.diag=FALSE) {
 #'  this vector at its diagonal. Otherwise, vector \code{M} is interpreted as a single-column matrix.
 #' @param check if \code{TRUE}, do some checks on the input matrix, such as a check for NAs and a
 #'  symmetry check in case \code{symmetric=TRUE}.
-#' @return the matrix in an efficient (memory and performance-wise) format.
+#' @returns The matrix in an efficient (memory and performance-wise) format.
 economizeMatrix <- function(M, sparse=NULL, symmetric=FALSE, strip.names=TRUE,
                             allow.tabMatrix=TRUE, drop.zeros=FALSE, vec.diag=FALSE, vec.as.diag=TRUE, check=FALSE) {
   if (is.vector(M)) {
@@ -616,14 +617,14 @@ economizeMatrix <- function(M, sparse=NULL, symmetric=FALSE, strip.names=TRUE,
 #'
 #' @noRd
 #' @param x a (possibly sparse) matrix object.
-#' @return fraction of zero matrix elements.
+#' @returns The fraction of zero matrix elements.
 sparsity <- function(x) 1 - nnzero(x) / prod(dim(x))
 
 #' Heuristic for choosing between sparse Matrix and (dense) matrix
 #'
 #' @noRd
 #' @param x a matrix or Matrix.
-#' @return whether a sparse matrix would probably be better based on a simple heuristic.
+#' @returns Whether, based on a simple heuristic, a sparse matrix representation would probably be more efficient.
 better_sparse <- function(x, symmetric=FALSE) {
   if (symmetric) {
     # the packed dsC format is another advantage compared to matrix
@@ -660,7 +661,7 @@ setMethod("solve", signature("ddiMatrix", "matrix"), function(a, b)
 #'  of all factors using this separator. Default is ':'.
 #' @param lex.order passed to \code{\link[base]{interaction}}.
 #' @param enclos enclosure to look for objects not found in \code{data}.
-#' @return the combined (interaction) factor variable.
+#' @returns The combined (interaction) factor variable.
 combine_factors <- function(fvars, data, drop=FALSE, sep=":", lex.order=FALSE, enclos=.GlobalEnv) {
   if (length(fvars)) {
     fac <- eval_in(fvars[1L], data, enclos)
@@ -704,7 +705,7 @@ cross <- function(Q1, Q2) {
 #' @param w vector of weights associated with the levels of \code{fac}.
 #' @param mean if \code{TRUE}, aggregation will produce (weighted) means instead of sums.
 #' @param facnames whether the factor levels should be used as column names for the aggregation matrix.
-#' @return sparse aggregation matrix of class \code{tabMatrix}.
+#' @returns A sparse aggregation matrix of class \code{tabMatrix}.
 aggrMatrix <- function(fac, w=1, mean=FALSE, facnames=FALSE) {
   n <- length(fac)
   if (n == 0L) stop("empty factor variable")
@@ -735,7 +736,7 @@ aggrMatrix <- function(fac, w=1, mean=FALSE, facnames=FALSE) {
 # M: dgCMatrix
 # fun: vector to scalar function
 dgC_colwise <- function(M, fun) {
-  out <- vector(mode="numeric", length=ncol(M))
+  out <- numeric(ncol(M))
   colsizes <- diff(M@p)
   ind <- 1L
   for (i in seq_along(colsizes)) {
@@ -747,19 +748,33 @@ dgC_colwise <- function(M, fun) {
 }
 
 # returns a logical vector indicating whether a column is zero or not
-# TODO use relative instead of absolute tolerance (?)
+# TODO use relative instead of absolute tolerance (?), or mean (over nonzero elements) instead of sum?
 zero_col <- function(M, tol=.Machine$double.eps^0.5) {
   f <- function(x) sum(abs(x))
   switch(class(M)[1L],
     matrix = apply(M, 2L, f) < tol,
-    ddiMatrix = if (M@diag == "U") rep.int(FALSE, M@Dim[1L]) else abs(M@x) < tol,
-    tabMatrix = {
+    ddiMatrix = if (M@diag == "U") rep(FALSE, M@Dim[2L]) else abs(M@x) < tol,
+    tabMatrix =
       if (M@num)
-        c(tapply(M@x, 0:(M@Dim[2L] - 1L), f)) < tol
+        as.numeric(tapply(M@x, 0:(M@Dim[2L] - 1L), f)) < tol
       else
-        tabulate(M@perm + 1L, nbins=M@Dim[2L]) == 0L
-    },
+        tabulate(M@perm + 1L, nbins=M@Dim[2L]) == 0L,
     dgCMatrix = dgC_colwise(M, f) < tol,
+    stop("unsupported class '", class(M)[1L], "'")
+  )
+}
+
+colwise_maxabs <- function(M) {
+  f <- function(x) max(abs(x))
+  switch(class(M)[1L],
+    matrix = apply(M, 2L, f),
+    ddiMatrix = if (M@diag == "U") rep.int(1, M@Dim[2L]) else abs(M@x),
+    tabMatrix =
+      if (M@num)
+        as.numeric(tapply(M@x, 0:(M@Dim[2L] - 1L), f))
+      else
+        as.numeric(tabulate(M@perm + 1L, nbins=M@Dim[2L]) != 0L),
+    dgCMatrix = dgC_colwise(M, f),
     stop("unsupported class '", class(M)[1L], "'")
   )
 }

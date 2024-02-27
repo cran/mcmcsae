@@ -23,8 +23,10 @@ gen(
   S0 = NULL,
   SA = NULL,
   formula.gl = NULL,
+  a = 1000,
   name = "",
   sparse = NULL,
+  control = gen_control(),
   debug = FALSE
 )
 }
@@ -145,11 +147,19 @@ of coefficients.}
 around which the random effect component is hierarchically centered.
 See \code{\link{glreg}} for details.}
 
+\item{a}{only used in case the effects are MLiG distributed, such as is
+assumed in case of a gamma sampling distribution, or for
+gaussian variance modelling. In those cases \code{a} controls how close
+the effects' prior is to a normal prior, see \code{\link{pr_MLiG}}.}
+
 \item{name}{the name of the model component. This name is used in the output of the MCMC simulation
 function \code{\link{MCMCsim}}. By default the name will be 'gen' with the number of the model term attached.}
 
 \item{sparse}{whether the model matrix associated with \code{formula} should be sparse.
 The default is based on a simple heuristic based on storage size.}
+
+\item{control}{a list with further computational options. These options can
+be specified using function \code{\link{gen_control}}.}
 
 \item{debug}{if \code{TRUE} a breakpoint is set at the beginning of the posterior
 draw function associated with this model component. Mainly intended for developers.}

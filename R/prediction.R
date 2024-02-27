@@ -65,7 +65,7 @@
 #' @param export a character vector with names of objects to export to the workers. This may
 #'  be needed for parallel execution if expressions in \code{fun.} depend on global variables.
 #' @param ... currently not used.
-#' @return An object of class \code{dc}, containing draws from the posterior (or prior) predictive distribution.
+#' @returns An object of class \code{dc}, containing draws from the posterior (or prior) predictive distribution.
 #'  If \code{ppcheck=TRUE} posterior predictive p-values are returned as an additional attribute.
 #'  In case \code{to.file=TRUE} the file name used is returned.
 # TODO: pp check only, i.e. without storing predictions either in an object or a file
@@ -244,10 +244,6 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
     if (type == "response") linkinv <- fam$linkinv
   }
 
-  # Poisson is implemented as negbin with large ry and offset -log(ry) --> need to subtract this offset 
-  subtract.offset <- fam$family == "poisson"
-  if (subtract.offset) log.ry <- log(model$ry)
-
   if (type %in% c("data", "data_cat")) {
     if (fam$family == "gamma") {
       rpred <- fam$make_rpredictive(newdata)
@@ -283,7 +279,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
       else
         out <- rep.int(list(matrix(NA_real_, length(iters), d)), length(chains))
       if (ppcheck) {
-        ppp <- rep.int(0, d)
+        ppp <- numeric(d)
         if (arg1)
           fy <- fun.(model$y)
         else
@@ -296,7 +292,6 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
             ystar <- p[["linpred_"]]
           else
             ystar <- model$lin_predict(p, X.)
-          if (subtract.offset) ystar <- ystar + log.ry
           switch(type,
             data=, data_cat = ystar <- rpredictive(p, ystar, cholQ, var, V, ny, ry),
             response = ystar <- linkinv(ystar)
@@ -325,7 +320,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
         out <- rep.int(list(matrix(NA_real_, n.it, d)), n.chain)
     }
     if (ppcheck) {
-      ppp <- rep.int(0, d)
+      ppp <- numeric(d)
       if (arg1)
         fy <- fun.(model$y)
       else
@@ -341,7 +336,6 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
           ystar <- p[["linpred_"]]
         else
           ystar <- model$lin_predict(p, X.)
-        if (subtract.offset) ystar <- ystar + log.ry
         switch(type,
           data=, data_cat = ystar <- rpredictive(p, ystar, cholQ, var, V, ny, ry),
           response = ystar <- linkinv(ystar)
@@ -402,7 +396,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
 #' @param Q0 see \code{\link{create_sampler}}.
 #' @param formula.V see \code{\link{create_sampler}}.
 #' @param linpred see \code{\link{create_sampler}}.
-#' @return A list with a generated data vector and a list of prior means of the
+#' @returns A list with a generated data vector and a list of prior means of the
 #'  parameters. The parameters are drawn from their priors.
 generate_data <- function(formula, data=NULL, family="gaussian",
                           ny=NULL, ry=NULL, r.mod,

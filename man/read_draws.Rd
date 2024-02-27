@@ -19,7 +19,7 @@ Read draws written to file by \code{\link{MCMCsim}} used with argument \code{to.
 }
 \examples{
 \dontrun{
-# NB this example creates a file "MCdraws_e_.RData" in the working directory
+# NB this example creates a file "MCdraws_e_.dat" in the working directory
 n <- 100
 dat <- data.frame(x=runif(n), f=as.factor(sample(1:5, n, replace=TRUE)))
 gd <- generate_data(~ reg(~ x + f, prior=pr_normal(precision=1), name="beta"), data=dat)

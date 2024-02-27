@@ -6,12 +6,7 @@ check_ny <- function(ny, data) {
     ny <- eval_in(ny, data)
   } else {
     if (!is.numeric(ny)) stop("wrong input for 'ny'")
-    if (is.integer(data) && length(data) == 1L) {
-      # data interpreted as sample size
-      n <- data
-    } else {
-      n <- nrow(data)
-    }
+    n <- n_row(data)
     if (all(length(ny) != c(1L, n))) stop("wrong length for 'ny'")
     if (anyNA(ny)) stop("missings in 'ny' not allowed")
     if (any(ny < 0)) stop("'ny' cannot be negative")
@@ -30,12 +25,7 @@ check_ry <- function(ry, data) {
     ry <- eval_in(ry, data)
   } else {
     if (!is.numeric(ry)) stop("wrong input for 'ry'")
-    if (is.integer(data) && length(data) == 1L) {
-      # data interpreted as sample size
-      n <- data
-    } else {
-      n <- nrow(data)
-    }
+    n <- n_row(data)
     if (all(length(ry) != c(1L, n))) stop("wrong length for 'ry'")
     if (anyNA(ry)) stop("missings in 'ry' not allowed")
     if (any(ry <= 0)) stop("'ry' must be positive")

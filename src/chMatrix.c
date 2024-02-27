@@ -52,21 +52,22 @@ void chm_set_ordering(const int m) {
 
 // Cholesky of dsCMatrix
 // added argument m: ordering method (integer)
-SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP super, SEXP Imult, SEXP m) {
+SEXP CHM_dsC_Cholesky(SEXP a, SEXP perm, SEXP super, SEXP Imult, SEXP m, SEXP LDL) {
   CHM_FR L;
   CHM_SP A = AS_CHM_SP__(a);
   double beta[2] = {0, 0};
   beta[0] = asReal(Imult);
 
   int iSuper = asLogical(super),
-      iPerm  = asLogical(perm);
+      iPerm  = asLogical(perm),
+      iLDL   = asLogical(LDL);
   int im     = asInteger(m);
   if ((im < -1) || (im > 3)) error("Cholesky ordering method must be an integer between -1 and 3");
 
-  // NA --> let CHOLMOD choose
-  if (iSuper == NA_LOGICAL)	iSuper = -1;
+  if (iSuper == NA_LOGICAL)	iSuper = -1;  // NA --> let CHOLMOD choose
+  if (iLDL > 0) iSuper = 0;
 
-  c.final_ll = 1;
+  c.final_ll = (iLDL == 0) ? 1 : 0;
   c.supernodal = (iSuper > 0) ? CHOLMOD_SUPERNODAL :
     ((iSuper < 0) ? CHOLMOD_AUTO : CHOLMOD_SIMPLICIAL);
 

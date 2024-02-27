@@ -26,7 +26,7 @@
 #' @param name the name of the model component. This name is used in the output of the
 #'  MCMC simulation function \code{\link{MCMCsim}}. By default the name will be 'vreg'
 #'  with the number of the variance model term attached.
-#' @return An object with precomputed quantities and functions for sampling from
+#' @returns An object with precomputed quantities and functions for sampling from
 #'  prior or conditional posterior distributions for this model component. Intended
 #'  for internal use by other package functions.
 #' @references
@@ -52,7 +52,7 @@ vreg <- function(formula=NULL, remove.redundant=FALSE, sparse=NULL, X=NULL,
     if (remove.redundant) X <- remove_redundancy(X)
   } else
     X <- economizeMatrix(X, strip.names=FALSE, check=TRUE)
-  if (nrow(X) != e$n) stop("design matrix with incompatible number of rows")
+  if (nrow(X) != e[["n"]]) stop("design matrix with incompatible number of rows")
   e$coef.names[[name]] <- colnames(X)
   X <- unname(X)
   q <- ncol(X)
@@ -83,7 +83,10 @@ vreg <- function(formula=NULL, remove.redundant=FALSE, sparse=NULL, X=NULL,
 
   MVNsampler <- create_TMVN_sampler(Q=0.5*crossprod(X) + Q0, name=name)
 
-  compute_Qfactor <- function(p) exp(X %m*v% (- p[[name]]))
+  if (is_ind_matrix(X) && q < e[["n"]])
+    compute_Qfactor <- function(p) X %m*v% exp(-p[[name]])
+  else
+    compute_Qfactor <- function(p) exp(X %m*v% (-p[[name]]))
 
   # function that creates an oos prediction function (closure) based on new data
   make_predict_Vfactor <- function(newdata) {

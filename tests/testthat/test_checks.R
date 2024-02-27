@@ -50,3 +50,10 @@ test_that("zeroes are flagged for gamma family", {
   dat$y <- rgamma(n, shape=1e-4)  # this yields many 0s due to numerical underflow
   expect_error(create_sampler(y ~ 1, data=dat, family="gamma"), "strictly positive")
 })
+
+test_that("using 'vreg' or 'vfac' model component in formula is flagged", {
+  dat$y <- rnorm(n)
+  dat$g <- sample(1:10, n, replace=TRUE)
+  expect_error(create_sampler(y ~ 1 + gen(factor = ~ g) + vreg(factor="g")), "variance model")
+  expect_error(create_sampler(y ~ 1 + x + vfac(factor="g")), "variance model")
+})

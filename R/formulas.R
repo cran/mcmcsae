@@ -37,21 +37,21 @@ get_vars <- function(formula, rhs.only=TRUE) {
   vars
 }
 
-get_types <- function(mod, specials=c("gen", "mec", "reg", "bart")) {
+get_types <- function(mod) {
   if (length(mod))
-    sapply(mod, function(x) match.arg(as.character(x[[1L]]), specials))
+    sapply(mod, function(x) match.arg(as.character(x[[1L]]), .mod.specials))
   else
     NULL
 }
 
 has_explicit_intercept <- function(formula) {
-  fstr <- tail(as.character(formula), 1L)
+  fstr <- as.character(formula[length(formula)])
   grepl("(^|\\+)\\s*\\(*\\s*1\\s*\\)*\\s*(\\+|$)", fstr)
 }
 
-standardize_formula <- function(formula, specials=c("reg", "mec", "gen", "bart"), default="reg", data=NULL) {
+standardize_formula <- function(formula, default="reg", data=NULL) {
   # interpret everything not in special terms as a default component
-  tf <- terms(formula, keep.order=TRUE, specials=specials, data=data)
+  tf <- terms(formula, keep.order=TRUE, specials=.mod.specials, data=data)
   # NB ~ . - var does not warn if var is not in data
   idx <- unlist(attr(tf, "specials"), use.names=FALSE)  # variable indices of special terms
   if (length(idx)) {
@@ -66,13 +66,13 @@ standardize_formula <- function(formula, specials=c("reg", "mec", "gen", "bart")
     remainder <- attr(tf, "term.labels")
   }
   e <- environment(formula)
-  if (length(remainder) || has_explicit_intercept(formula) || (!length(idx) && attr(tf, "intercept") == 1L)) {
+  if (length(remainder) || has_explicit_intercept(formula) ||
+      (!length(idx) && !length(attr(tf, "offset")) && attr(tf, "intercept") == 1L)) {
     if (length(remainder)) {
-      if (attr(tf, "intercept") == 0L) {
+      if (attr(tf, "intercept") == 0L)
         formula <- paste0(default, "( ~ 0 +", paste(remainder, collapse=" + "), ")")
-      } else {
+      else
         formula <- paste0(default, "( ~", paste(remainder, collapse=" + "), ")")
-      }
     } else {
       formula <- paste0(default, "( ~ 1)")
     }
@@ -82,7 +82,7 @@ standardize_formula <- function(formula, specials=c("reg", "mec", "gen", "bart")
     }
     if (!is.null(attr(tf, "offset"))) {
       if (length(attr(tf, "offset")) > 1L) stop("only one offset allowed")
-      formula <- paste(rownames(attr(tf, "factors"))[[attr(tf, "offset")]], "+", formula)
+      formula <- paste(deparse(attr(tf, "variables")[[attr(tf, "offset") + 1L]]), "+", formula)
     }
     if (attr(tf, "response") > 0L) {
       formula <- as.formula(paste(deparse(attr(tf, "variables")[[attr(tf, "response") + 1L]]), "~", formula), env=e)
@@ -95,11 +95,11 @@ standardize_formula <- function(formula, specials=c("reg", "mec", "gen", "bart")
 
 # use prefix to prevent duplicate names in automatic naming of
 # model components in different model parts, e.g. mean and variance model
-to_mclist <- function(formula, specials=c("gen", "mec", "reg", "bart"), prefix="") {
+to_mclist <- function(formula, prefix="") {
   vars <- get_vars(formula)
   if (length(vars)) {
     parnames <- sapply(vars, function(x) if (is.null(x$name)) NA_character_ else x$name)
-    types <- sapply(vars, function(x) match.arg(as.character(x[[1L]]), specials))
+    types <- get_types(vars)
     if (prefix == "v") {  # backward compatible naming for vfac, vreg components
       prefix <- ifelse(any(types[is.na(parnames)] == c("reg", "gen")), "v", "")
     }

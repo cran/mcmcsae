@@ -20,7 +20,9 @@
 #'  algorithm. In the latter case, a Metropolis-Hastings accept-reject step is
 #'  currently omitted, so the sampling algorithm is an approximate one,
 #'  though one that is usually quite accurate and efficient.
-#' @return A family object.
+#' @param var.data the (variance) data for the gamma part of family \code{gaussian_gamma}.
+#' @param ... further arguments passed to \code{f_gamma}.
+#' @returns A family object.
 #' @name mcmcsae-family
 #' @references
 #'  J.W. Miller (2019).
@@ -75,7 +77,7 @@ f_multinomial <- function(link="logit", K=NULL) {
 #' @export
 #' @rdname mcmcsae-family
 # TODO use control function for shape.MH.type
-f_gamma <- function(link="log", shape.vec = ~ 1, shape.prior = pr_gamma(1, 1),
+f_gamma <- function(link="log", shape.vec = ~ 1, shape.prior = pr_gamma(0.1, 0.1),
                     shape.MH.type = c("RW", "gamma")) {
   family <- "gamma"  # later change to type <- "gamma"
   link <- match.arg(link)
@@ -113,11 +115,11 @@ f_gamma <- function(link="log", shape.vec = ~ 1, shape.prior = pr_gamma(1, 1),
         function(p) alpha0 * p[["gamma_shape_"]]
     }
   }
+  g <- function(y, p) y * exp(-p[["e_"]]) + p[["e_"]]
   if (!alpha.fixed) {
     make_draw_shape <- function(y) {
       # set up sampler for full conditional posterior for alpha, given linear predictor
       n <- length(y)
-      #if (shape.prior$type == "fixed") return(function(p) shape.prior$value)
       # MH within Gibbs
       switch(shape.MH.type,
         RW = {
@@ -138,7 +140,8 @@ f_gamma <- function(link="log", shape.vec = ~ 1, shape.prior = pr_gamma(1, 1),
             f <- add(f, quote(
               log.ar <- shape.prior[["shape"]] * log(alpha.star/alpha) - shape.prior[["rate"]] * (alpha.star - alpha) +
                 n * (lgamma(alpha) - lgamma(alpha.star) + alpha.star * log(alpha.star) - alpha * log(alpha)) +
-                (alpha.star - alpha) * (sumlogy - sum(p[["e_"]]) - sum(y * exp(-p[["e_"]])))
+                (alpha.star - alpha) * (sumlogy - sum(g(y, p)))
+                #(alpha.star - alpha) * (sumlogy - sum(p[["e_"]]) - sum(y * exp(-p[["e_"]])))
               ))
           } else {
             f <- f |>
@@ -149,7 +152,8 @@ f_gamma <- function(link="log", shape.vec = ~ 1, shape.prior = pr_gamma(1, 1),
                   sum(lgamma(alpha.vec) - lgamma(alpha.star.vec)) +
                   sum(alpha.star.vec * log(alpha.star.vec * y)) -
                   sum(alpha.vec * log(alpha.vec * y)) +
-                  sum((alpha.vec - alpha.star.vec) * (y * exp(-p[["e_"]]) + p[["e_"]]))
+                  sum((alpha.vec - alpha.star.vec) * g(y, p))
+                  #sum((alpha.vec - alpha.star.vec) * (y * exp(-p[["e_"]]) + p[["e_"]]))
               ))
           }
           add(f, quote(if (log(runif(1L)) < log.ar) alpha.star else alpha))
@@ -162,7 +166,8 @@ f_gamma <- function(link="log", shape.vec = ~ 1, shape.prior = pr_gamma(1, 1),
             B00 <- shape.prior[["rate"]] - sum(log(y)) - n
             function(p) {
               A <- A0
-              B0 <- B00 + sum(y * exp(-p[["e_"]])) + sum(p[["e_"]])
+              B0 <- B00 + sum(g(y, p))
+              #B0 <- B00 + sum(y * exp(-p[["e_"]])) + sum(p[["e_"]])
               B <- B0
               #A <- shape.prior$shape + n
               #B0 <- shape.prior$rate + sum(y * exp(-p[["e_"]])) - sumlogy + sum(p[["e_"]]) - n
@@ -189,7 +194,8 @@ f_gamma <- function(link="log", shape.vec = ~ 1, shape.prior = pr_gamma(1, 1),
             B00 <- shape.prior[["rate"]] - sum(alpha0 * (log(y) + 1))
             function(p) {
               A <- A0
-              B0 <- B00 + sum(alpha0 * (y * exp(-p[["e_"]]) + p[["e_"]]))
+              B0 <- B00 + sum(alpha0 * g(y, p))
+              #B0 <- B00 + sum(alpha0 * (y * exp(-p[["e_"]]) + p[["e_"]]))
               B <- B0
               for (i in 1:10) {
                 a <- A/B
@@ -214,23 +220,23 @@ f_gamma <- function(link="log", shape.vec = ~ 1, shape.prior = pr_gamma(1, 1),
       if (alpha.scalar) {
         llh_0 <- (alpha - 1) * sum(log(y))
         llh_0 <- llh_0 + n * (alpha * log(alpha) - lgamma(alpha))
-        function(p) llh_0 - alpha * sum(p[["e_"]] + y * exp(-p[["e_"]]))
+        function(p) llh_0 - alpha * sum(g(y, p))
       } else {
         llh_0 <- sum((alpha - 1) * log(y))
         llh_0 <- llh_0 + sum(alpha * log(alpha) - lgamma(alpha))
-        function(p) llh_0 - sum(alpha * (p[["e_"]] + y * exp(-p[["e_"]])))
+        function(p) llh_0 - sum(alpha * g(y, p))
       }
     } else {
       llh_0 <- -sum(log(y))
       if (alpha.scalar) {
         function(p) {
           alpha <- get_shape(p)
-          (1 - alpha) * llh_0 + n * (alpha * log(alpha) - lgamma(alpha)) - alpha * sum(p[["e_"]] + y * exp(-p[["e_"]]))
+          (1 - alpha) * llh_0 + n * (alpha * log(alpha) - lgamma(alpha)) - alpha * sum(g(y, p))
         }
       } else
         function(p) {
           alpha <- get_shape(p)
-          llh_0 + sum(alpha * log(alpha * y) - lgamma(alpha)) - sum(alpha * (p[["e_"]] + y * exp(-p[["e_"]])))
+          llh_0 + sum(alpha * log(alpha * y) - lgamma(alpha)) - sum(alpha * g(y, p))
         }
     }
   }
@@ -284,4 +290,50 @@ f_gamma <- function(link="log", shape.vec = ~ 1, shape.prior = pr_gamma(1, 1),
     }
   }
   environment()
+}
+
+#' @export
+#' @rdname mcmcsae-family
+f_gaussian_gamma <- function(link="identity", var.data, ...) {
+  family <- "gaussian_gamma"
+  link <- match.arg(link)
+  linkinv=make.link(link)$linkinv
+  if (!inherits(var.data, "formula")) stop("'var.data' must be a formula")
+  var.family <- f_gamma(...)
+  self <- environment()
+  sigmasq <- NULL
+  init <- function(data) {
+    var.family$init(data)
+    copy_objects(var.family, self,
+                 c("alpha.fixed", "shape.MH.type", "get_shape",
+                   if (var.family$alpha.fixed) NULL else "shape.prior"))
+    sigmasq <<- model_matrix(update.formula(var.data, ~ . - 1), data)
+    if (ncol(sigmasq) != 1L) stop("'var.data' must contain a single numeric variable")
+    sigmasq <<- as.numeric(sigmasq)
+  }
+  g <- function(y, p) y * p[["Q_"]] - log(p[["Q_"]])
+  make_draw_shape <- function(y) {
+    draw_shape <- var.family$make_draw_shape(y)
+    assign("g", g, envir=environment(draw_shape))
+    draw_shape
+  }
+  make_llh_gamma <- function(y) {
+    llh_gamma <- var.family$make_llh(sigmasq)
+    assign("g", g, envir=environment(llh_gamma))
+    # NB gaussian contribution is added in samplers.R (until all llh computations have been moved to family objects)
+    llh_gamma
+  }
+  make_llh_i <- function(y) {
+    stop("TBI: pointwise log-likelihood for gaussian-gamma family")
+    # TODO gaussian contribution
+    var.family$make_llh_i(y)
+  }
+  self
+}
+
+# copy objects from one env to another by reference
+# see https://stackoverflow.com/questions/9965577/copy-move-one-environment-to-another
+copy_objects <- function(from, to, names=ls(from, all.names=TRUE)) {
+  mapply(assign, names, mget(names, from), list(to), SIMPLIFY=FALSE, USE.NAMES=FALSE)
+  invisible(NULL)
 }

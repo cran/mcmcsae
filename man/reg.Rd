@@ -81,7 +81,7 @@ with the number of the model term attached.}
 draw function associated with this model component. Mainly intended for developers.}
 }
 \value{
-an object with precomputed quantities and functions for sampling from
+An object with precomputed quantities and functions for sampling from
  prior or conditional posterior distributions for this model component. Intended
  for internal use by other package functions.
 }

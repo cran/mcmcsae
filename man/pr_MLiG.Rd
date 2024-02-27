@@ -15,7 +15,7 @@ large \code{a} limit, when the distribution approaches a normal
 distribution.}
 
 \item{labels}{optional character vector with coefficient labels. If specified,
-it should have the same length of at least one of \code{mean} and \code{precision},
+it should have the same length as at least one of \code{mean} and \code{precision},
 and in that case the MLiG prior with these parameters is assigned to these coefficients,
 while any coefficients not present in labels will be assigned a non-informative
 prior with mean 0 and precision 0.}

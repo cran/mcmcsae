@@ -16,7 +16,7 @@ aggrMatrix(fac, w = 1, mean = FALSE, facnames = FALSE)
 \item{facnames}{whether the factor levels should be used as column names for the aggregation matrix.}
 }
 \value{
-sparse aggregation matrix of class \code{tabMatrix}.
+A sparse aggregation matrix of class \code{tabMatrix}.
 }
 \description{
 Utility function to construct a sparse aggregation matrix from a factor

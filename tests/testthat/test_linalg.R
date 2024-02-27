@@ -21,6 +21,20 @@ test_that("is_zero_matrix works", {
   expect_true(is_zero_matrix(0*as(Diagonal(1), "tabMatrix")))
 })
 
+test_that("zero_col works", {
+  expect_true(!any(zero_col(Diagonal(3))))
+  expect_identical(zero_col(Diagonal(x=c(1, 0, 2))), c(FALSE, TRUE, FALSE))
+  M <- as(matrix(c(1,0,1,0,1,0,0,0,0), 3, 3), "tabMatrix")
+  expect_identical(zero_col(M), c(FALSE, FALSE, TRUE))
+  expect_identical(zero_col(Ctab2dgC(M)), zero_col(Ctab2mat(M)))
+  M <- as(matrix(c(-2,0,0,0,1,0,0,0,0), 3, 3), "tabMatrix")
+  expect_identical(zero_col(M), c(FALSE, FALSE, TRUE))
+  expect_identical(zero_col(Ctab2dgC(M)), zero_col(Ctab2mat(M)))
+  M <- as(matrix(c(1,0,1,0,0,0,0,0,0), 3, 3), "tabMatrix")
+  expect_identical(zero_col(M), c(FALSE, TRUE, TRUE))
+  expect_identical(zero_col(Ctab2dgC(M)), zero_col(Ctab2mat(M)))
+})
+
 test_that("inverseSPD works", {
   n <- 4
   M <- crossprod(matrix(rnorm(n*n), n, n)) + diag(n)
@@ -152,6 +166,12 @@ test_that("tabMatrix column selection works", {
   expect_identical(Ctab2mat(M[, c(-2, -3), drop=FALSE]), m[, c(-2, -3), drop=FALSE])
   colnames(M) <- paste0("c", seq_len(ncol(M)))
   expect_identical(Ctab2mat(M[, c("c2"), drop=FALSE]), m[, 2, drop=FALSE])
+})
+
+test_that("diag works for tabMatrix", {
+  Mm <- matrix(c(1,0,1,0,2.3,0,0,0,0), 3, 3)
+  M <- as(Mm, "tabMatrix")
+  expect_equal(diag(M), diag(Mm))
 })
 
 test_that("crossprod_sym works", {

@@ -64,11 +64,11 @@
 #'  from a smooth approximation to the truncated MVN. Alternatively, the method setting
 #'  functions \code{m_direct}, \code{m_HMC}, \code{m_HMC_ZigZag}, \code{m_Gibbs} or
 #'  \code{m_softTMVN} can be used to select the method and possibly set some of its
-#'  options to non-default values, see \code{\link{mcmcsae-TMVN-method}}.
+#'  options to non-default values, see \code{\link{TMVN-methods}}.
 #' @param reduce whether to a priori restrict the simulation to the subspace defined by the
 #'  equality constraints.
 #' @param chol.control options for Cholesky decomposition, see \code{\link{chol_control}}.
-#' @return An environment for sampling from a possibly degenerate and truncated multivariate normal
+#' @returns An environment for sampling from a possibly degenerate and truncated multivariate normal
 #'  distribution.
 #' @references
 #'  Z.I. Botev and P. L'Ecuyer (2016).
@@ -122,7 +122,7 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
   n <- nrow(Q)
 
   if (is.null(Xy)) {
-    mu <- if (is.null(mu)) rep.int(0, n) else as.numeric(mu)
+    mu <- if (is.null(mu)) numeric(n) else as.numeric(mu)
     if (length(mu) != n) stop("incompatible dimensions 'Q' and 'mu'")
   } else {
     if (!is.null(mu)) stop("only one of 'mu' and 'Xy' should be specified")
@@ -143,7 +143,7 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
     R <- economizeMatrix(R, vec.as.diag=FALSE, check=TRUE)
     if (nrow(R) != n || ncol(R) > n) stop("incompatible constraint matrix 'R'")
     if (is.null(r)) {
-      r <- rep.int(0, ncol(R))
+      r <- numeric(ncol(R))
     } else {
       r <- as.numeric(r)
       if (length(r) != ncol(R)) stop("length of 'r' should equal the number of columns of 'R'")
@@ -187,7 +187,7 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
     if (nrow(S) != n) stop("incompatible constraint matrix 'S'")
     ncS <- ncol(S)
     if (is.null(s)) {
-      s <- rep.int(0, ncS)
+      s <- numeric(ncS)
     } else {
       s <- as.numeric(s)
       if (length(s) != ncS) stop("length of 's' should equal the number of columns of 'S'")
@@ -275,7 +275,7 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
     }
     # fixed part of x: backtransform mu_z2_given_z1
     x0 <- Q1 %m*v% z1 + Q2 %m*v% mu_z2_given_z1
-    mu <- rep.int(0, n2)  # this now refers to the mean of the transformed variable z2 - mu_z2_given_z1
+    mu <- numeric(n2)  # this now refers to the mean of the transformed variable z2 - mu_z2_given_z1
 
     if (ineq) {
       # transform s and S to the frame defined by z2 - mu_z2_given_z1 (with vanishing mean)
@@ -339,10 +339,9 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
       } else {
         if (method$method != "softTMVN") {
           VR <- if (use.cholV) economizeMatrix(V %*% R, allow.tabMatrix=FALSE) else cholQ$solve(R)
-          VR.RVRinv <- economizeMatrix(VR %*% solve(crossprod_sym2(R, VR)))
-          if (method$method == "HMCZigZag" & is.null(method$prec.eq)) {
+          VR.RVRinv <- economizeMatrix(VR %*% solve(crossprod_sym2(R, VR)), drop.zeros=TRUE)
+          if (method$method == "HMCZigZag" & is.null(method$prec.eq))
             prec.eq <- 100 * diag(solve(crossprod_sym2(R, VR)))
-          }
           rm(VR)
         }
       }
@@ -352,7 +351,7 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
   rm(Xy)
 
   self <- environment()
-  
+
   if (ineq && method$method == "Gibbs") {
     # transform to unit covariance matrix frame
     # inequalities U'v >= u
@@ -405,7 +404,7 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
       diagnostic <- method$diagnostic
       if (diagnostic) {
         # set up a vector of wall bounce counts
-        bounces <- setNames(rep.int(0L, ncS), if (is.null(colnames(S))) seq_len(ncS) else colnames(S))
+        bounces <- setNames(integer(ncS), if (is.null(colnames(S))) seq_len(ncS) else colnames(S))
         display.n <- seq_len(min(10L, ncS))  # number of counts to display
       } else {
         bounces <- integer(0L)
@@ -457,13 +456,13 @@ create_TMVN_sampler <- function(Q, mu=NULL, Xy=NULL, update.Q=FALSE, update.mu=u
     unit.rate <- all(rate == 1) && !adapt
     diagnostic <- method$diagnostic
     if (diagnostic) {
-      gradbounces <- setNames(rep.int(0L, n), seq_len(n))
+      gradbounces <- setNames(integer(n), seq_len(n))
       display.n <- seq_len(min(10L, n))  # number of counts to display
       if (ineq) {
         # set up a vector of wall bounce counts
-        bounces <- setNames(rep.int(0L, ncS), if (is.null(colnames(S))) seq_len(ncS) else colnames(S))
+        bounces <- setNames(integer(ncS), if (is.null(colnames(S))) seq_len(ncS) else colnames(S))
         display.ncS <- seq_len(min(10L, ncS))  # number of counts to display
-        flips <- setNames(rep.int(0L, n), seq_len(n))
+        flips <- setNames(integer(n), seq_len(n))
       }
     }
     if (adapt) {
