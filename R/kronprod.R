@@ -7,12 +7,12 @@
 # NB zero structure assumed to be constant, even for matrix M1
 build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
 
-  if (isUnitDiag(M1) && !M1.fixed) stop("unexpected input")  # unit ddi is assumed to be fixed
+  if (is_unit_ddi(M1) && !M1.fixed) stop("unexpected input")  # unit ddi is assumed to be fixed
   if (q2 == 1L) {  # scalar multiplication
     if (is.matrix(M1)) {
       update <- function(M1, M2x, values.only=FALSE) M2x * M1
-    } else if (isUnitDiag(M1)) {
-      template <- expandUnitDiag(M1)
+    } else if (is_unit_ddi(M1)) {
+      template <- expand_unit_ddi(M1)
       update <- function(M1, M2x, values.only=FALSE) {
         x <- M2x * template@x
         if (values.only)
@@ -26,9 +26,9 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
     } else {
       update <- function(M1, M2x, values.only=FALSE) {
         x <- M2x * M1@x
-        if (values.only)
+        if (values.only) {
           x
-        else {
+        } else {
           out <- M1
           attr(out, "x") <- x
           out
@@ -42,7 +42,7 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
     if (is.matrix(M1)) {
       update <- function(M1, M2x, values.only=FALSE) M1[1L, 1L] * M2x
     } else {
-      if (isUnitDiag(M1))
+      if (is_unit_ddi(M1))
         update <- function(M1, M2x, values.only=FALSE) M2x
       else
         update <- function(M1, M2x, values.only=FALSE) M1@x * M2x
@@ -56,9 +56,9 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
     matmat = update <- function(M1, M2x, values.only=FALSE) Cdense_kron(M1, M2x),
     ddinum = {  # result ddi
       expand <- q2 > length(M2)  # scalar M2
-      template <- Cdiag(as.numeric(base_tcrossprod(if (expand) rep.int(M2, q2) else M2, if (isUnitDiag(M1)) rep.int(1, nrow(M1)) else M1@x)))
+      template <- Cdiag(as.numeric(base_tcrossprod(if (expand) rep.int(M2, q2) else M2, if (is_unit_ddi(M1)) rep.int(1, nrow(M1)) else M1@x)))
       attr(template, "x") <- NULL  # save some space
-      if (isUnitDiag(M1)) {
+      if (is_unit_ddi(M1)) {
         ones <- rep.int(1, nrow(M1))
         update <- function(M1, M2x, values.only=FALSE) {
           x <- as.numeric(base_tcrossprod(if (expand) rep.int(M2x, q2) else M2x, ones))
@@ -87,7 +87,7 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       template <- kron_ddimat(M1, M2)
       attr(template, "x") <- NULL
       upper <- which(row(M2) <= col(M2))
-      if (isUnitDiag(M1)) {
+      if (is_unit_ddi(M1)) {
         q1 <- nrow(M1)
         update <- function(M1, M2x, values.only=FALSE) {
           x <- rep.int(M2x[upper], q1)
@@ -102,9 +102,9 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       } else {
         update <- function(M1, M2x, values.only=FALSE) {
           x <- as.numeric(base_tcrossprod(M2x[upper], M1@x))
-          if (values.only)
+          if (values.only) {
             x
-          else {
+          } else {
             out <- template
             attr(out, "x") <- x
             out
@@ -123,9 +123,9 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       rm(M1dsC)
       update <- function(M1, M2x, values.only=FALSE) {
         x <- Crepgen(M1[w], d, if (expand) rep.int(M2x, q2) else M2x)
-        if (values.only)
+        if (values.only) {
           x
-        else {
+        } else {
           out <- template
           attr(out, "x") <- x
           out
@@ -135,13 +135,13 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
     ddidsC = {
       template <- forceSymmetric(as(kronecker(M1, M2), "CsparseMatrix"), uplo="U")
       attr(template, "x") <- NULL
-      if (isUnitDiag(M1)) {
+      if (is_unit_ddi(M1)) {
         q1 <- nrow(M1)
         update <- function(M1, M2x, values.only=FALSE) {
           x <- rep.int(M2x, q1)
-          if (values.only)
+          if (values.only) {
             x
-          else {
+          } else {
             out <- template
             attr(out, "x") <- x
             out
@@ -150,9 +150,9 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       } else {
         update <- function(M1, M2x, values.only=FALSE) {
           x <- as.numeric(base_tcrossprod(M2x, M1@x))
-          if (values.only)
+          if (values.only) {
             x
-          else {
+          } else {
             out <- template
             attr(out, "x") <- x
             out
@@ -169,9 +169,9 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       d <- d[d > 0L]
       update <- function(M1, M2x, values.only=FALSE) {
         x <- Crepgen(M1@x, d, if (expand) rep.int(M2x, q2) else M2x)
-        if (values.only)
+        if (values.only) {
           x
-        else {
+        } else {
           out <- template
           attr(out, "x") <- x
           out
@@ -194,9 +194,9 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
         rm(ind1)
         update <- function(M1, M2x, values.only=FALSE) {
           x <- x0 * M2x[ind2]
-          if (values.only)
+          if (values.only) {
             x
-          else {
+          } else {
             out <- template
             attr(out, "x") <- x
             out
@@ -205,9 +205,9 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       } else {
         update <- function(M1, M2x, values.only=FALSE) {
           x <- M1[ind1] * M2x[ind2]
-          if (values.only)
+          if (values.only) {
             x
-          else {
+          } else {
             out <- template
             attr(out, "x") <- x
             out
@@ -243,9 +243,9 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       } else {
        update <- function(M1, M2x, values.only=FALSE) {
          x <- M1@x[ind1] * M2x[ind2]
-         if (values.only)
+         if (values.only) {
            x
-         else {
+         } else {
            out <- template
            attr(out, "x") <- x
            out
@@ -272,9 +272,9 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
         rm(ind1)
         update <- function(M1, M2x, values.only=FALSE) {
           x <- x0 * M2x[ind2]
-          if (values.only)
+          if (values.only) {
             x
-          else {
+          } else {
             out <- template
             attr(out, "x") <- x
             out
@@ -283,9 +283,9 @@ build_kron <- function(M1, M2, q2, M1.fixed=FALSE) {
       } else {
         update <- function(M1, M2x, values.only=FALSE) {
           x <- M1@x[ind1] * M2x[ind2]
-          if (values.only)
+          if (values.only) {
             x
-          else {
+          } else {
             out <- template
             attr(out, "x") <- x
             out
@@ -306,9 +306,9 @@ kron_ddimat <- function(Mddi, Mmat) {
   rmat <- as.integer(row(Mmat) - 1L)[upper]
   n.ddi <- nrow(Mddi)
   n.mat <- nrow(Mmat)
-  i = rep.int(rmat, n.ddi) + nrow(Mmat) * rep_each(seq_len(n.ddi) - 1L, length(rmat))
+  i <- rep.int(rmat, n.ddi) + nrow(Mmat) * rep_each(seq_len(n.ddi) - 1L, length(rmat))
   p <- c(0L, cumsum(rep.int(seq_len(n.mat), n.ddi)))
-  if (isUnitDiag(Mddi))
+  if (is_unit_ddi(Mddi))
     x <- rep.int(Mmat[upper], n.ddi)
   else
     x <- as.numeric(tcrossprod(Mmat[upper], Mddi@x))

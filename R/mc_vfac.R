@@ -50,7 +50,7 @@ vfac <- function(factor="local_",
 
   if (e$Q0.type == "symm") {
     # check that scale factor is compatible with block-diagonal structure of Q0
-    if (sum(abs(commutator(e$Q0, Diagonal(x = X %m*v% sin(1.23*seq_len(q)))))) > sqrt(.Machine$double.eps)) stop("'formula.V' incompatible with 'Q0'")
+    if (sum(abs(commutator(e[["Q0"]], Cdiag(X %m*v% sin(1.23*seq_len(q)))))) > sqrt(.Machine$double.eps)) stop("'formula.V' incompatible with 'Q0'")
   }
 
   switch(prior$type,
@@ -76,11 +76,10 @@ vfac <- function(factor="local_",
         invchisq = {
           # NB this assumes that all hyperparameters are scalar! TODO check this
           # Student t marginal sampling distribution, provided scale is fixed
-          if (is.list(prior$df)) {
+          if (is.list(prior$df))
             pred <- add(pred, bquote(df <- p[[.(name_df)]]))
-          } else {
+          else
             pred <- add(pred, quote(df <- prior$df))
-          }
           if (is.list(prior$scale)) {
             if (prior$scale$common) {
               # for this case we need to store the common scale parameter!
@@ -147,7 +146,7 @@ vfac <- function(factor="local_",
         fac <- numeric(q)
         for (i in seq_len(q)) {
           X.ind[[i]] <- which(X@perm == i - 1L)  # NB tabMatrix 0-based
-          Q0.list[[i]] <- e$Q0[X.ind[[i]], X.ind[[i]]]
+          Q0.list[[i]] <- e[["Q0"]][X.ind[[i]], X.ind[[i]]]
         }
         get_partial_factor <- function(p) {
           for (i in seq_along(Q0.list)) {

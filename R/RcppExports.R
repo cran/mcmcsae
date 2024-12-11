@@ -69,8 +69,8 @@ copy_vector <- function(x) {
     .Call(`_mcmcsae_copy_vector`, x)
 }
 
-add_vector <- function(x, y) {
-    invisible(.Call(`_mcmcsae_add_vector`, x, y))
+v_update <- function(y, plus, x) {
+    invisible(.Call(`_mcmcsae_v_update`, y, plus, x))
 }
 
 mv_update <- function(y, plus, M, x) {

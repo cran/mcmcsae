@@ -21,8 +21,8 @@ test_that("linear regression works, as well as fitted, residuals and predict met
   expect_equal(fitted(sim, mean.only=TRUE), as.vector(summary(fitted(sim))[, "Mean"]))
   expect_equal(residuals(sim, mean.only=TRUE), as.vector(summary(residuals(sim))[, "Mean"]))
   expect_equal(nrow(summary(predict(sim, iters=sample(1:500, 100), show.progress=FALSE))), n)
-  expect_equal(nvars(predict(sim, X.=list(beta=model_matrix(~1+x1+x2+x3+x4, df[1:10, ])), show.progress=FALSE)), 10)
-  expect_equal(nvars(predict(sim, newdata=df[21, ], show.progress=FALSE)), 1)
+  expect_equal(n_vars(predict(sim, X.=list(beta=model_matrix(~1+x1+x2+x3+x4, df[1:10, ])), show.progress=FALSE)), 10)
+  expect_equal(n_vars(predict(sim, newdata=df[21, ], show.progress=FALSE)), 1)
 })
 
 test_that("single-site Gibbs sampler works", {
@@ -82,8 +82,8 @@ test_that("using an offset for linear regression works", {
   sampler <- create_sampler(
     formula = y ~ reg(~ x1 + x2 + x3, name="beta") + offset(4*x4), data=df
   )
-  expect_length(sampler$mod, 1L)
-  expect_equal(sampler$offset, 4*df$x4)
+  expect_length(sampler$mod, 2L)
+  expect_equal(sampler$mod[[length(sampler$mod)]]$offset, 4*df$x4)
   sim <- MCMCsim(sampler, n.iter=500, burnin=100, n.chain=2, verbose=FALSE)
   summ <- summary(sim)
   expect_between(summ$beta[, "Mean"], 0.5 * c(1,1,2,3), 2 * c(1,1,2,3))
@@ -94,8 +94,8 @@ test_that("simplified formula + offset works for linear regression", {
   sampler <- create_sampler(
     formula = y ~ x1 + x2 + x3 + offset(4*x4), data=df
   )
-  expect_length(sampler$mod, 1L)
-  expect_equal(sampler$offset, 4*df$x4)
+  expect_length(sampler$mod, 2L)
+  expect_equal(sampler$mod[[length(sampler$mod)]]$offset, 4*df$x4)
   sim <- MCMCsim(sampler, n.iter=500, burnin=100, n.chain=2, verbose=FALSE)
   summ <- summary(sim)
   expect_between(summ$reg1[, "Mean"], 0.5 * c(1,1,2,3), 2 * c(1,1,2,3))
@@ -110,6 +110,17 @@ test_that("model specification in two steps works", {
   summ <- summary(sim)
   expect_between(summ$beta[, "Mean"], 0.5 * c(1,1,2,3,4), 2 * c(1,1,2,3,4))
   expect_between(summ$sigma_[, "Mean"], 0.5, 2)
+})
+
+test_that("non-zero prior mean works", {
+  mod <- y ~ x1 + x2 + x3 + x4
+  ml_mod <- y ~ reg(mod, prior=pr_normal(mean=c(1,1,2,3,4), precision=1e3), name="beta")
+  sampler <- create_sampler(ml_mod, data=df)
+  expect_length(sampler$mod[[1L]]$prior[["mean"]], 5L)
+  sim <- MCMCsim(sampler, n.iter=500, burnin=100, n.chain=2, verbose=FALSE)
+  summ <- summary(sim)
+  expect_between(summ$beta[, "Mean"], 0.75 * c(1,1,2,3,4), 1.5 * c(1,1,2,3,4))
+  expect_between(summ$sigma_[, "Mean"], 0.75, 1.5)
 })
 
 n <- 1000

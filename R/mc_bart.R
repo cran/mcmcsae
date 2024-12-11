@@ -32,7 +32,7 @@
 #' # NB prediction is currently slow
 #' \donttest{
 #' pred <- predict(sim, newdata=test,
-#'   iters=sample(seq_len(ndraws(sim)), 100),
+#'   iters=sample(seq_len(n_draws(sim)), 100),
 #'   show.progress=FALSE
 #' )
 #' (summpred <- summary(pred))
@@ -69,19 +69,21 @@
 #'    Multivariate adaptive regression splines.
 #'    The Annals of Statistics 19, 1-67.
 brt <- function(formula, X=NULL, n.trees=75L,
-                 name="", debug=FALSE, keepTrees=FALSE, ...) {
+                name="", debug=FALSE, keepTrees=FALSE, ...) {
 
   e <- sys.frame(-2L)
   type <- "brt"
   if (name == "") stop("missing model component name")
 
-  if (!requireNamespace("dbarts", quietly=TRUE)) stop("Package dbarts required for a model including Bayesian Additive Regression Trees")
+  if (!requireNamespace("dbarts", quietly=TRUE)) stop("package dbarts required for a model including Bayesian Additive Regression Trees")
 
   if (e$modeled.Q && e$Q0.type == "symm") stop("BART component not compatible with non-diagonal residual variance matrix")
 
   if (is.null(X)) {
     # no contrasts applied, no (urgent) need to remove redundancy
-    X <- model_matrix(formula, e$data, contrasts.arg="contr.none", sparse=FALSE)
+    X <- model_matrix(formula, e[["data"]], contrasts.arg="contr.none", sparse=FALSE)
+  } else {
+    if (is.null(colnames(X))) colnames(X) <- seq_len(ncol(X))
   }
   X <- economizeMatrix(X, sparse=FALSE, strip.names=FALSE, check=TRUE)
   q <- ncol(X)
@@ -91,7 +93,19 @@ brt <- function(formula, X=NULL, n.trees=75L,
   in_block <- FALSE
 
   name_sampler <- paste0(name, "_sampler_")  # trailing '_' --> not stored by MCMCsim even if store.all=TRUE
-  linpred <- function(p) p[[name]]
+  lp <- function(p) copy_vector(p[[name]])
+  lp_update <- function(x, plus=TRUE, p) v_update(x, plus, p[[name]])
+  draws_linpred <- function(obj, units=NULL, chains=NULL, draws=NULL, matrix=FALSE) {
+    if (is.null(obj[[name]])) stop("no fitted values for 'brt' component; please re-run MCMCsim with 'store.all=TRUE'")
+    if (matrix)
+      out <- as.matrix.dc(get_from(obj[[name]], vars=units, chains=chains, draws=draws))
+    else {
+      out <- list()
+      for (ch in seq_along(chains))
+        out[[ch]] <- get_from(obj[[name]], vars=units, chains=chains[ch], draws=draws)[[1L]]
+    }
+    out
+  }
 
   # TODO if sigma.fixed set prior to (almost) fix sigma to 1
   create_BART_sampler <- function() {
@@ -117,30 +131,36 @@ brt <- function(formula, X=NULL, n.trees=75L,
     p
   }
 
-  if (keepTrees) {
-    name_trees <- paste0(name, "_", "trees_")
+  if (e$family$family == "multinomial") {
+    edat <- new.env(parent = environment(formula))
+    environment(formula) <- edat
+  }
 
-    make_predict <- function(newdata=NULL, Xnew, verbose=TRUE) {
+  if (keepTrees) name_trees <- paste0(name, "_", "trees_")
+  make_predict <- function(newdata=NULL, Xnew=NULL, verbose=TRUE) {
+    if (is.null(newdata) && is.null(Xnew)) {
+      # in-sample prediction
+      linpred <- function(p) copy_vector(p[[name]])
+      linpred_update <- function(x, plus=TRUE, p) v_update(x, plus, p[[name]])
+    } else {
       if (is.null(newdata)) {
         if (missing(Xnew)) stop("one of 'newdata' and 'Xnew' should be supplied")
-        if (is.null(colnames(Xnew)))
-          if (ncol(Xnew) != q) stop("wrong number of columns for Xnew matrix of component ", name)
       } else {
+        if (!keepTrees) stop("out-of-sample prediction requires setting keepTrees=TRUE in brt() model specification")
         nnew <- nrow(newdata)
         if (e$family$family == "multinomial") {
-          edat <- new.env(parent = .GlobalEnv)
           Xnew <- NULL
-          for (k in seq_len(e$Km1)) {
+          for (k in seq_len(e[["Km1"]])) {
             edat$cat_ <- factor(rep.int(e$cats[k], nnew), levels=e$cats[-length(e$cats)])
-            Xnew <- rbind(Xnew, model_matrix(formula, data=newdata, contrasts.arg="contr.none", sparse=FALSE, enclos=edat))
+            Xnew <- rbind(Xnew, model_matrix(formula, data=newdata, contrasts.arg="contr.none", sparse=FALSE))
           }
-          rm(edat)
+          edat$cat_ <- NULL
         } else {
           Xnew <- model_matrix(formula, newdata, contrasts.arg="contr.none", sparse=FALSE)
         }
       }
       if (is.null(colnames(Xnew))) {
-        if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
+        if (ncol(Xnew) != q) stop("wrong number ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
       } else {
         Xnew <- Xnew[, colnames(X), drop=FALSE]
       }
@@ -150,7 +170,7 @@ brt <- function(formula, X=NULL, n.trees=75L,
 
       # predict based on Xnew using stored tree; see dbarts' 'Working with saved trees' vignette
       # TODO rewrite in C++
-      function(p) {
+      tree_predict <- function(p) {
         getPredictionsForTreeRecursive <- function(tree, indices) {
           if (tree$var[1L] == -1L) {
             predictions[indices] <<- predictions[indices] + tree$value[1L]
@@ -159,21 +179,20 @@ brt <- function(formula, X=NULL, n.trees=75L,
           goesLeft <- Xnew[indices, tree$var[1L]] <= tree$value[1L]
           headOfLeftBranch <- tree[-1L, ]
           n_nodes.left <- getPredictionsForTreeRecursive(headOfLeftBranch, indices[goesLeft])
-          headOfRightBranch <- tree[seq.int(2L + n_nodes.left, nrow(tree)), ]
+          headOfRightBranch <- tree[seq.int(2L + n_nodes.left, dim(tree)[1L]), ]
           n_nodes.right <- getPredictionsForTreeRecursive(headOfRightBranch, indices[!goesLeft])
           return(1L + n_nodes.left + n_nodes.right)
         }
         trees <- p[[name_trees]]
         predictions <- numeric(nnew)
-        for (t in seq_len(n.trees)) {
+        for (t in seq_len(n.trees))
           getPredictionsForTreeRecursive(trees[trees$tree == t, ], seq_len(nnew))
-        }
         predictions
       }
+      linpred <- function(p) tree_predict(p)
+      linpred_update <- function(x, plus=TRUE, p) v_update(x, plus, tree_predict(p))
     }
-  } else {
-    make_predict <- function(newdata=NULL, Xnew, verbose=TRUE)
-      stop("out-of-sample prediction requires setting keepTrees=TRUE in brt() model specification")
+    environment()
   }
 
   rprior <- function(p) {

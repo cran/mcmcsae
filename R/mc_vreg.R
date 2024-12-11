@@ -48,13 +48,14 @@ vreg <- function(formula=NULL, remove.redundant=FALSE, sparse=NULL, X=NULL,
   if (e$Q0.type == "symm") stop("TBI: vreg component with (compatible) non-diagonal sampling variance matrix")
 
   if (is.null(X)) {
-    X <- model_matrix(formula, e$data, sparse=sparse)
+    X <- model_matrix(formula, e[["data"]], sparse=sparse)
     if (remove.redundant) X <- remove_redundancy(X)
-  } else
-    X <- economizeMatrix(X, strip.names=FALSE, check=TRUE)
+  } else {
+    if (is.null(colnames(X))) colnames(X) <- seq_len(ncol(X))
+  }
   if (nrow(X) != e[["n"]]) stop("design matrix with incompatible number of rows")
   e$coef.names[[name]] <- colnames(X)
-  X <- unname(X)
+  X <- economizeMatrix(X, sparse=sparse, strip.names=FALSE, check=TRUE)
   q <- ncol(X)
 
   if (!is.null(b0) || !is.null(Q0)) {

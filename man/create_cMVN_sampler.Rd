@@ -2,41 +2,40 @@
 % Please edit documentation in R/cMVN_sampler.R
 \name{create_cMVN_sampler}
 \alias{create_cMVN_sampler}
-\title{Set up a a function for direct sampling from a constrained multivariate normal distribution}
+\title{Set up a function for direct sampling from a constrained multivariate normal distribution}
 \usage{
 create_cMVN_sampler(
-  mbs,
-  X,
-  Q,
+  D = NULL,
+  Q = NULL,
+  update.Q = FALSE,
   R = NULL,
   r = NULL,
-  sampler,
-  name = "x",
-  chol.control
+  eps1 = 0,
+  eps2 = 0,
+  chol.control = chol_control(perm = TRUE)
 )
 }
 \arguments{
-\item{mbs}{block component containing several model components.}
+\item{D}{factor of precision matrix Q such that Q=D'D.}
 
-\item{X}{design matrix.}
+\item{Q}{precision matrix.}
 
-\item{Q}{(structured) precision matrix.}
+\item{update.Q}{whether to update (D and) Q for each draw.}
 
 \item{R}{equality restriction matrix.}
 
 \item{r}{rhs vector for equality constraints \eqn{R'x = r}, where \eqn{R'} denotes the transpose of R.}
 
-\item{sampler}{sampler object as created by \code{\link{create_sampler}}.}
+\item{eps1}{scalar parameter to control numerical robustness against singularity of Q.}
 
-\item{name}{name of the cMVN vector parameter.}
+\item{eps2}{scalar parameter associated with the constraint part to control numerical robustness.}
 
 \item{chol.control}{options for Cholesky decomposition, see \code{\link{chol_control}}.}
 }
 \value{
-An environment with precomputed quantities and functions for sampling
+An environment with precomputed quantities and a method 'draw' for sampling
   from a multivariate normal distribution subject to equality constraints.
 }
 \description{
-Set up a a function for direct sampling from a constrained multivariate normal distribution
+Set up a function for direct sampling from a constrained multivariate normal distribution
 }
-\keyword{internal}

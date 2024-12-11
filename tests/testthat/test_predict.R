@@ -34,7 +34,7 @@ test_that("prediction is reproducible", {
 test_that("prediction types 'link' and 'response' work", {
   pred_link <- predict(sim, type="link", show.progress=FALSE, verbose=FALSE)
   pred_response <- predict(sim, type="response", show.progress=FALSE, verbose=FALSE)
-  # in this example there is no link function so they should be equal
+  # in this example the link function is identity so they should be equal
   expect_equal(summary(pred_link), summary(pred_response))
 })
 
@@ -84,4 +84,16 @@ test_that("predict generates out-of-sample random effects", {
   ypred <- summary(pred)[, "Mean"]
   ypred2 <- ypred; ypred2[ind_new] <- ypred2[ind_new] + v2[dat$f2[ind_new]]
   expect_true(cor(dat$y, ypred) < cor(dat$y, ypred2) && cor(dat$y, ypred2) > 0.5)
+})
+
+# fit a model including categorical fixed effects
+sampler <- create_sampler(
+  y ~ x + f1 + gen(factor = ~f2),
+  data=dat
+)
+sim <- MCMCsim(sampler, store.all=TRUE, n.iter=300, verbose=FALSE)
+
+test_that("predict indicates when not all model matrix columns for fixed effects are present", {
+  newdat <- droplevels(dat[1:2, ])
+  expect_error(predict(sim, newdata=newdat), "columns are missing")
 })

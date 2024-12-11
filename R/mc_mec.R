@@ -113,31 +113,32 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
   if (is.null(X)) {
     # TODO: warn if formula contains explicit intercept or categorical terms
     vs <- as.list(attr(terms(formula), "variables")[-1L])
-    if (all(sapply(vs, length) == 3L)) {
-      if (!all(sapply(vs, function(x) identical(x[[1L]], as.name("|"))))) stop("invalid 'formula' argument")
+    if (all(lengths(vs) == 3L)) {
+      if (!all(b_apply(vs, function(x) identical(x[[1L]], as.name("|"))))) stop("invalid 'formula' argument")
       V.in.formula <- TRUE
-      formula.X <- as.formula(paste0("~ 0 + ", paste(sapply(vs, function(x) deparse(x[[2L]])), collapse=" + ")), env=environment(formula))
+      formula.X <- as.formula(paste0("~ 0 + ", paste0(s_apply(vs, function(x) deparse(x[[2L]])), collapse=" + ")), env=environment(formula))
       if (grepl("|", as.character(formula.X)[2L], fixed=TRUE)) stop("invalid 'formula'")  # maybe '()' forgotten?
-      formula.V <- as.formula(paste0("~ 0 + ", paste(sapply(vs, function(x) deparse(x[[3L]])), collapse=" + ")), env=environment(formula))
-      X <- model_matrix(formula.X, e$data, sparse=sparse)
-      V <- model_matrix(formula.V, e$data, sparse=sparse)
+      formula.V <- as.formula(paste0("~ 0 + ", paste0(s_apply(vs, function(x) deparse(x[[3L]])), collapse=" + ")), env=environment(formula))
+      X <- model_matrix(formula.X, e[["data"]], sparse=sparse)
+      V <- model_matrix(formula.V, e[["data"]], sparse=sparse)
     } else {
-      if (all(sapply(vs, length) <= 2L)) {
+      if (all(lengths(vs) <= 2L)) {
         V.in.formula <- FALSE
-        formula.X <- as.formula(paste0("~ 0 + ", paste(sapply(vs, deparse), collapse=" + ")), env=environment(formula))
-        X <- model_matrix(formula.X, e$data, sparse=sparse)
+        formula.X <- as.formula(paste0("~ 0 + ", paste0(s_apply(vs, deparse), collapse=" + ")), env=environment(formula))
+        X <- model_matrix(formula.X, e[["data"]], sparse=sparse)
       } else {
         stop("invalid 'formula' argument")
       }
     }
   } else {
+    if (is.null(colnames(X))) colnames(X) <- seq_len(ncol(X))
     V.in.formula <- FALSE
   }
   if (nrow(X) != e[["n"]]) stop("design matrix with incompatible number of rows")
   e$coef.names[[name]] <- colnames(X)
-  X <- unname(X)
+  X <- economizeMatrix(X, sparse=sparse, strip.names=TRUE, check=TRUE)
   q <- ncol(X)
-  in_block <- any(name == unlist(e$block, use.names=FALSE))
+  in_block <- any(name == unlst(e$block))
 
   if (!V.in.formula) {
     if (is.null(V)) stop("no measurement error variances supplied in mec component")
@@ -165,7 +166,7 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
     if (q == 1L) v0 <- 1 else v0 <- rep.int(1, nme)
   } else {
     if (e$Q0.type == "symm") stop("not supported: measurement error component and non-diagonal sampling variance")
-    v0 <- 1/diag(e$Q0)[i.me]
+    v0 <- 1/diag(e[["Q0"]])[i.me]
   }
 
   if (!is.null(b0) || !is.null(Q0)) {
@@ -193,35 +194,64 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
   if (!zero.mean && e$compute.weights) stop("weights cannot be computed if some coefficients have non-zero prior means")
 
   name_X <- paste0(name, "_X")
-  linpred <- function(p) p[[name_X]] %m*v% p[[name]]
+  lp <- function(p) p[[name_X]] %m*v% p[[name]]
+  lp_update <- function(x, plus=TRUE, p) mv_update(x, plus, p[[name_X]], p[[name]])
+  # draws_linpred method acts on (subset of) mcdraws object, used in fitted() and pointwise log-likelihood llh_i functions
+  draws_linpred <- function(obj, units=NULL, chains=NULL, draws=NULL, matrix=FALSE) {
+    Xi <- get_from(obj[[name_X]], vars=units, chains=chains, draws=draws)
+    if (matrix) {
+      out <- tcrossprod(as.matrix.dc(get_from(obj[[name]], chains=chains, draws=draws), colnames=FALSE), Xi)
+    } else {
+      out <- list()
+      for (ch in seq_along(chains))
+        out[[ch]] <- tcrossprod(get_from(obj[[name]], chains=chains[ch], draws=draws)[[1L]], Xi)
+    }
+    out
+  }
 
   # function that creates an oos prediction function (closure) based on new data
   # this computes the contribution of this component to the linear predictor
-  make_predict <- function(newdata=NULL, Xnew, verbose=TRUE) {
-    if (is.null(newdata)) stop("for out-of-sample prediction with 'mec' components a data frame ",
-                               "must be supplied")
-    if (!V.in.formula) stop("for out-of-sample prediction with 'mec' components make sure to specify ",
-                            "the measurement error variances using the formula argument")
-    Xnew <- model_matrix(formula.X, newdata, sparse=sparse)
-    dimnames(Xnew) <- list(NULL, NULL)
-    SEnew <- model_matrix(formula.V, newdata, sparse=sparse)
-    dimnames(SEnew) <- list(NULL, NULL)
-    if (any(SEnew < 0)) stop("negative measurement error variance(s) in 'newdata'")
-    SEnew <- sqrt(SEnew)
-    if (nrow(SEnew) < 0.5 * nrow(Xnew)) {
-      pred <- function(p) (Xnew + SEnew * Crnorm(length(SEnew))) %m*v% p[[name]]
+  make_predict <- function(newdata=NULL, Xnew=NULL, verbose=TRUE) {
+    if (is.null(newdata)) {
+      if (is.null(Xnew)) {
+        # in-sample prediction
+        Xnew <- X
+        linpred <- function(p) p[[name_X]] %m*v% p[[name]]
+        linpred_update <- function(x, plus=TRUE, p) mv_update(x, plus, p[[name_X]], p[[name]])
+      } else {
+        stop("for out-of-sample prediction with 'mec' components a data frame ",
+             "must be supplied")
+      }
     } else {
-      i.me.new <- which(apply(SEnew, 1L, function(x) all(x > 0)))  # TODO add tolerance + allow list of matrix
-      if (length(i.me.new) == nrow(newdata)) i.me.new <- seq_len(nrow(newdata))
-      SEnew <- SEnew[i.me.new, ]
-      pred <- function(p) {
-        out <- Xnew
-        out[i.me.new, ] <- out[i.me.new, ] + SEnew * Crnorm(length(SEnew))
-        out %m*v% p[[name]]
+      if (!V.in.formula) stop("for out-of-sample prediction with 'mec' components make sure to specify ",
+                              "the measurement error variances using the formula argument")
+      Xnew <- model_matrix(formula.X, newdata, sparse=sparse)
+      dimnames(Xnew) <- list(NULL, NULL)
+      SEnew <- model_matrix(formula.V, newdata, sparse=sparse)
+      dimnames(SEnew) <- list(NULL, NULL)
+      if (any(SEnew < 0)) stop("negative measurement error variance(s) in 'newdata'")
+      SEnew <- sqrt(SEnew)
+      if (nrow(SEnew) < 0.5 * nrow(Xnew)) {
+        linpred <- function(p) (Xnew + SEnew * Crnorm(length(SEnew))) %m*v% p[[name]]
+        linpred_update <- function(x, plus=TRUE, p) mv_update(x, plus, Xnew + SEnew * Crnorm(length(SEnew)), p[[name]])
+      } else {
+        i.me.new <- which(apply(SEnew, 1L, function(x) all(x > 0)))  # TODO add tolerance + allow list of matrix
+        if (length(i.me.new) == nrow(newdata)) i.me.new <- seq_len(nrow(newdata))
+        SEnew <- SEnew[i.me.new, ]
+        linpred <- function(p) {
+          out <- Xnew
+          out[i.me.new, ] <- out[i.me.new, ] + SEnew * Crnorm(length(SEnew))
+          out %m*v% p[[name]]
+        }
+        linpred_update <- function(x, plus=TRUE, p) {
+          out <- Xnew
+          out[i.me.new, ] <- out[i.me.new, ] + SEnew * Crnorm(length(SEnew))
+          mv_update(x, plus, out, p[[name]])
+        }
       }
     }
     rm(newdata, verbose)
-    pred
+    environment()
   }
 
   rprior <- function(p) {}
@@ -300,15 +330,15 @@ mec <- function(formula = ~ 1, sparse=NULL, X=NULL, V=NULL,
       if (informative.prior) {
         # TODO instead of runif(n, ...) account for the structure in Qmod; lambda may not vary per unit!
         # TODO here we need M1 to be dense without zeros
-        mat_sum <- make_mat_sum(M0=Q0, M1=crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e[["n"]], 0.9, 1.1)), e$Q0)))
+        mat_sum <- make_mat_sum(M0=Q0, M1=crossprod_sym(X, crossprod_sym(Cdiag(runif(e[["n"]], 0.9, 1.1)), e[["Q0"]])))
         MVNsampler <- create_TMVN_sampler(
-          Q=mat_sum(crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e[["n"]], 0.9, 1.1)), e$Q0))),
+          Q=mat_sum(crossprod_sym(X, crossprod_sym(Cdiag(runif(e[["n"]], 0.9, 1.1)), e[["Q0"]]))),
           update.Q=TRUE, name=name, R=R, r=r, S=S, s=s, lower=lower, upper=upper
         )
         draw <- add(draw, bquote(p[[.(name)]] <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])), Q=mat_sum(XX), Xy=Xy)[[.(name)]]))
       } else {
         MVNsampler <- create_TMVN_sampler(
-          Q=crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e[["n"]], 0.9, 1.1)), e$Q0)),
+          Q=crossprod_sym(X, crossprod_sym(Cdiag(runif(e[["n"]], 0.9, 1.1)), e[["Q0"]])),
           update.Q=TRUE, name=name, R=R, r=r, S=S, s=s, lower=lower, upper=upper
         )
         draw <- add(draw, bquote(p[[.(name)]] <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])), Q=XX, Xy=Xy)[[.(name)]]))

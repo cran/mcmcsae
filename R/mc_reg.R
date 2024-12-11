@@ -103,6 +103,7 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
                 name="", debug=FALSE) {
 
   e <- sys.frame(-2L)
+  if (is.null(e$family) || is.null(e$family$family)) stop("'reg()' should only be used within a formula")
   type <- "reg"
   if (name == "") stop("missing model component name")
 
@@ -117,27 +118,31 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
     modus <- "regular"     # model for mean of gaussian/binomial/...
   }
 
+  if (e$family$family == "multinomial") {
+    edat <- new.env(parent = environment(formula))
+    environment(formula) <- edat
+  }
+  
   if (is.null(X)) {
     if (e$family$family == "multinomial") {
-      edat <- new.env(parent = .GlobalEnv)
       X <- NULL
-      for (k in seq_len(e$Km1)) {
+      for (k in seq_len(e[["Km1"]])) {
         edat$cat_ <- factor(rep.int(e$cats[k], e[["n0"]]), levels=e$cats[-length(e$cats)])
-        X <- rbind(X, model_matrix(formula, data=e$data, sparse=sparse, enclos=edat))
+        X <- rbind(X, model_matrix(formula, data=e[["data"]], sparse=sparse))#, enclos=edat))
       }
-      rm(edat)
+      edat$cat_ <- NULL
     } else {
-      X <- model_matrix(formula, e$data, sparse=sparse)
+      X <- model_matrix(formula, e[["data"]], sparse=sparse)
     }
     if (remove.redundant) X <- remove_redundancy(X)
+  } else {
+    if (is.null(colnames(X))) colnames(X) <- seq_len(ncol(X))
   }
-  X <- economizeMatrix(X, sparse=sparse, strip.names=FALSE, check=TRUE)
-
   if (nrow(X) != e[["n"]]) stop("design matrix with incompatible number of rows")
   e$coef.names[[name]] <- colnames(X)
-  X <- unname(X)
+  X <- economizeMatrix(X, sparse=sparse, strip.names=TRUE, check=TRUE)
   q <- ncol(X)
-  in_block <- any(name == unlist(e$block, use.names=FALSE)) || any(name == unlist(e$block.V, use.names=FALSE))
+  in_block <- any(name == unlst(e$block)) || any(name == unlst(e$block.V))
 
   if (!is.null(b0) || !is.null(Q0)) {
     warn("arguments 'b0' and 'Q0' are deprecated; please use argument 'prior' instead")
@@ -198,6 +203,8 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
     stop("'", prior$type, "' is not a supported prior for regression coefficients '", name, "'")
   )
 
+  is.proper <- informative.prior  # not accurate, but will do
+
   if (e$compute.weights) {
     # TODO see if following restriction can be relaxed
     if (prior$type != "normal") stop("weights computation not supported for priors of type ", prior$type)
@@ -210,47 +217,63 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
     else
       compute_Qfactor <- function(p) exp(X %m*v% (-p[[name]]))
   }
-  linpred <- function(p) X %m*v% p[[name]]
+  lp <- function(p) X %m*v% p[[name]]
+  lp_update <- function(x, plus=TRUE, p) mv_update(x, plus, X, p[[name]])
+  # draws_linpred method acts on (subset of) mcdraws object, used in fitted() and pointwise log-likelihood llh_i functions
+  draws_linpred <- function(obj, units=NULL, chains=NULL, draws=NULL, matrix=FALSE) {
+    if (is.null(units)) Xi <- X else Xi <- X[units, , drop=FALSE]
+    if (matrix) {
+      out <- tcrossprod(as.matrix.dc(get_from(obj[[name]], chains=chains, draws=draws), colnames=FALSE), Xi)
+    } else {
+      out <- list()
+      for (ch in seq_along(chains))
+        out[[ch]] <- tcrossprod(get_from(obj[[name]], chains=chains[ch], draws=draws)[[1L]], Xi)
+    }
+    out
+  }
 
   # for regression components assume that categorical variables in newdata
   #   carry the exact same levels as those in the training data
-  make_predict <- function(newdata=NULL, Xnew, verbose=TRUE) {
+  make_predict <- function(newdata=NULL, Xnew=NULL, verbose=TRUE) {
     if (modus == "vargamma") stop("prediction for 'gaussian_gamma' family not supported")
-    if (is.null(newdata)) {
-      if (missing(Xnew)) stop("one of 'newdata' and 'Xnew' should be supplied")
-      if (is.null(colnames(Xnew))) {
-        if (ncol(Xnew) != q) stop("wrong number of columns for Xnew matrix of component ", name)
-      }
+    if (is.null(newdata) && is.null(Xnew)) {
+      # in-sample prediction
+      Xnew <- X
     } else {
-      nnew <- nrow(newdata)
-      if (e$family$family == "multinomial") {
-        edat <- new.env(parent = .GlobalEnv)
-        Xnew <- NULL
-        for (k in seq_len(e$Km1)) {
-          edat$cat_ <- factor(rep.int(e$cats[k], nnew), levels=e$cats[-length(e$cats)])
-          Xnew <- rbind(Xnew, model_matrix(formula, data=newdata, sparse=sparse, enclos=edat))
+      if (is.null(newdata)) {
+        if (is.null(colnames(Xnew))) {
+          if (ncol(Xnew) != q) stop("wrong number of columns for Xnew matrix of component ", name)
         }
-        rm(edat)
       } else {
-        Xnew <- model_matrix(formula, newdata, sparse=sparse)
-      }
-    }
-    if (remove.redundant && !is.null(colnames(Xnew))) {
-      # TODO check that any columns removed are redundant
-      Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
-    } else {
-      if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
-      if (!is.null(colnames(Xnew)) && !identical(colnames(Xnew), e$coef.names[[name]])) {
-        if (!all(e$coef.names[[name]] %in% colnames(Xnew))) {
-          stop("the following model matrix columns could not be derived from Xnew: ",
-            paste(setdiff(e$coef.names[[name]], colnames(Xnew)), collapse=", "))
+        nnew <- nrow(newdata)
+        if (e$family$family == "multinomial") {
+          Xnew <- NULL
+          for (k in seq_len(e[["Km1"]])) {
+            edat$cat_ <- factor(rep.int(e$cats[k], nnew), levels=e$cats[-length(e$cats)])
+            Xnew <- rbind(Xnew, model_matrix(formula, data=newdata, sparse=sparse))#, enclos=edat))
+          }
+          edat$cat_ <- NULL
+        } else {
+          Xnew <- model_matrix(formula, newdata, sparse=sparse)
         }
+      }
+      if (is.null(colnames(Xnew))) {
+        if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
+      } else if (!identical(colnames(Xnew), e$coef.names[[name]])) {
+        if (!all(e$coef.names[[name]] %in% colnames(Xnew))) {
+          stop("the following prediction matrix columns are missing: ",
+            paste0(setdiff(e$coef.names[[name]], colnames(Xnew)), collapse=", "))
+        }
+        if (!remove.redundant) warn("prediction matrix has additional columns")
+        # TODO check that any columns removed are redundant in newdata as well
         Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
       }
+      Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE, check=TRUE)
     }
-    Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE, check=TRUE)
     rm(newdata, verbose)
-    function(p) Xnew %m*v% p[[name]]
+    linpred <- function(p) Xnew %m*v% p[[name]]
+    linpred_update <- function(x, plus=TRUE, p) mv_update(x, plus, Xnew, p[[name]])
+    environment()
   }
 
   if (!in_block && !e$prior.only && prior$type != "fixed") {
@@ -265,7 +288,7 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
       }
     } else {
       if (e$single.block) {
-        if (e$use.offset || e$e.is.res)
+        if (e$e.is.res)
           draw <- add(draw, quote(p$e_ <- e$y_eff()))
       } else {
         if (e$e.is.res)
@@ -275,10 +298,10 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
       }
     }
     if (e$single.block && e$family$link != "probit" && modus == "regular" &&
-        (!e$modeled.Q || (all(e$family$family != c("gaussian", "gaussian_gamma")) && !e$use.offset && !e$modeled.r))) {
+        (!e$modeled.Q || (all(e$family$family != c("gaussian", "gaussian_gamma")) && !e$modeled.r))) {
       # single regression component, no variance modeling, Xy fixed
       if (e$family$family == "gaussian")
-        Xy <- crossprod_mv(X, e$Q0 %m*v% e$y_eff()) + Q0b0
+        Xy <- crossprod_mv(X, e[["Q0"]] %m*v% e$y_eff()) + Q0b0
       else
         Xy <- crossprod_mv(X, e$Q_e(e$y_eff())) + Q0b0
     } else if (modus == "regular") {
@@ -298,7 +321,7 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
       if (modus == "gamma") {
         if (e$family$alpha.fixed) {
           alpha <- e$family$get_shape()
-          if (e$single.block && !e$use.offset)
+          if (e$single.block)
             kappa <- alpha * e[["y"]]
           else {
             kappa0 <- alpha * e[["y"]]
@@ -306,7 +329,7 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
           }
         } else {
           draw <- add(draw, quote(alpha <- e$family$get_shape(p)))
-          if (e$single.block && !e$use.offset) {
+          if (e$single.block) {
             draw <- add(draw, quote(kappa <- alpha * e[["y"]]))
           } else {
             draw <- add(draw, quote(kappa <- alpha * e[["y"]] * exp(-p[["e_"]])))
@@ -316,9 +339,9 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
       } else if (modus == "vargamma") {
         if (e$family$alpha.fixed) {
           alpha <- e$family$get_shape()
-          if (e$single.V.block)
+          if (e$single.V.block) {
             kappa <- alpha * e$family[["sigmasq"]]
-          else {
+          } else {
             kappa0 <- alpha * e$family[["sigmasq"]]
             draw <- add(draw, quote(kappa <- kappa0 * p[["Q_"]]))
           }
@@ -347,16 +370,16 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
         draw <- add(draw, quote(XX <- crossprod_sym(X, p[["Q_"]])))
       if (informative.prior) {
         # TODO instead of runif(n, ...) account for the structure in Qmod; lambda may not vary per unit!
-        mat_sum <- make_mat_sum(M0=Q0, M1=crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e[["n"]], 0.9, 1.1)), e$Q0)))
+        mat_sum <- make_mat_sum(M0=Q0, M1=crossprod_sym(X, crossprod_sym(Cdiag(runif(e[["n"]], 0.9, 1.1)), e[["Q0"]])))
         MVNsampler <- create_TMVN_sampler(
-          Q=mat_sum(crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e[["n"]], 0.9, 1.1)), e$Q0))),
+          Q=mat_sum(crossprod_sym(X, crossprod_sym(Cdiag(runif(e[["n"]], 0.9, 1.1)), e[["Q0"]]))),
           update.Q=TRUE, name=name, R=R, r=r, S=S, s=s, lower=lower, upper=upper,
           chol.control=e$control$chol.control
         )
         draw <- add(draw, bquote(p <- MVNsampler$draw(p, .(if (e$sigma.fixed) 1 else quote(p[["sigma_"]])), Q=mat_sum(XX), Xy=Xy)))
       } else {
         MVNsampler <- create_TMVN_sampler(
-          Q=crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e[["n"]], 0.9, 1.1)), e$Q0)),
+          Q=crossprod_sym(X, crossprod_sym(Cdiag(runif(e[["n"]], 0.9, 1.1)), e[["Q0"]])),
           update.Q=TRUE, name=name, R=R, r=r, S=S, s=s, lower=lower, upper=upper,
           chol.control=e$control$chol.control
         )
@@ -366,7 +389,7 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
       if (modus == "regular") {
         if (e$single.block && e$family$link != "probit") {
           MVNsampler <- create_TMVN_sampler(
-            Q=crossprod_sym(X, e$Q0) + Q0, Xy=Xy,
+            Q=crossprod_sym(X, e[["Q0"]]) + Q0, Xy=Xy,
             R=R, r=r, S=S, s=s, lower=lower, upper=upper,
             name=name, chol.control=e$control$chol.control
           )
@@ -374,7 +397,7 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
           rm(Xy)
         } else {
           MVNsampler <- create_TMVN_sampler(
-            Q=crossprod_sym(X, e$Q0) + Q0,
+            Q=crossprod_sym(X, e[["Q0"]]) + Q0,
             update.mu=TRUE,
             R=R, r=r, S=S, s=s, lower=lower, upper=upper,
             name=name, chol.control=e$control$chol.control
@@ -402,13 +425,13 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
           draw <- add(draw, bquote(p[["Q_"]] <- p[["Q_"]] * exp(X %m*v% (-p[[.(name)]]))))
       }
     } else {
-      if (e$e.is.res)
+      if (e$e.is.res) {
         draw <- add(draw, bquote(mv_update(p[["e_"]], plus=FALSE, X, p[[.(name)]])))
-      else {
-        if (e$use.offset || !e$single.block)
-          draw <- add(draw, bquote(mv_update(p[["e_"]], plus=TRUE, X, p[[.(name)]])))
-        else
+      } else {
+        if (e$single.block)
           draw <- add(draw, bquote(p$e_ <- X %m*v% p[[.(name)]]))
+        else
+          draw <- add(draw, bquote(mv_update(p[["e_"]], plus=TRUE, X, p[[.(name)]])))
       }
     }
     draw <- add(draw, quote(p))
@@ -435,9 +458,9 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
       p
     }
     start <- function(p) {
-      if (is.null(p[[name]]))
+      if (is.null(p[[name]])) {
         p[[name]] <- prior$rprior()
-      else {
+      } else {
         p[[name]] <- as.numeric(p[[name]])
         if (length(p[[name]]) != q) stop("start value for '", name, "' has wrong length")
       }
@@ -450,7 +473,7 @@ reg <- function(formula = ~ 1, remove.redundant=FALSE, sparse=NULL, X=NULL,
   }
 
   if (in_block && (!is.null(e$control$CG) || e$control$expanded.cMVN.sampler)) {
-    # TODO account for b0
+    # TODO account for nonzero prior mean
     if (informative.prior) {
       cholQV <- build_chol(Q0, control=e$control$chol.control)
       drawMVNvarQ <- function(p) {

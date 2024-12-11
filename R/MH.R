@@ -1,5 +1,131 @@
-
-# functions for Metropolis-Hastings updates
+#' Set options for Metropolis-Hastings sampling
+#'
+#' @export
+#' @param type a character string defining the proposal distribution.
+#'  Among supported types are random walk proposals "RWTN",
+#'  "RWN" and "RWLN" with truncated normal, normal and log-normal
+#'  proposal distributions. Other choices correspond to independence
+#'  proposals: "TN" for a truncated normal proposal, "unif" for a
+#'  uniform proposal, and "beta" and "gamma" for specific beta and
+#'  gamma proposal distributions. Not all types are supported for
+#'  a particular parameter; see the specific help of the function
+#'  defining the model component of interest to see which proposal
+#'  distribution types are supported.
+#' @param adaptive in case of the random walk "RWTN" or "RWN"
+#'  proposals, whether the scale parameter is adapted based on
+#'  acceptance rates during the burnin phase of the MCMC simulation.
+#'  The default is \code{TRUE} in these cases.
+#' @param scale in case of the "RWTN" proposal, the (initial) scale of the
+#'  distribution.
+#' @param ... additional parameters depending on the proposal type.
+#'  Supported arguments are 'l' and 'u' to pass the lower and upper
+#'  limits of uniform or random walk truncated normal proposals
+#'  (defaults l=0 and u=1), and 'a' and 'b' to pass the shape parameters
+#'  of a beta proposal distribution (defaults a = b = 0.5).
+#' @returns An environment with variables and methods for Metropolis-Hastings
+#'  sampling, for use by other package functions.
+set_MH <- function(type = "RWTN", scale = 0.025, adaptive = NULL, ...) {
+  type <- match.arg(type, c("RWTN", "RWN", "RWLN", "TN", "unif", "beta", "gamma"))
+  scale <- as.numeric(scale)
+  if (length(scale) != 1L || scale <= 0) stop("'scale' must be a single positive value")
+  if (is.null(adaptive)) {
+    adaptive <- any(type == c("RWTN", "RWN", "RWLN"))
+  } else {
+    if (!is.logical(adaptive) || length(adaptive) != 1L)
+      stop("argument 'adaptive' must be a single logical value, or 'NULL' for a default choice")
+    if (adaptive && all(type != c("RWTN", "RWN", "RWLN")))
+      stop("adaptive=TRUE only supported for 'RWTN', 'RWN' and 'RWLN' proposals")
+  }
+  extra.args <- list(...)
+  if (!all(names(extra.args) %in% c("l", "u", "a", "b")))
+    stop("invalid argument(s) for set_MH: ", paste(setdiff(names(extra.args), c("l", "u", "a", "b")), collapse=", "))
+  if (any(type == c("RWTN", "unif"))) {
+    if (any("l" == names(extra.args))) {
+      l <- as.numeric(extra.args[["l"]])
+      if (length(l) != 1L) stop("lower bound 'l' must be a single numeric value")
+    } else {
+      l <- NULL  # default can vary e.g. -1 for AR1, 0 for bym2
+    }
+    if (any("u" == names(extra.args))) {
+      u <- as.numeric(extra.args[["u"]])
+      if (length(u) != 1L) stop("upper bound 'u' must be a single numeric value")
+    } else {
+      u <- NULL
+    }
+  }
+  switch(type,
+    RWTN = {
+      # random walk truncated normal proposal
+      propose <- function(x) x + scale * Crtuvn((l - x)/scale, (u - x)/scale)
+      log.ar_prop <- function(x.star, x)
+        log(
+          (pnorm((u - x)/scale) - pnorm((l - x)/scale)) /
+          (pnorm((u - x.star)/scale) - pnorm((l - x.star)/scale))
+        )
+    },
+    RWN = {
+      # random walk normal proposal
+      propose <- function(x) x + scale * rnorm(1L)
+      log.ar_prop <- function(x.star, x) 0
+    },
+    RWLN = {
+      propose <- function(x) x * exp(scale * rnorm(1L))
+      log.ar_prop <- function(x.star, x) log(x.star/x)
+    },
+    TN = {
+      # independence truncated normal proposal
+      # this is currently specific to AR1 parameter,
+      # so methods propose and log.ar_prop are not defined here
+    },
+    unif = {
+      # uniform proposal
+      propose <- function(x) runif(1L, l, u)
+      log.ar_prop <- function(x.star, x) 0
+    },
+    beta = {
+      # beta proposal
+      if (any("a" == names(extra.args))) {
+        a <- as.numeric(extra.args[["a"]])
+        if (length(a) != 1L) stop("argument 'a' of beta proposal must be a single numeric value")
+        if (a <= 0) stop("argument 'a' of beta proposal must be positive")
+      } else {
+        a <- 0.5
+      }
+      if (any("b" == names(extra.args))) {
+        b <- as.numeric(extra.args[["b"]])
+        if (length(b) != 1L) stop("argument 'b' of beta proposal must be a single numeric value")
+        if (b <= 0) stop("argument 'b' of beta proposal must be positive")
+      } else {
+        b <- 0.5
+      }
+      propose <- function(x) rbeta(1L, a, b)
+      log.ar_prop <- function(x.star, x) {
+        out <- if (a == 1) 0 else (a - 1) * log(x/x.star)
+        if (b != 1) out <- out + (b - 1) * log((1 - x)/(1 - x.star))
+        out
+      }
+    },
+    gamma = {
+      # independence gamma proposal
+      # this is currently specific to gamma family shape parameter,
+      # so methods propose and log.ar_prop are not defined here
+    },
+    stop("MH proposal type should be one of 'RWTN', 'unif' or 'beta'")
+  )
+  rm(extra.args)
+  MH_accept <- function(x.star, x, log.ar.post)
+    log(runif(1L)) < log.ar.post + log.ar_prop(x.star, x)
+  if (adaptive) {
+    # adaptation based on acceptance rates, called every 50 iterations (cf. Roberts, Rosenthal)
+    adapt <- function(ar) {
+      if (ar < .2)
+        scale <<- scale * runif(1L, 0.6, 0.9)
+      else if (ar > .7)
+        scale <<- scale * runif(1L, 1.1, 1.5)
+    }
+  }
+  environment()
+}
 
 
 ###############################
@@ -29,43 +155,4 @@ draw_df_MH_mala <- function(r, df.current, Q.current, df.mod) {
                   + lgamma(0.5 * df.current) - lgamma(0.5 * df.star) ) +
     + (df.current - df.star) * temp + df.mod$alpha0 * log(df.star/df.current)
   if (log(runif(1L)) < log.ar) df.star else df.current
-}
-
-
-###################
-# Leroux parameter
-
-# draw Leroux parameter and also update
-# p: current state, mc: model component, coef_raw: raw coefficients (vector if q0=1, otherwise matrix)
-draw_Leroux <- function(p, mc, coef_raw) {
-  L <- p[[mc$name_Leroux]]  # current value
-  # draw a candidate value (proposal)
-  #   and initialize log acceptance probability
-  if (mc$Leroux_type == "default") {
-    L.star <- runif(1L)
-    log.ar <- 0
-  } else {
-    L.star <- rbeta(1L, mc$Leroux$a.star, mc$Leroux$b.star)
-    log.ar <- (mc$Leroux$a - mc$Leroux$a.star) * log(L.star / L) + (mc$Leroux$b - mc$Leroux$b.star) * log((1 - L.star) / (1 - L))
-  }
-  # compute log full conditional posterior in L.star
-  Ldiff <- L.star - L
-  QA_diff <- mc$mat_sum_Leroux(mc$QA, mc$idL, Ldiff, -Ldiff)
-  tr_diff <- switch(mc$var,
-    unstructured = sum(crossprod_sym(coef_raw, QA_diff) * p[[mc$name_Qraw]]),
-    diagonal = sum(.colSums(coef_raw * (QA_diff %m*m% coef_raw), mc$l, mc$q0) * p[[mc$name_Qraw]]),
-    scalar =
-      if (mc$q0 == 1L)
-        dotprodC(coef_raw, QA_diff %m*v% coef_raw) * p[[mc$name_Qraw]]
-      else
-        sum(coef_raw * (QA_diff %m*m% coef_raw)) * p[[mc$name_Qraw]]
-  )
-  # for now, assume a uniform prior on Leroux parameter
-  detQA.star <- mc$det(2*L.star, 1 - 2*L.star)
-  log.ar <- log.ar + 0.5 * ( mc$q0 * (detQA.star - p[[mc$name_detQA]]) - tr_diff )
-  if (log(runif(1L)) < log.ar) {  # accept
-    p[[mc$name_Leroux]] <- L.star
-    p[[mc$name_detQA]] <- detQA.star
-  }
-  p
 }

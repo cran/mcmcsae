@@ -25,24 +25,25 @@ NULL
 NULL
 
 # other namespace imports
-#' @importFrom Matrix .updateCHMfactor bandSparse bdiag coerce diag Diagonal
-#'   drop0 forceSymmetric invPerm isDiagonal KhatriRao Matrix nnzero
-#'   rsparsematrix sparseMatrix
+# .m2sparse
+#' @importFrom Matrix .updateCHMfactor bandSparse bdiag coerce
+#'  diag Diagonal drop0 forceSymmetric invPerm isDiagonal KhatriRao Matrix
+#'  nnzero rsparsematrix sparseMatrix
 #' @importClassesFrom Matrix CHMfactor dCHMsimpl ddiMatrix CsparseMatrix
-#'   dgCMatrix dsCMatrix generalMatrix sparseMatrix
+#'  dgCMatrix dsCMatrix generalMatrix sparseMatrix
 #' @importMethodsFrom Matrix %*% as.matrix as.vector Cholesky colSums crossprod
-#'   determinant diag isSymmetric rowSums solve t tcrossprod unname
+#'  determinant diag isSymmetric rowSums solve t tcrossprod unname
 ## do not import which() S4 generic from Matrix package as it slows down normal use of which
 ## @rawNamespace import(Matrix, except = which)
 #' @import GIGrvg
 #' @importFrom matrixStats colLogSumExps colQuantiles colSds colVars rowCumsums
-#'   rowVars
+#'  rowVars
 #' @importFrom graphics abline axis legend lines matplot pairs par plot
-#'   plot.new points segments
+#'  plot.new points segments
 #' @importFrom methods as cbind2 new rbind2 setMethod show
 #' @importFrom stats acf as.formula density fitted make.link mvfft optim
-#'   pnorm predict rbeta rbinom rchisq residuals rexp rgamma rnbinom rnorm
-#'   rpois runif rWishart sd setNames terms update.formula var weights
+#'  pnorm predict rbeta rbinom rchisq residuals rexp rgamma rnbinom rnorm
+#'  rpois runif rWishart sd setNames terms update.formula var weights
 #' @importFrom utils modifyList object.size setTxtProgressBar str tail
-#'   txtProgressBar
+#'  txtProgressBar
 NULL

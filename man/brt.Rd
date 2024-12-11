@@ -77,7 +77,7 @@ plot(train$mu, summ$bart[, "Mean"]); abline(0, 1)
 # NB prediction is currently slow
 \donttest{
 pred <- predict(sim, newdata=test,
-  iters=sample(seq_len(ndraws(sim)), 100),
+  iters=sample(seq_len(n_draws(sim)), 100),
   show.progress=FALSE
 )
 (summpred <- summary(pred))

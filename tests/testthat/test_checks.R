@@ -32,8 +32,11 @@ test_that("logistic binomial model works for non-integral data", {
 
 test_that("for negative binomial and Poisson families negative response values are flagged", {
   dat$y <- rnorm(n)
-  expect_error(create_sampler(y ~ x + z, data=dat, family="negbinomial"), "negative")
-  expect_error(create_sampler(y ~ x + z, data=dat, family="poisson"), "negative")
+  expect_warning(sampler <- create_sampler(y ~ x + z, data=dat, family="negbinomial"), "negative")
+  # this still runs:
+  sim <- MCMCsim(sampler, n.iter=200, n.chain=2, verbose=FALSE)
+  summary(sim)
+  expect_warning(create_sampler(y ~ x + z, data=dat, family="poisson"), "negative")
 })
 
 test_that("response variable for multinomial family is checked", {

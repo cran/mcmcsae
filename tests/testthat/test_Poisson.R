@@ -16,6 +16,10 @@ test_that("negative binomial approximation to Poisson regression works", {
   sim <- MCMCsim(sampler, n.chain=2, burnin=150, n.iter=500, verbose=FALSE)
   summ <- summary(sim)
   expect_equal(summ$reg1[, "Mean"], c(`(Intercept)`=1, x=2), tolerance=0.25)
+  predsumm <- summary(predict(sim, show.progress = FALSE))
+  expect_between(mean(predsumm[, "Mean"]), 0.75*mean(y), 1.3*mean(y))
+  compute_DIC(sim)
+  compute_WAIC(sim)
 })
 
 test_that("Poisson shortcut works", {
@@ -23,4 +27,34 @@ test_that("Poisson shortcut works", {
   sim <- MCMCsim(sampler, n.chain=2, burnin=150, n.iter=500, verbose=FALSE)
   summ <- summary(sim)
   expect_equal(summ$reg1[, "Mean"], c(`(Intercept)`=1, x=2), tolerance=0.25)
+  predsumm <- summary(predict(sim, show.progress = FALSE))
+  expect_between(mean(predsumm[, "Mean"]), 0.75*mean(y), 1.3*mean(y))
+  compute_DIC(sim)
+  compute_WAIC(sim)
+})
+
+test_that("f_poisson works", {
+  expect_warning(sampler <- create_sampler(y ~ 1 + x, ry=100, family="poisson"), "deprecated")
+  sampler <- create_sampler(y ~ 1 + x, family=f_poisson(size=200))
+  expect_equal(sampler$ry, 200)
+  sim <- MCMCsim(sampler, n.chain=2, burnin=150, n.iter=500, verbose=FALSE)
+  summ <- summary(sim)
+  expect_equal(summ$reg1[, "Mean"], c(`(Intercept)`=1, x=2), tolerance=0.25)
+  predsumm <- summary(predict(sim, show.progress = FALSE))
+  expect_between(mean(predsumm[, "Mean"]), 0.75*mean(y), 1.3*mean(y))
+  compute_DIC(sim)
+  compute_WAIC(sim)
+})
+
+test_that("in-sample prediction works", {
+  sampler <- create_sampler(y ~ 1 + x, family=f_poisson(size=200),
+                            linpred = "fitted")
+  sim <- MCMCsim(sampler, n.chain=2, burnin=150, n.iter=400, verbose=FALSE)
+  summ <- summary(sim)
+  fitted <- transform_dc(sim$linpred_, fun = exp)
+  fittedsumm <- summary(fitted)
+  expect_between(mean(fittedsumm[, "Mean"]), 0.75*mean(y), 1.3*mean(y))
+  fitted <- fitted(sim, type="response")
+  fittedsumm <- summary(fitted)
+  expect_between(mean(fittedsumm[, "Mean"]), 0.75*mean(y), 1.3*mean(y))
 })

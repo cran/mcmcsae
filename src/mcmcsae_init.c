@@ -7,9 +7,9 @@
 
 cholmod_common c;
 
+
 /* .Call calls */
 extern SEXP _mcmcsae_add_diagC(SEXP, SEXP);
-extern SEXP _mcmcsae_add_vector(SEXP, SEXP);
 extern SEXP _mcmcsae_Cbacksolve(SEXP, SEXP);
 extern SEXP _mcmcsae_CbacksolveM(SEXP, SEXP);
 extern SEXP _mcmcsae_cCHM_dsC_Cholesky(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -82,10 +82,10 @@ extern SEXP _mcmcsae_mv_update(SEXP, SEXP, SEXP, SEXP);
 extern SEXP _mcmcsae_prec2se_cor(SEXP);
 extern SEXP _mcmcsae_sparse_sum_x(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP _mcmcsae_TMVN_HMC_C(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP _mcmcsae_v_update(SEXP, SEXP, SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
     {"_mcmcsae_add_diagC",                             (DL_FUNC) &_mcmcsae_add_diagC,                              2},
-    {"_mcmcsae_add_vector",                            (DL_FUNC) &_mcmcsae_add_vector,                             2},
     {"_mcmcsae_Cbacksolve",                            (DL_FUNC) &_mcmcsae_Cbacksolve,                             2},
     {"_mcmcsae_CbacksolveM",                           (DL_FUNC) &_mcmcsae_CbacksolveM,                            2},
     {"_mcmcsae_cCHM_dsC_Cholesky",                     (DL_FUNC) &_mcmcsae_cCHM_dsC_Cholesky,                      6},
@@ -158,6 +158,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_mcmcsae_prec2se_cor",                           (DL_FUNC) &_mcmcsae_prec2se_cor,                            1},
     {"_mcmcsae_sparse_sum_x",                          (DL_FUNC) &_mcmcsae_sparse_sum_x,                           9},
     {"_mcmcsae_TMVN_HMC_C",                            (DL_FUNC) &_mcmcsae_TMVN_HMC_C,                            14},
+    {"_mcmcsae_v_update",                              (DL_FUNC) &_mcmcsae_v_update,                               3},
     {NULL, NULL, 0}
 };
 

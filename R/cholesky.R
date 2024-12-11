@@ -1,6 +1,5 @@
 
-# only system A, Lt and L solves used so far
-.solve.systems <- setNames(1:9, c("A", "LDLt", "LD", "DLt", "L", "Lt", "D", "P", "Pt"))
+.solve.systems <- setNames(c(1L, 5L, 6L), c("A", "L", "Lt"))
 
 # define R function to set defaults
 # ordering=1L (AMD only) seems to give same permutations as Matrix::Cholesky
@@ -29,7 +28,7 @@ check_chol_control <- function(control) {
   if (!is.list(control)) stop("control options must be specified as a list, preferably using the appropriate control setter function")
   defaults <- chol_control()
   w <- which(!(names(control) %in% names(defaults)))
-  if (length(w)) stop("unrecognized control parameters ", paste(names(control)[w], collapse=", "))
+  if (length(w)) stop("unrecognized control parameters ", paste0(names(control)[w], collapse=", "))
   control <- modifyList(defaults, control, keep.null=TRUE)
   control$ordering <- as.integer(control$ordering)
   control
@@ -59,7 +58,6 @@ build_chol <- function(M, Imult=0, control=chol_control(), LDL=FALSE) {
   # solve
   #   rhs: right hand side, of type numeric, matrix or dgCMatrix
   #   system: the type of system to be solved, see Matrix package
-  #   systemP: if TRUE modifies system Lt to LtP and L to PtL; has no effect if PERM=FALSE or system="A" or type="ddiMatrix"
   # Ltimes left-multiplies a vector/matrix by L (in case of permutations P'L which need not be lower triangular!) or its transpose
   # inverse: return inverse of the original matrix
   switch(type,
@@ -69,7 +67,7 @@ build_chol <- function(M, Imult=0, control=chol_control(), LDL=FALSE) {
         cholM <- M
         update <- function(parent, mult=0) if (mult != 0) stop("unit ddiMatrix assumed fixed")
         Ltimes <- function(x, transpose=TRUE) x
-        solve <- function(rhs, system="A", systemP=FALSE) rhs
+        solve <- function(rhs, system="A") rhs
         inverse <- function() cholM
       } else {
         if (type == "ddiMatrix") {
@@ -80,7 +78,7 @@ build_chol <- function(M, Imult=0, control=chol_control(), LDL=FALSE) {
           update <- function(parent, mult=0) cholM <<- sqrt(parent + mult)
         }
         Ltimes <- function(x, transpose=TRUE) cholM * x
-        solve <- function(rhs, system="A", systemP=FALSE) {
+        solve <- function(rhs, system="A") {
           switch(class(rhs)[1L],
             numeric=, matrix =
               switch(system,
@@ -123,51 +121,43 @@ build_chol <- function(M, Imult=0, control=chol_control(), LDL=FALSE) {
         # TODO check whether the permutation is handled correctly in the transpose=FALSE case
         Ltimes <- function(x, transpose=TRUE) {
           L <- as(cholM, "Matrix")
-          if (transpose) {
+          if (transpose)
             if (is.vector(x)) crossprod_mv(L, x[P]) else crossprod_mv(L, x[P, , drop=FALSE])
-          } else {
+          else
             if (is.vector(x)) (L %m*v% x)[iP] else (L %m*v% x)[iP, , drop=FALSE]
-          }
         }
-        solve <- function(rhs, system="A", systemP=FALSE) {
+        solve <- function(rhs, system="A") {
           switch(class(rhs)[1L],
             numeric =
-              if (systemP)
-                switch(system,
-                  Lt = cCHMf_solve(cholM, rhs, 6L)[iP],
-                  L = cCHMf_solve(cholM, rhs[P], 5L)
-                )
-              else
-                cCHMf_solve(cholM, rhs, .solve.systems[system]),
+              switch(system,
+                A = cCHMf_solve(cholM, rhs, 1L),
+                Lt = cCHMf_solve(cholM, rhs, 6L)[iP],
+                L = cCHMf_solve(cholM, rhs[P], 5L)
+              ),
             matrix =
-              if (systemP)
-                switch(system,
-                  Lt = cCHMf_solve_matrix(cholM, rhs, 6L)[iP, , drop=FALSE],
-                  L = cCHMf_solve_matrix(cholM, rhs[P, , drop=FALSE], 5L)
-                )
-              else
-                cCHMf_solve_matrix(cholM, rhs, .solve.systems[system]),
+              switch(system,
+                A = cCHMf_solve_matrix(cholM, rhs, 1L),
+                Lt = cCHMf_solve_matrix(cholM, rhs, 6L)[iP, , drop=FALSE],
+                L = cCHMf_solve_matrix(cholM, rhs[P, , drop=FALSE], 5L)
+              ),
             dgCMatrix =
-              if (systemP)
-                switch(system,
-                  Lt = cCHMf_spsolve(cholM, rhs, 6L)[iP, , drop=FALSE],
-                  L = cCHMf_spsolve(cholM, rhs[P, , drop=FALSE], 5L)
-                )
-              else
-                cCHMf_spsolve(cholM, rhs, .solve.systems[system]),
+              switch(system,
+                A = cCHMf_spsolve(cholM, rhs, 1L),
+                Lt = cCHMf_spsolve(cholM, rhs, 6L)[iP, , drop=FALSE],
+                L = cCHMf_spsolve(cholM, rhs[P, , drop=FALSE], 5L)
+              ),
             stop("'", class(rhs)[1L], "' not supported as right hand side in solve")
           )
         }
       } else {
         Ltimes <- function(x, transpose=TRUE) {
           L <- as(cholM, "Matrix")
-          if (is.vector(x)) {
-            if (transpose) crossprod_mv(L, x) else L %m*v% x
-          } else {
-            if (transpose) crossprod_mm(L, x) else L %m*m% x
-          }
+          if (transpose)
+            if (is.vector(x)) crossprod_mv(L, x) else crossprod_mm(L, x)
+          else
+            if (is.vector(x)) L %m*v% x else L %m*m% x
         }
-        solve <- function(rhs, system="A", systemP=FALSE)
+        solve <- function(rhs, system="A")
           switch(class(rhs)[1L],
             numeric = cCHMf_solve(cholM, rhs, .solve.systems[system]),
             matrix = cCHMf_solve_matrix(cholM, rhs, .solve.systems[system]),
@@ -175,10 +165,7 @@ build_chol <- function(M, Imult=0, control=chol_control(), LDL=FALSE) {
             stop("'", class(rhs)[1L], "' not supported as right hand side in solve")
           )
       }
-      inverse <- function() {
-        I <- new("dgCMatrix", i=0:(size - 1L), p=0:size, Dim=c(size, size), x=rep.int(1, size))
-        solve(I)
-      }
+      inverse <- function() Matrix::solve(cholM)
     },
     matrix = {
       # use chol.default to initialize as it signals non-positive-definiteness
@@ -195,13 +182,12 @@ build_chol <- function(M, Imult=0, control=chol_control(), LDL=FALSE) {
           cholM <<- Ccholesky(add_diagC(parent, rep.int(mult, size)))
       }
       Ltimes <- function(x, transpose=TRUE) {
-        if (is.vector(x)) {
-          if (transpose) cholM %m*v% x else crossprod_mv(cholM, x)
-        } else {
-          if (transpose) cholM %m*m% x else crossprod_mm(cholM, x)
-        }
+        if (transpose)
+          if (is.vector(x)) cholM %m*v% x else cholM %m*m% x
+        else
+          if (is.vector(x)) crossprod_mv(cholM, x) else crossprod_mm(cholM, x)
       }
-      solve <- function(rhs, system="A", systemP=FALSE) {
+      solve <- function(rhs, system="A") {
         switch(class(rhs)[1L],
           numeric =
             switch(system,

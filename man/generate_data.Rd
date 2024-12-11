@@ -60,7 +60,8 @@ dat <- data.frame(
   ny = 10
 )
 gd <- generate_data(
-  ~ reg(~ 1 + x, Q0=10, b0=c(0, 1), name="beta") + gen(factor = ~ g, name="v"),
+  ~ reg(~ 1 + x, prior=pr_normal(precision=10, mean=c(0, 1)), name="beta") +
+    gen(factor = ~ g, name="v"),
   family="binomial", ny="ny", data=dat
 )
 gd

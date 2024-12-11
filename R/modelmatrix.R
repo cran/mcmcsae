@@ -35,25 +35,21 @@
 #'  By default it is the empty string, reproducing the labels of \code{model.matrix}.
 #' @param by a vector by which to aggregate the result.
 #' @param tabM if \code{TRUE} return a list of tabMatrix objects.
-#' @param enclos enclosure to look for objects not found in \code{data}.
 #' @returns Design matrix X, either an ordinary matrix or a sparse \code{dgCMatrix}.
 model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
                          drop.unused.levels=FALSE, sparse=NULL, drop0=TRUE, catsep="",
-                         by=NULL, tabM=FALSE, enclos=.GlobalEnv) {
+                         by=NULL, tabM=FALSE) {
+  enclos <- environment(formula)
   if (is.null(data)) {
     trms <- terms(formula)
-    envir <- environment(formula)  # where to search for variables
     if (!NROW(attr(trms, "factors"))) stop("cannot determine the sample size")
-    n <- NROW(eval_in(rownames(attr(trms, "factors"))[1L], envir, enclos))
+    n <- NROW(eval_in(rownames(attr(trms, "factors"))[1L], data, enclos))
   } else if (is.integer(data) && length(data) == 1L) {
     # data is interpreted as sample size
     trms <- terms(formula)
-    envir <- environment(formula)
     n <- data
-    data <- NULL
   } else {
     trms <- terms(formula, data=data)
-    envir <- data
     n <- nrow(data)
   }
   if (!is.null(by)) {
@@ -84,7 +80,7 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
   vnames <- rownames(tmat)
   # 1. analyse
   # which variables are quantitative
-  qvar <- !catvars(trms, envir, enclos=enclos)
+  qvar <- !catvars(trms, data)
   qvar <- vnames[which(qvar)]
   q <- if (has_intercept) 1L else 0L  # nr of columns
   qd <- q  # equivalent nr of dense columns, for estimation of sparseness
@@ -100,36 +96,41 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
     nc <- 1L  # number of cells (or columns in design matrix)
     # loop over quantitative variables, including possibly matrices
     for (v in intersect(vnames[tmat[, k] > 0L], qvar)) {
-      qv <- eval_in(v, envir, enclos)
-      if (NROW(qv) != n) stop("variable '", v, "' has different length ", NROW(qv))
+      qv <- eval_in(v, data, enclos)
+      if (NROW(qv) != n) {
+        if (length(qv) == 1L)
+          qv <- rep.int(qv, n)
+        else
+          stop("variable '", v, "' has different size ", NROW(qv))
+      }
       if (anyNA(qv)) stop("missing(s) in variable ", v)
       if (is.matrix(qv) || inherits(qv, "data.frame")) nc <- nc * ncol(qv)
     }
     qd <- qd + nc
     rmlevs <- NULL
     # loop over the factor vars and compute number of levels accounting for removed cols
-    for (f in setdiff(vnames[tmat[, k] > 0L], qvar)) {
-      fac <- eval_in(f, envir, enclos)
+    for (v in setdiff(vnames[tmat[, k] > 0L], qvar)) {
+      fac <- eval_in(v, data, enclos)
       if (length(fac) != n) stop("variable '", v, "' has different length ", length(fac))
       if (!is.factor(fac) || drop.unused.levels) fac <- factor(fac)
-      if (anyNA(fac)) stop("missing(s) in variable ", f)
+      if (anyNA(fac)) stop("missing(s) in variable ", v)
       levs <- attr(fac, "levels")
       ncat <- length(levs)
-      # NB if tmat[f, k] == 2L a main effect is missing and we should not remove a level!
+      # NB if tmat[v, k] == 2L a main effect is missing and we should not remove a level!
       # also, if there is no intercept, no level should be removed for the first main factor effect
       # see the documentation of terms.formula
       if (!has_intercept && first && attr(trms, "order")[k] == 1L) {
-        tmat[f, k] <- 2L  # next time we can just check for value 2, meaning not to remove a level
+        tmat[v, k] <- 2L  # next time we can just check for value 2, meaning not to remove a level
         first <- FALSE
       }
       # store levels to remove to be passed to fac2tabM
-      if (!is.null(contrasts.arg) && tmat[f, k] == 1L) {
+      if (!is.null(contrasts.arg) && tmat[v, k] == 1L) {
         if (is.list(contrasts.arg)) {
-          rml <- contrasts.arg[[f]]
+          rml <- contrasts.arg[[v]]
           if (is.null(rml))
             rml <- levs[1L]
           else
-            if (all(rml != levs)) stop("invalid contrasts.arg: cannot remove level '", rml, "' from factor ", f)
+            if (all(rml != levs)) stop("invalid contrasts.arg: cannot remove level '", rml, "' from factor ", v)
         } else if (contrasts.arg == "contr.treatment") {
           rml <- levs[1L]  # remove first category
         } else if (contrasts.arg == "contr.SAS") {
@@ -137,10 +138,10 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
         }
         ncat <- ncat - 1L
         if (ncat == 0L) {
-          warn("model term '", tnames[k], "' is removed as contrasts are applied to the single-level factor variable '", f, "'")
+          warn("model term '", tnames[k], "' is removed as contrasts are applied to the single-level factor variable '", v, "'")
           terms.removed[k] <- TRUE  # contrasts applied to single-level factor
         }
-        rmlevs <- c(rmlevs, setNames(rml, f))
+        rmlevs <- c(rmlevs, setNames(rml, v))
       }
       nc <- nc * ncat
     }
@@ -185,14 +186,14 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
     if (terms.removed[k]) next
     countvars <- intersect(vnames[tmat[, k] > 0L], qvar)
     if (length(countvars)) {
-      xk <- eval_in(countvars[1L], envir, enclos)
+      xk <- eval_in(countvars[1L], data, enclos)
       if (inherits(xk, "data.frame")) xk <- as.matrix(xk)
       if (is.matrix(xk))
         labk <- paste(countvars[1L], if (is.null(colnames(xk))) seq_len(ncol(xk)) else colnames(xk), sep=catsep)
       else
         labk <- countvars[1L]
       for (v in countvars[-1L]) {
-        temp <- eval_in(v, envir, enclos)
+        temp <- eval_in(v, data, enclos)
         if (is.matrix(temp)) {
           xk <- t(KhatriRao(t(xk), t(temp)))
           labk <- outer(labk, paste(v, colnames(xk), sep=catsep), paste, sep=":")
@@ -209,9 +210,9 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
     if (length(facvars)) {
       if (length(countvars) && !is.matrix(xk)) {
         # TODO allow matrix; --> generalize x-slot in tabMatrix to matrix (and even dgCMatrix)
-        fk <- fac2tabM(facvars, envir, enclos, x=xk, drop.unused.levels=drop.unused.levels, contrasts=contr.list[[tnames[k]]], catsep=catsep)
+        fk <- fac2tabM(facvars, data, enclos, x=xk, drop.unused.levels=drop.unused.levels, contrasts=contr.list[[tnames[k]]], catsep=catsep)
       } else {
-        fk <- fac2tabM(facvars, envir, enclos, drop.unused.levels=drop.unused.levels, contrasts=contr.list[[tnames[k]]], catsep=catsep)
+        fk <- fac2tabM(facvars, data, enclos, drop.unused.levels=drop.unused.levels, contrasts=contr.list[[tnames[k]]], catsep=catsep)
       }
       if (is.matrix(xk)) {
         lab[col:(col + ncol(fk)*ncol(xk) - 1L)] <- outer(colnames(fk), labk, paste, sep=":")
@@ -288,7 +289,8 @@ model_matrix <- function(formula, data=NULL, contrasts.arg=NULL,
 
 # return a named logical vector indicating for each variable in
 #   the model terms object whether it is categorical
-catvars <- function(trms, data, enclos=.GlobalEnv) {
+catvars <- function(trms, data) {
+  enclos <- environment(trms)
   vnames <- rownames(terms_matrix(trms))
   vapply(vnames, function(x) {
       temp <- eval_in(x, data, enclos)
@@ -297,7 +299,7 @@ catvars <- function(trms, data, enclos=.GlobalEnv) {
   )
 }
 
-# extract the independent variable in terms matrix from a terms object
+# extract the independent variables' terms matrix from a terms object
 terms_matrix <- function(trms) {
   tmat <- attr(trms, "factor")
   if (attr(trms, "response")) {

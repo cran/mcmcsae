@@ -75,12 +75,12 @@ gd <- generate_data(model, data=dat)
 dat$y <- gd$y
 # fit a base model
 model0 <- y ~ reg(~ 1, name="beta") + gen(factor=~f, name="v")
-sampler <- create_sampler(model0, data=dat, block=TRUE)
+sampler <- create_sampler(model0, data=dat)
 sim <- MCMCsim(sampler, store.all=TRUE)
 (summ0 <- summary(sim))
 # fit 'true' model
 model <- y ~ reg(~ x, name="beta") + gen(factor=~f, name="v")
-sampler <- create_sampler(model, data=dat, block=TRUE)
+sampler <- create_sampler(model, data=dat)
 sim <- MCMCsim(sampler, store.all=TRUE)
 (summ <- summary(sim))
 # compare random effect estimates against true parameter values

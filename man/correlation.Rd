@@ -18,11 +18,18 @@ RW1(name, circular = FALSE, w = NULL)
 
 RW2(name)
 
-AR1(name, phi, w = NULL)
+AR1(name, phi, w = NULL, control = NULL)
 
 season(name, period)
 
-spatial(name, poly.df, snap = sqrt(.Machine$double.eps), queen = TRUE)
+spatial(
+  name,
+  graph = NULL,
+  snap = sqrt(.Machine$double.eps),
+  queen = TRUE,
+  poly.df = NULL,
+  derive.constraints = FALSE
+)
 
 spline(name, knots, degree)
 
@@ -35,15 +42,41 @@ custom(name, D = NULL, Q = NULL, R = NULL, derive.constraints = NULL)
 
 \item{w}{a vector of weights.}
 
-\item{phi}{value of an autoregressive parameter.}
+\item{phi}{prior distribution, or fixed value, for an
+autoregressive parameter. The default is a uniform prior over
+the interval [-1, 1]. A single numeric value is interpreted as
+a fixed value, corresponding to a degenerate prior, which can also
+be specified as \code{pr_fixed(value)}. Alternatively,
+\code{link{pr_truncnormal}} can be used to specify a truncated
+normal prior.}
+
+\item{control}{options for Metropolis-Hastings sampling from the
+conditional posterior for an autoregressive parameter. These options
+can be set using function \code{\link{set_MH}}. Supported proposal
+types are "TN" and "RWTN". By default an independence truncated
+normal proposal (type="TN"), or a random walk truncated normal
+proposal (type="RWTN") with adaptive scale initialised at 0.025
+is used, depending on whether the specified random effects'
+distribution is Gaussian or non-Gaussian.}
 
 \item{period}{a positive integer specifying the seasonal period.}
 
-\item{poly.df}{a spatial data frame.}
+\item{graph}{either a spatial object of class \code{SpatialPolygons},
+\code{sf}, \code{sfc}, or a neighbours list of class \code{nb}.}
 
-\item{snap}{passed to \code{\link[spdep]{poly2nb}}.}
+\item{snap}{passed to \code{\link[spdep]{poly2nb}}.
+Ignored if \code{graph} is a neighbours list.}
 
-\item{queen}{passed to \code{\link[spdep]{poly2nb}}.}
+\item{queen}{passed to \code{\link[spdep]{poly2nb}}.
+Ignored if \code{graph} is a neighbours list.}
+
+\item{poly.df}{a spatial data frame. DEPRECATED, use argument
+\code{graph} instead.}
+
+\item{derive.constraints}{whether to derive the constraint matrix for an
+IGMRF model component numerically from the precision matrix.
+The use of \code{derive.constraints} in function \code{spatial}
+is DEPRECATED, as it is no longer needed.}
 
 \item{knots}{passed to \code{\link[splines]{splineDesign}}.}
 
@@ -54,9 +87,6 @@ custom(name, D = NULL, Q = NULL, R = NULL, derive.constraints = NULL)
 \item{Q}{custom precision matrix.}
 
 \item{R}{custom restriction matrix.}
-
-\item{derive.constraints}{whether to derive the constraint matrix for an
-IGMRF model component numerically from the precision matrix.}
 }
 \description{
 Element 'factor' of a model component created using function
@@ -73,18 +103,20 @@ to be imposed on the coefficient vector.
     reasonable to choose \code{w} proportional to the reciprocal time differences. For equidistant
     times there is generally no need to specify \code{w}.}
   \item{RW2(f)}{Second-order random walk.}
-  \item{AR1(f, phi, w=NULL)}{First-order autoregressive correlation structure among
-    the levels of \code{f}. Required argument is the (fixed) autoregressive parameter \code{phi}.
+  \item{AR1(f, phi, w=NULL, control=NULL)}{First-order autoregressive correlation structure among
+    the levels of \code{f}. Argument \code{phi} can be a single numerical value of the
+    autoregressive parameter, or an appropriate prior specification if phi should be inferred.
+    If not supplied, a uniform prior on (-1, 1] is assumed.
     For irregularly spaced AR(1) processes weights can be specified, in the same way as for
     \code{RW1}.}
   \item{season(f, period)}{Dummy seasonal with period \code{period}.}
-  \item{spatial(f, poly.df, snap, queen, derive.constraints=FALSE)}{CAR spatial correlation.
-    Argument \code{poly.df} can either be an object of (S4) class \code{SpatialPolygonsDataFrame}
-    or an object of (S3) class \code{sf}. The latter can be obtained, e.g., from reading in a
+  \item{spatial(f, graph, snap, queen)}{CAR spatial correlation.
+    Argument \code{graph} can either be an object of (S4) class \code{SpatialPolygonsDataFrame}
+    or an object of (S3) class \code{sf}. The latter can be obtained, e.g., by reading in a
     shape file using function \code{\link[sf]{st_read}}. Arguments \code{snap} and \code{queen}
-    are passed to \code{\link[spdep]{poly2nb}}.
-    If \code{derive.constraints=TRUE} the constraint matrix for an IGMRF model component
-    is formed by computing the singular vectors of the precision matrix.}
+    are passed to \code{\link[spdep]{poly2nb}}, which computes a neighbours list.
+    Alternatively, a neighbours list object of class \code{nb} can be passed directly
+    as argument \code{graph}.}
   \item{spline(f, knots, degree)}{P-splines, i.e. penalized B-splines structure over
     the domain of a quantitative variable f. Arguments knots and degree are passed to
     \code{\link[splines]{splineDesign}}. If \code{knots} is a single value it is interpreted as
@@ -106,7 +138,7 @@ if (requireNamespace("sf")) {
   # effects, as well as spatial random effects
   gd <- generate_data(
     ~ reg(~ AREA + BIR74, prior=pr_normal(precision=1), name="beta") +
-      gen(factor = ~ spatial(NAME, poly.df=nc), name="vs"),
+      gen(factor = ~ spatial(NAME, graph=nc), name="vs"),
     sigma.mod = pr_invchisq(df=10, scale=1),
     data = nc
   )
@@ -118,8 +150,8 @@ if (requireNamespace("sf")) {
   #    parameters used to generate the data, gd$pars, are reproduced
   sampler <- create_sampler(
     y ~ reg(~ AREA + BIR74, prior=pr_normal(precision=1), name="beta") +
-    gen(factor = ~ spatial(NAME, poly.df=nc), name="vs"),
-    block=TRUE, data=nc
+    gen(factor = ~ spatial(NAME, graph=nc), name="vs"),
+    data=nc
   )
   sim <- MCMCsim(sampler, store.all=TRUE, n.iter=600, n.chain=2, verbose=FALSE)
   (summ <- summary(sim))

@@ -41,6 +41,16 @@ test_that("inverseSPD works", {
   expect_equal(solve(M), inverseSPD(M))
 })
 
+test_that("inverse method of cholesky object works", {
+  n <- 20L
+  M <- crossprod(matrix(rnorm(n*n), n, n)) + 2*diag(n)
+  MdsC <- as(M, "CsparseMatrix")
+  cholM <- build_chol(MdsC)
+  MdsCinv <- cholM$inverse()
+  expect_is(MdsCinv, "dsCMatrix")
+  expect_equal(as.matrix(MdsCinv), inverseSPD(M))
+})
+
 test_that("dotprodC works", {
   x <- rnorm(10)
   y <- runif(10)
@@ -301,4 +311,20 @@ test_that("rbinding tabMatrices works", {
   expect_identical(colnames(rbind(M1, M2)), colnames(M1))
   rownames(M2) <- paste0("r", 1:nrow(M2))
   expect_identical(rownames(rbind(M1, M2)), c(rep.int("", nrow(M1)), rownames(M2)))
+})
+
+test_that("economizeMatrix works", {
+  M <- matrix(1L, 2, 3)  # integer matrix
+  expect_is(economizeMatrix(M, sparse=TRUE), "dgCMatrix")
+  n <- 25
+  M <- Diagonal(x=rnorm(n))
+  colnames(M) <- paste0("c", 1:n)
+  expect_equal(colnames(economizeMatrix(M)), NULL)
+  expect_equal(colnames(economizeMatrix(M, strip.names=FALSE)), colnames(M))
+  expect_is(economizeMatrix(M, vec.diag=TRUE, strip.names=FALSE), "numeric")
+  expect_equal(names(economizeMatrix(M, vec.diag=TRUE, strip.names=FALSE)), colnames(M))
+  M <- diag(10)
+  colnames(M) <- paste("c", 1:10)
+  expect_is(economizeMatrix(M, sparse=TRUE), "ddiMatrix")
+  expect_equal(colnames(economizeMatrix(M, sparse=TRUE, strip.names=FALSE)), colnames(M))
 })

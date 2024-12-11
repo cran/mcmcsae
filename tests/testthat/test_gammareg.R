@@ -59,26 +59,27 @@ test_that("exponential prior on shape works", {
   expect_between(summ$reg1[, "Mean"], 0.2 * b, 5 * b)
 })
 
-alpha <- 1
-o <- rexp(n)
-mu <- exp(o + b[1] + b[2]*df$x1 + b[3]*df$x2)
-df$y <- rgamma(n, shape=alpha, rate=alpha/mu)
 test_that("gamma regression with offset works", {
+  alpha <- 1
+  df$o <- rexp(n)
+  mu <- exp(df$o + b[1] + b[2]*df$x1 + b[3]*df$x2)
+  df$y <- rgamma(n, shape=alpha, rate=alpha/mu)
   sampler <- create_sampler(
-    df$y ~ offset(o) + reg(~ x1 + x2, name="beta"),
+    y ~ offset(o) + reg(~ x1 + x2, name="beta"),
     family="gamma", data = df
   )
   expect_length(sampler$block, 0L)
+  expect_equal(sampler$mod[[length(sampler$mod)]]$offset, df$o)
   sim <- MCMCsim(sampler, n.iter=600, burnin=250, n.chain=2, verbose=FALSE)
   summ <- summary(sim)
   expect_between(summ$beta[, "Mean"], 0.25 * b, 4 * b)
-  # same with block=TRUE
   expect_warning(sampler <- create_sampler(
-      df$y ~ offset(o) + reg(~ x1 + x2, name="beta"),
+      y ~ offset(o) + reg(~ x1 + x2, name="beta"),
       family="gamma", data = df, control=sampler_control(block=list("beta"))
     ), "only one"
   )
   expect_length(sampler$block, 1L)
+  expect_equal(sampler$mod[[length(sampler$mod)]]$offset, df$o)
   sim <- MCMCsim(sampler, n.iter=600, burnin=250, n.chain=2, verbose=FALSE)
   summ <- summary(sim)
   expect_between(summ$beta[, "Mean"], 0.25 * b, 4 * b)

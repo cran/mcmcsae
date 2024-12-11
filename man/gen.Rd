@@ -14,9 +14,8 @@ gen(
   prior = NULL,
   Q0 = NULL,
   PX = NULL,
-  GMRFmats = NULL,
   priorA = NULL,
-  Leroux = FALSE,
+  strucA = GMRF_structure(),
   R0 = NULL,
   RA = NULL,
   constr = NULL,
@@ -59,12 +58,13 @@ associated with \code{formula}. Default is \code{FALSE}.}
 
 \item{drop.empty.levels}{whether to remove factor levels without observations.}
 
-\item{X}{A (possibly sparse) design matrix. This can be used instead of \code{formula} and \code{factor}.}
+\item{X}{A (possibly sparse) design matrix. If \code{X} is specified, \code{formula} and \code{factor}
+are only used to derive the random effects' structured precision matrix.}
 
 \item{var}{the (co)variance structure among the varying effects defined by \code{formula}
 over the levels of the factors defined by \code{factor}.
 The default is \code{"unstructured"}, meaning that a full covariance matrix
-parameterization is used. For uncorrelated effects with unequal variances use
+parametrization is used. For uncorrelated effects with unequal variances use
 \code{var="diagonal"}. For uncorrelated effects with equal variances use \code{var="scalar"}.
 In the case of a single varying effect there is no difference between these choices.}
 
@@ -94,23 +94,14 @@ by supplying a list with one or more of the following components:
     parameters. Default is \code{TRUE}.}
 }}
 
-\item{GMRFmats}{list of incidence/precision/constraint matrices. This can be specified
-as an alternative to \code{factor}. It should be a list such as that returned
-by \code{\link{compute_GMRF_matrices}}. Can be used together with argument \code{X}
-as a flexible alternative to \code{formula} and \code{factor}.}
-
 \item{priorA}{prior distribution for scale factors at the variance scale associated with \code{QA}.
 In case of IGMRF models the scale factors correspond to the innovations.
 The default \code{NULL} means not to use any local scale factors.
 A prior can currently be specified using \code{\link{pr_invchisq}} or \code{\link{pr_exp}}.}
 
-\item{Leroux}{this option alters the precision matrix determined by \code{factor} by taking a
-weighted average of it with the identity matrix. If \code{TRUE} the model gains an additional parameter,
-the 'Leroux' parameter, being the weight of the original, structured, precision matrix in the weighted
-average. By default a uniform prior for the weight and a uniform Metropolis-Hastings proposal density
-are employed. This default can be changed by supplying a list with elements a, b, and a.star, b.star,
-implying a beta(a, b) prior and a beta(a.star, b.star) independence proposal density. A third option is
-to supply a single number between 0 and 1, which is then used as a fixed value for the Leroux parameter.}
+\item{strucA}{this option can be used to modify the default structure encoded by
+\code{factor} to a 'bym2' or 'leroux' structure. See \code{\link{GMRF_structure}}
+for details.}
 
 \item{R0}{an optional equality restriction matrix acting on the coefficients defined by \code{formula}, for each
 level defined by \code{factor}. If c is the number of restrictions, \code{R0} is a
@@ -147,7 +138,7 @@ of coefficients.}
 around which the random effect component is hierarchically centered.
 See \code{\link{glreg}} for details.}
 
-\item{a}{only used in case the effects are MLiG distributed, such as is
+\item{a}{only used in case the effects are MLiG distributed, as
 assumed in case of a gamma sampling distribution, or for
 gaussian variance modelling. In those cases \code{a} controls how close
 the effects' prior is to a normal prior, see \code{\link{pr_MLiG}}.}
@@ -194,11 +185,6 @@ J. Besag and C. Kooperberg (1995).
  A. Gelman, D.A. Van Dyk, Z. Huang and W.J. Boscardin (2008).
    Using Redundant Parameterizations to Fit Hierarchical Models.
    Journal of Computational and Graphical Statistics 17(1), 95-122.
-
- B. Leroux, X. Lei and N. Breslow (1999).
-   Estimation of Disease Rates in Small Areas: A New Mixed Model for Spatial Dependence.
-   In M. Halloran and D. Berry (Eds.), Statistical Models in Epidemiology,
-   the Environment and Clinical Trials, 135-178.
 
  T. Park and G. Casella (2008).
    The Bayesian Lasso.

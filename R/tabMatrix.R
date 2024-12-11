@@ -18,8 +18,8 @@ setClass("tabMatrix",
     num <- object@num
     reduced <- object@reduced
     xlab <- object@xlab
-    if (length(perm) != n) return(paste("length of 'perm' slot must be", n))
-    if (num && length(object@x) != n) return(paste("length of 'x' slot must be", n))
+    if (length(perm) != n) return(paste0("length of 'perm' slot must be ", n))
+    if (num && length(object@x) != n) return(paste0("length of 'x' slot must be ", n))
     if (length(xlab) > 1L) return("length of 'xlab' must not be greater than 1")
     if (n > 0L && (any(perm > d - 1L) || (!reduced && any(perm < 0L)))) return("'perm' slot is not a valid index")
     # NB 'num' can represent zero rows, so it is more general than 'reduced'
@@ -380,7 +380,7 @@ remove_levels <- function(f, l=1L) {
 #   If left unspecified no levels are removed.
 # drop.unused.levels: drop unused levels of each factor
 # drop: drop empty cells in the interaction (which may result in more columns to be dropped)
-fac2tabM <- function(fvars, data, enclos=.GlobalEnv, x=numeric(), xlab=character(), drop.unused.levels=FALSE, drop=FALSE, contrasts=NULL, varsep=":", catsep="$", lex.order=FALSE) {
+fac2tabM <- function(fvars, data, enclos=emptyenv(), x=numeric(), xlab=character(), drop.unused.levels=FALSE, drop=FALSE, contrasts=NULL, varsep=":", catsep="$", lex.order=FALSE) {
   if (missing(fvars) || !length(fvars)) stop("unexpected 'fvars' argument")
   for (f in seq_along(fvars)) {
     fac <- eval_in(fvars[f], data, enclos)
@@ -463,10 +463,11 @@ tables2tabM <- function(formula, data, ...) {
     }
     facvars <- setdiff(vnames[tmat[, k] > 0L], qvar)
     if (length(facvars)) {
+      enclos <- environment(formula)
       if (length(countvars)) {
-        fk <- fac2tabM(facvars, data, x=xk, xlab=labk, contrasts=NULL, ...)
+        fk <- fac2tabM(facvars, data, enclos, x=xk, xlab=labk, contrasts=NULL, ...)
       } else {
-        fk <- fac2tabM(facvars, data, contrasts=NULL, ...)
+        fk <- fac2tabM(facvars, data, enclos, contrasts=NULL, ...)
       }
     } else {
       if (length(countvars)) {

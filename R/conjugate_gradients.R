@@ -72,7 +72,7 @@ CG <- function(b, env, x=NULL, max.it=NULL, e=NULL, verbose=FALSE, ...) {
 #'    Journal of the American Statistical Association, 1-14.
 # TODO
 # - input checks
-# - allow updates of QA (priorA or Leroux), i.p. QA = DA' diag(w) DA where w is updated
+# - allow updates of QA (priorA or GMRF extension), i.p. QA = DA' diag(w) DA where w is updated
 # - allow updates of X (model component mec)
 # - use X's of underlying model components
 #   and for each component use X0 and XA instead of X, using mixed product relations
@@ -94,8 +94,8 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
     } else {
       Q_x <- switch(sampler$Q0.type,
         unit = function(p, x) x,
-        diag = function(p, x) sampler$Q0@x * x,
-        symm = function(p, x) sampler$Q0 %m*v% x
+        diag = function(p, x) sampler[["Q0"]]@x * x,
+        symm = function(p, x) sampler[["Q0"]] %m*v% x
       )
     }
   } else {
@@ -112,9 +112,9 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
   for (mc in mbs) {
     if (mc[["type"]] == "gen") {
       if (mc$var == "unstructured")
-        cholQV[[mc$name]] <- build_chol(rWishart(1L, mc$q0, diag(mc$q0))[,,1L])
+        cholQV[[mc$name]] <- build_chol(rWishart(1L, mc[["q0"]], diag(mc[["q0"]]))[,,1L])
       else
-        cholQV[[mc$name]] <- build_chol(runif(mc$q0, 0.5, 1.5))
+        cholQV[[mc$name]] <- build_chol(runif(mc[["q0"]], 0.5, 1.5))
     } else {
       if (mc[["type"]] != "reg") stop("TBI")
       ## TODO account for b0, and optimize for zero Q0 (default)
@@ -137,17 +137,17 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
       # - remove duplicate code, see setup_priorGMRFsampler in mc_gen
       # - update cholDD in case of local shrinkage priorA
       # cholDD is only used in the GMRF preconditioners
-      if (nrow(mc$DA) <= ncol(mc$DA)) {
-        mc$cholDD <- build_chol(tcrossprod(mc$DA), control=chol_control(perm=FALSE))  # sometimes perm=TRUE may be more efficient
+      if (nrow(mc[["DA"]]) <= ncol(mc[["DA"]])) {
+        mc$cholDD <- build_chol(tcrossprod(mc[["DA"]]), control=chol_control(perm=FALSE))  # sometimes perm=TRUE may be more efficient
       } else {
         # more edges than vertices, as usual in e.g. spatial models --> adjust for non-singularity
-        mc$cholDD <- build_chol(tcrossprod(mc$DA) + 0.1 * Diagonal(nrow(mc$DA)), control=chol_control(perm=FALSE))
+        mc$cholDD <- build_chol(tcrossprod(mc[["DA"]]) + 0.1 * CdiagU(nrow(mc[["DA"]])), control=chol_control(perm=FALSE))
       }
     } else {
       # regression usually uses non- or weakly-informative prior -->
       # use simple regression posterior variances in preconditioner, as suggested in NS paper
       # TODO more efficient computation of diagonal values only
-      mc$gamma <- 2*diag(solve(crossprod_sym(mc$X, sampler$Q0)))
+      mc$gamma <- 2*diag(solve(crossprod_sym(mc[["X"]], sampler[["Q0"]])))
     }
   }
 
@@ -159,10 +159,10 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
         for (mc in mbs) {
           ind <- mbs$vec_list[[mc$name]]
           if (mc[["type"]] == "gen") {
-            temp <- mc$DA %m*m% t.default(cholQV[[mc$name]]$solve(matrix(x[mc$block.i], nrow=mc$q0)))
-            out[mc$block.i] <- as.numeric(t.default(crossprod_mm(mc$DA, mc$cholDD$solve(temp))))
+            temp <- mc[["DA"]] %m*m% t.default(cholQV[[mc$name]]$solve(matrix(x[mc$block.i], nrow=mc[["q0"]])))
+            out[mc$block.i] <- as.numeric(t.default(crossprod_mm(mc[["DA"]], mc$cholDD$solve(temp))))
           } else {
-            out[mc$block.i] <- mc$gamma * x[mc$block.i]
+            out[mc$block.i] <- mc[["gamma"]] * x[mc$block.i]
           }
         }
         out
@@ -173,11 +173,11 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
         out <- numeric(q)
         for (mc in mbs) {
           if (mc[["type"]] == "gen") {
-            temp <- mc$DA %m*m% t.default(cholQV[[mc$name]]$solve(matrix(x[mc$block.i], nrow=mc$q0)))
+            temp <- mc[["DA"]] %m*m% t.default(cholQV[[mc$name]]$solve(matrix(x[mc$block.i], nrow=mc[["q0"]])))
             temp <- mc$cholDD$solve(temp)
-            out[mc$block.i] <- as.numeric(t.default(crossprod_mm(mc$DA, mc$cholDD$solve(temp))))
+            out[mc$block.i] <- as.numeric(t.default(crossprod_mm(mc[["DA"]], mc$cholDD$solve(temp))))
           } else {
-            out[mc$block.i] <- mc$gamma * x[mc$block.i]
+            out[mc$block.i] <- mc[["gamma"]] * x[mc$block.i]
           }
         }
         out
@@ -189,11 +189,11 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
         out <- numeric(q)
         for (mc in mbs) {
           if (mc[["type"]] == "gen") {
-            temp <- mc$DA %m*m% t.default(cholQV[[mc$name]]$solve(matrix(scale * x[mc$block.i], nrow=mc$q0)))
+            temp <- mc[["DA"]] %m*m% t.default(cholQV[[mc$name]]$solve(matrix(scale * x[mc$block.i], nrow=mc[["q0"]])))
             temp <- mc$cholDD$solve(temp)
-            out[mc$block.i] <- as.numeric(t.default(crossprod_mm(mc$DA, mc$cholDD$solve(temp))))
+            out[mc$block.i] <- as.numeric(t.default(crossprod_mm(mc[["DA"]], mc$cholDD$solve(temp))))
           } else {
-            out[mc$block.i] <- mc$gamma * x[mc$block.i]
+            out[mc$block.i] <- mc[["gamma"]] * x[mc$block.i]
           }
         }
         out
@@ -205,7 +205,7 @@ setup_CG_sampler <- function(mbs, X, sampler, control=CG_control()) {
   self <- environment()
   # X, QT passed from block's draw function
   draw <- function(p, Xy, X, QT, sampler, start=NULL) {
-    # Xy is rhs, i.e. X' Qn ytilde (+ possibly prior reg term if b0 != 0)
+    # Xy is rhs, i.e. X' Qn ytilde (+ possibly prior reg term)
     if (is.null(p[["sigma_"]])) sigma <- 1 else sigma <- p[["sigma_"]]
     u <- Xy + sigma * crossprod_mv(X, sampler$drawMVNvarQ(p))
     for (mc in mbs) {
@@ -249,7 +249,7 @@ check_CG_control <- function(control) {
   if (!is.list(control)) stop("control options must be specified as a list, preferably using the appropriate control setter function")
   defaults <- CG_control()
   w <- which(!(names(control) %in% names(defaults)))
-  if (length(w)) stop("unrecognized control parameters ", paste(names(control)[w], collapse=", "))
+  if (length(w)) stop("unrecognized control parameters ", paste0(names(control)[w], collapse=", "))
   control <- modifyList(defaults, control, keep.null=TRUE)
   control$chol.control <- check_chol_control(control$chol.control)
   control

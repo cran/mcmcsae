@@ -85,10 +85,10 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
     iters <- seq_len(object[["_info"]]$n.draw)
   else
     if (!all(iters %in% seq_len(object[["_info"]]$n.draw))) stop("non-existing iterations selected")
-  n.chain <- nchains(object)
+  n.chain <- n_chains(object)
 
   fun. <- match.fun(fun.)
-  arg1 <- length(formals(fun.))
+  arg1 <- length(formals(args(fun.)))
   if (arg1 < 1L || arg1 > 2L) stop("'fun.' must be a function of 1 or 2 arguments")
   arg1 <- arg1 == 1L  # flag for single argument function, i.e. function of prediction x only
 
@@ -98,9 +98,11 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
     if (is.null(X.)) stop("one of 'newdata' and 'X.' must be supplied")
     if (identical(X., "in-sample")) {
       use.linpred_ <- any("linpred_" == par.names) && model$do.linpred && is.null(model$linpred)
-      if (!use.linpred_ && !all(names(model$mod) %in% par.names)) stop("for prediction all coefficients must be stored in 'object' (use 'store.all=TRUE' in MCMCsim)")
-      X. <- NULL
-      n <- model$n
+      if (!use.linpred_ && !all(names(Filter(function(mc) mc[["type"]] != "mc_offset", model[["mod"]])) %in% par.names))
+        stop("for prediction all coefficients must be stored in 'object' (use 'store.all=TRUE' in MCMCsim)")
+      X. <- list()
+      for (mc in model$mod) X.[[mc$name]] <- mc$make_predict(verbose=verbose)
+      n <- model[["n"]]
       if (!is.null(var)) {
         warn("argument 'var' ignored for in-sample prediction")
         var <- NULL
@@ -126,22 +128,21 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
       if (fam$family == "negbinomial") ry <- model$ry
     } else {
       if (fam$family == "gamma") {
-        # for X.="linpred" and custom X., we currently
-        # disallow vector shape parameter
+        # currently disallow vector shape parameter for X.="linpred" and custom X.
         if (!fam$alpha.scalar) stop("cannot derive vector shape")
       }
       if (identical(X., "linpred")) {
         if (all("linpred_" != par.names))
           stop("'linpred_' not found in object. Use linpred='fitted' in create_sampler.")
-        n <- nvars(object[["linpred_"]])
+        n <- n_vars(object[["linpred_"]])
         use.linpred_ <- TRUE
         X. <- NULL
       } else {
         if (!is.list(X.) || length(X.) == 0L) stop("'X.' must be a non-empty list")
         if (!all(names(X.) %in% names(model$mod)))
-          stop("X. names not corresponding to a model component: ", paste(setdiff(names(X.), names(model$mod)), collapse=", "))
+          stop("X. names not corresponding to a model component: ", paste0(setdiff(names(X.), names(model$mod)), collapse=", "))
         n <- nrow(X.[[1L]])
-        if (!all(sapply(X., NROW) == n)) stop("not all matrices in 'X.' have the same number of rows")
+        if (!all(i_apply(X., NROW) == n)) stop("not all matrices in 'X.' have the same number of rows")
         for (k in names(X.)) {
           X.[[k]] <- model$mod[[k]]$make_predict(Xnew=X.[[k]], verbose=verbose)
         }
@@ -166,7 +167,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
     }
     if (!use.linpred_) {
       # check that for mec components name_X is stored
-      name_Xs <- unlist(lapply(model$mod, `[[`, "name_X"), use.names=FALSE)
+      name_Xs <- unlst(lapply(model$mod, `[[`, "name_X"))
       if (!is.null(X.)) name_Xs <- name_Xs[names(X.)]
       if (!all(name_Xs %in% par.names))
         stop("(in-sample) prediction for a model with measurement error components requires ",
@@ -179,7 +180,8 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
     X. <- list()
     if (verbose && nrow(newdata) > 5e4L) message("setting up model design matrices for 'newdata'")
     for (mc in model$mod) X.[[mc$name]] <- mc$make_predict(newdata, verbose=verbose)
-    if (!is.null(X.) && !all(names(X.) %in% par.names)) stop("for prediction all coefficients must be stored in 'object' (use 'store.all=TRUE' in MCMCsim)")
+    if (!is.null(X.) && !all(names(Filter(function(mc) mc[["type"]] != "mc_offset", model[["mod"]])) %in% par.names))
+      stop("for prediction all coefficients must be stored in 'object' (use 'store.all=TRUE' in MCMCsim)")
     if (fam$family == "multinomial")
       n <- nrow(newdata) * model$Km1
     else
@@ -245,7 +247,7 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
   }
 
   if (type %in% c("data", "data_cat")) {
-    if (fam$family == "gamma") {
+    if (any(fam$family == c("gamma", "poisson"))) {
       rpred <- fam$make_rpredictive(newdata)
       rpredictive <- function(p, lp, cholQ=NULL, var=NULL, V=NULL, ny, ry)
         rpred(p, lp)
@@ -272,8 +274,8 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
     if (verbose) message(length(iters) * n.chain, " draws distributed over ", n.cores, " cores")
     sim_list <- split_iters(object, iters, parts=n.cores)
     predict_obj <- function(obj) {
-      chains <- seq_len(nchains(obj))
-      iters <- seq_len(ndraws(obj))
+      chains <- seq_len(n_chains(obj))
+      iters <- seq_len(n_draws(obj))
       if (out_type == "logical" || out_type == "integer")
         out <- rep.int(list(matrix(NA_integer_, length(iters), d)), length(chains))
       else
@@ -376,7 +378,8 @@ predict.mcdraws <- function(object, newdata=NULL, X.=if (is.null(newdata)) "in-s
 #'   ny = 10
 #' )
 #' gd <- generate_data(
-#'   ~ reg(~ 1 + x, Q0=10, b0=c(0, 1), name="beta") + gen(factor = ~ g, name="v"),
+#'   ~ reg(~ 1 + x, prior=pr_normal(precision=10, mean=c(0, 1)), name="beta") +
+#'     gen(factor = ~ g, name="v"),
 #'   family="binomial", ny="ny", data=dat
 #' )
 #' gd

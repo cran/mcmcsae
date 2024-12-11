@@ -4,11 +4,11 @@
 create_mc_block <- function(mcs, e=parent.frame()) {
   type <- "block"
   name <- "coef_"
-  debug <- any(sapply(mcs, `[[`, "debug"))
+  debug <- any(b_apply(mcs, `[[`, "debug"))
 
   if (e$family$family == "gamma") {
     modus <- "gamma"       # model for log(mean) of gamma
-  } else if (all(sapply(mcs, `[[`, "name") %in% names(e$Vmod))) {
+  } else if (all(s_apply(mcs, `[[`, "name") %in% names(e$Vmod))) {
     if (e$family$family == "gaussian_gamma")
       modus <- "vargamma"  # model for log(var) of gaussian and log(mean) of gamma
     else
@@ -32,9 +32,9 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   ind <- 0L
   for (mc in mcs) {
     if (mc[["type"]] == "gen" && mc$gl)
-      X <- cbind(X, mc$X, zeroMatrix(e[["n"]], mc$glp$q))
+      X <- cbind(X, mc[["X"]], zeroMatrix(e[["n"]], mc$glp$q))
     else
-      X <- cbind(X, mc$X)
+      X <- cbind(X, mc[["X"]])
     mc$block.i <- (ind + 1L):ncol(X)
     ind <- ncol(X)
   }
@@ -45,8 +45,8 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   # template for (updating) blocked precision matrix
   # each mc$Q for gen is either ddi or dsC; the same holds true for mc$Q0 for reg and mec
   get_Q <- function(mc) if (mc[["type"]] == "gen") mc[["Q"]] else mc[["Q0"]]
-  if (all(sapply(mcs, function(mc) class(get_Q(mc))[[1L]] == "ddiMatrix"))) {
-    QT <- Cdiag(unlist(lapply(mcs, function(mc) ddi_diag(get_Q(mc))), use.names=FALSE))
+  if (all(b_apply(mcs, function(mc) class(get_Q(mc))[[1L]] == "ddiMatrix"))) {
+    QT <- Cdiag(unlst(lapply(mcs, function(mc) ddi_diag(get_Q(mc)))))
   } else {
     x <- NULL
     i <- NULL
@@ -77,12 +77,12 @@ create_mc_block <- function(mcs, e=parent.frame()) {
       if (mc[["type"]] == "gen")
         Qvector <- c(Qvector, p[[mc$name_Q]])
       else
-        Qvector <- c(Qvector, tau * mc$Q0@x)
+        Qvector <- c(Qvector, tau * mc[["Q0"]]@x)
     Qvector
   }
 
   # non-zero prior means of reg or mec components
-  nonzero.mean <- any(sapply(mcs, function(x) any(x[["type"]] == c("reg", "mec")) && !x$zero.mean))
+  nonzero.mean <- any(b_apply(mcs, function(x) any(x[["type"]] == c("reg", "mec")) && !x$zero.mean))
   if (nonzero.mean) {
     Q0b0 <- numeric(q)
     for (mc in mcs) {
@@ -92,28 +92,32 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   }
 
   if (is.null(e$control$CG)) {
-    if (e$modeled.Q)
-      XX <- crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e[["n"]], 0.9, 1.1)), e[["Q0"]]))
-    else
-      XX <- economizeMatrix(crossprod_sym(X, e$Q0), symmetric=TRUE, drop.zeros=TRUE)
+    if (e$modeled.Q) {
+      XX <- crossprod_sym(X, crossprod_sym(Cdiag(runif(e[["n"]], 0.9, 1.1)), e[["Q0"]]))
+    } else {
+      XX <- economizeMatrix(crossprod_sym(X, e[["Q0"]]),
+        #sparse = if (e$control$expanded.cMVN.sampler) TRUE else NULL,
+        symmetric=TRUE, drop.zeros=TRUE
+      )
+    }
 
     # derive constraint matrix, if any
-    if (any(sapply(mcs, function(mc) !is.null(mc$R)))) {
+    if (any(b_apply(mcs, function(mc) !is.null(mc[["R"]])))) {
       R <- zeroMatrix(0L, 0L)
       r <- NULL
       for (mc in mcs) {
-        if (is.null(mc$R)) {
-          if (mc[["type"]] == "gen" && mc$gl)
-            R <- rbind(R, zeroMatrix(mc$q + mc$glp$q, ncol(R)))
+        if (is.null(mc[["R"]])) {
+          if (mc[["type"]] == "gen" && mc[["gl"]])
+            R <- rbind(R, zeroMatrix(mc[["q"]] + mc$glp[["q"]], ncol(R)))
           else
-            R <- rbind(R, zeroMatrix(mc$q, ncol(R)))
+            R <- rbind(R, zeroMatrix(mc[["q"]], ncol(R)))
         } else {
-          if (mc[["type"]] == "gen" && mc$gl) {
-            R <- bdiag(R, mc$glp$R)
-            r <- c(r, rep(if (is.null(mc$glp$r)) 0 else mc$glp$r, ncol(mc$glp$R)))
+          if (mc[["type"]] == "gen" && mc[["gl"]]) {
+            R <- bdiag(R, mc$glp[["R"]])
+            r <- c(r, rep(if (is.null(mc$glp[["r"]])) 0 else mc$glp[["r"]], ncol(mc$glp[["R"]])))
           } else {
-            R <- bdiag(R, mc$R)
-            r <- c(r, rep(if (is.null(mc$r)) 0 else mc$r, ncol(mc$R)))
+            R <- bdiag(R, mc[["R"]])
+            r <- c(r, rep(if (is.null(mc[["r"]])) 0 else mc[["r"]], ncol(mc[["R"]])))
           }
         }
       }
@@ -129,15 +133,15 @@ create_mc_block <- function(mcs, e=parent.frame()) {
       R <- NULL
     }
 
-    if (any(sapply(mcs, function(mc) !is.null(mc$S)))) {
+    if (any(b_apply(mcs, function(mc) !is.null(mc[["S"]])))) {
       S <- zeroMatrix(0L, 0L)
       s <- NULL
       for (mc in mcs) {
-        if (is.null(mc$S))
-          S <- rbind(S, zeroMatrix(mc$q, ncol(S)))
+        if (is.null(mc[["S"]]))
+          S <- rbind(S, zeroMatrix(mc[["q"]], ncol(S)))
         else {
-          S <- bdiag(S, mc$S)
-          s <- c(s, rep(if (is.null(mc$s)) 0 else mc$s, ncol(mc$S)))
+          S <- bdiag(S, mc[["S"]])
+          s <- c(s, rep(if (is.null(mc[["s"]])) 0 else mc[["s"]], ncol(mc[["S"]])))
         }
       }
       if (nrow(S) != q) stop("incompatible dimensions of design and constraint matrices")
@@ -148,7 +152,7 @@ create_mc_block <- function(mcs, e=parent.frame()) {
     }
 
     if (modus == "regular") {
-      sparse_template(environment(), update.XX=e$modeled.Q || any(sapply(mcs, `[[`, "type") == "mec"),
+      sparse_template(environment(), update.XX=e$modeled.Q || any(s_apply(mcs, `[[`, "type") == "mec"),
                       add.outer.R=e$control$add.outer.R)
     } else {
       if (is.null(R)) {
@@ -171,7 +175,7 @@ create_mc_block <- function(mcs, e=parent.frame()) {
     linpred <- if (is.null(e$linpred))
       economizeMatrix(t(X), strip.names=FALSE)
     else
-      economizeMatrix(t(do.call(cbind, lapply(e$linpred[names(mcs)], function(x) environment(x)$Xnew))), allow.tabMatrix=FALSE)
+      economizeMatrix(t(do.call(cbind, lapply(e$linpred[names(mcs)], function(x) x$Xnew))), allow.tabMatrix=FALSE)
   }
 
   if (e$prior.only) return(environment())
@@ -183,21 +187,20 @@ create_mc_block <- function(mcs, e=parent.frame()) {
       for (m in seq_along(mcs)) {
         # TODO linpred function (NB name clash) --> apply exp() only once
         #      or exploit index design matrices to reduce cost of exp()
-        draw <- add(draw, bquote(p[["Q_"]] <- p[["Q_"]] * exp(mcs[[.(m)]]$linpred(p))))
+        draw <- add(draw, bquote(p[["Q_"]] <- p[["Q_"]] * exp(mcs[[.(m)]]$lp(p))))
       }
   } else if (e$single.block) {
-    if (e$e.is.res || e$use.offset || e$family$family == "poisson")
+    if (e$e.is.res)
       draw <- add(draw, quote(p$e_ <- e$y_eff()))
     # otherwise p$e_ = e$y_eff() = 0
   } else {
     for (m in seq_along(mcs)) {
-      # residuals could also be computed using the block mb$X,
+      # residuals could also be computed using the block X,
       #   but this way it is usually faster due to more efficient matrix types
-      # TODO composite matrix type
       if (e$e.is.res)
-        draw <- add(draw, bquote(p$e_ <- p[["e_"]] + mcs[[.(m)]]$linpred(p)))
+        draw <- add(draw, bquote(mcs[[.(m)]]$lp_update(p[["e_"]], TRUE, p)))
       else
-        draw <- add(draw, bquote(p$e_ <- p[["e_"]] - mcs[[.(m)]]$linpred(p)))
+        draw <- add(draw, bquote(mcs[[.(m)]]$lp_update(p[["e_"]], FALSE, p)))
     }
   }
   draw <- draw |>
@@ -218,8 +221,8 @@ create_mc_block <- function(mcs, e=parent.frame()) {
     for (mc in mcs)
       if (mc[["type"]] == "mec")
         draw <- add(draw, bquote(X[, mcs[[.(mc$name)]]$block.i] <- p[[.(mc$name_X)]]))
-    if (e$single.block && !e$modeled.Q && !any(sapply(mcs, `[[`, "type") == "mec") && e$family$link != "probit") {
-      Xy <- crossprod_mv(X, e$Q0 %m*v% e$y_eff())
+    if (e$single.block && !e$modeled.Q && !any(s_apply(mcs, `[[`, "type") == "mec") && e$family$link != "probit") {
+      Xy <- crossprod_mv(X, e[["Q0"]] %m*v% e$y_eff())
       if (nonzero.mean) {
         Xy <- Xy + Q0b0
         rm(Q0b0)
@@ -251,7 +254,7 @@ create_mc_block <- function(mcs, e=parent.frame()) {
             draw <- add(draw, quote(XX <- cps_template(p[["Q_"]])))
           }
         }
-      } else if (any(sapply(mcs, `[[`, "type") == "mec")) {
+      } else if (any(s_apply(mcs, `[[`, "type") == "mec")) {
         draw <- add(draw, quote(XX <- crossprod_sym(X, e[["Q0"]])))
       }
       draw <- add(draw, quote(Qlist <- update(XX, QT, 1, 1/tau)))
@@ -276,15 +279,15 @@ create_mc_block <- function(mcs, e=parent.frame()) {
     if (modus == "gamma") {
       if (e$family$alpha.fixed) {
         alpha <- e$family$get_shape()
-        if (e$single.block && !e$use.offset)
+        if (e$single.block) {
           kappa <- alpha * e[["y"]]
-        else {
+        } else {
           kappa0 <- alpha * e[["y"]]
           draw <- add(draw, quote(kappa <- kappa0 * exp(-p[["e_"]])))
         }
       } else {
         draw <- add(draw, quote(alpha <- e$family$get_shape(p)))
-        if (e$single.block && !e$use.offset)
+        if (e$single.block)
           draw <- add(draw, quote(kappa <- alpha * e[["y"]]))
         else
           draw <- add(draw, quote(kappa <- alpha * e[["y"]] * exp(-p[["e_"]])))
@@ -292,9 +295,9 @@ create_mc_block <- function(mcs, e=parent.frame()) {
     } else if (modus == "vargamma") {
       if (e$family$alpha.fixed) {
         alpha <- e$family$get_shape()
-        if (e$single.V.block)
+        if (e$single.V.block) {
           kappa <- alpha * e$family[["sigmasq"]]
-        else {
+        } else {
           kappa0 <- alpha * e$family[["sigmasq"]]
           draw <- add(draw, quote(kappa <- kappa0 * p[["Q_"]]))
         }
@@ -350,18 +353,18 @@ create_mc_block <- function(mcs, e=parent.frame()) {
     }
     if (modus == "var" || modus == "vargamma") {
       if (e$single.V.block)
-        draw <- add(draw, bquote(p[["Q_"]] <- exp(-mcs[[.(m)]]$linpred(p))))
+        draw <- add(draw, bquote(p[["Q_"]] <- exp(-mcs[[.(m)]]$lp(p))))
       else
-        draw <- add(draw, bquote(p[["Q_"]] <- p[["Q_"]] * exp(-mcs[[.(m)]]$linpred(p))))
+        draw <- add(draw, bquote(p[["Q_"]] <- p[["Q_"]] * exp(-mcs[[.(m)]]$lp(p))))
     } else {
       if (e$e.is.res) {
-        draw <- add(draw, bquote(mv_update(p[["e_"]], plus=FALSE, mcs[[.(m)]][["X"]], p[[.(mcs[[m]]$name)]])))
+        draw <- add(draw, bquote(mcs[[.(m)]]$lp_update(p[["e_"]], FALSE, p)))
       } else {
-        if (m == 1L && e$single.block && !e$use.offset && e$family$family != "poisson") {
+        if (m == 1L && e$single.block) {
           # in this case p$e_ = e$y_eff() = 0
-          draw <- add(draw, quote(p$e_ <- mcs[[1L]]$linpred(p)))
+          draw <- add(draw, quote(p$e_ <- mcs[[1L]]$lp(p)))
         } else {
-          draw <- add(draw, bquote(mv_update(p[["e_"]], plus=TRUE, mcs[[.(m)]][["X"]], p[[.(mcs[[m]]$name)]])))
+          draw <- add(draw, bquote(mcs[[.(m)]]$lp_update(p[["e_"]], TRUE, p)))
         }
       }
     }
@@ -405,13 +408,14 @@ create_mc_block <- function(mcs, e=parent.frame()) {
   } else {
     start <- add(start, quote(
       for (mc in mcs) {
-        if (mc[["type"]] == "gen" && mc$fastGMRFprior) {
+        if (mc[["type"]] == "gen" && mc[["fastGMRFprior"]]) {
           Qv <- rexp(1L)
           if (is.null(mc$rGMRFprior))
             setup_priorGMRFsampler(mc, Qv)
-          p[[mc$name]] <- mc$rGMRFprior(Qv)
-        } else
-          p[[mc$name]] <- Crnorm(mc$q, sd=e$scale_sigma)
+          p[[mc[["name"]]]] <- mc$rGMRFprior(Qv)
+        } else {
+          p[[mc[["name"]]]] <- Crnorm(mc[["q"]], sd=e[["scale_sigma"]])
+        }
       }
     ))
   }

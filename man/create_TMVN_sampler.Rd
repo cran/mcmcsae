@@ -21,7 +21,8 @@ create_TMVN_sampler(
   check.constraints = FALSE,
   method = NULL,
   reduce = NULL,
-  chol.control = chol_control()
+  chol.control = chol_control(),
+  debug = FALSE
 )
 }
 \arguments{
@@ -31,9 +32,11 @@ create_TMVN_sampler(
 
 \item{Xy}{alternative to specifying mu; in this case \code{mu} is computed as \eqn{Q^{-1}\code{Xy}}.}
 
-\item{update.Q}{whether \code{Q} is updated for each draw.}
+\item{update.Q}{whether \code{Q} is updated for each draw. Currently only supported
+by methods 'direct' and 'HMC'.}
 
-\item{update.mu}{whether \code{mu} is updated for each draw. By default equal to \code{update.Q}.}
+\item{update.mu}{whether \code{mu} is updated for each draw. By default equal to \code{update.Q}.
+Currently only supported by methods 'direct' and 'HMC'.}
 
 \item{name}{name of the TMVN vector parameter.}
 
@@ -67,6 +70,9 @@ options to non-default values, see \code{\link{TMVN-methods}}.}
 equality constraints.}
 
 \item{chol.control}{options for Cholesky decomposition, see \code{\link{chol_control}}.}
+
+\item{debug}{if \code{TRUE} a breakpoint is set at the beginning of the TMVN sampling
+function \code{draw}.}
 }
 \value{
 An environment for sampling from a possibly degenerate and truncated multivariate normal

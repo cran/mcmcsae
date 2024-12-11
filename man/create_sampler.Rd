@@ -42,9 +42,6 @@ that can be used to specify \code{family} and associated parameters and controls
 For the binomial distribution logistic and probit link functions are supported, the latter only
 for binary data. For the negative binomial, Poisson and gamma sampling distributions
 a log link function is assumed.
-Note that currently \code{family = 'poisson'} is implemented using the negative
-binomial distribution with its (reciprocal) overdispersion parameter set
-to a very large value.
 For categorical or multinomial data, \code{family = "multinomial"} can be used. The implementation
 is based on a stick-breaking representation of the multinomial distribution, and the logistic link
 function relates each category except the last to a linear predictor. The categories can be
@@ -58,11 +55,7 @@ Defaults to a vector of 1s.}
 dispersion parameter. It can be specified either as a numeric vector or the name of a
 numeric variable in \code{data}. The overall dispersion parameter is the product of \code{ry}
 with a positive scalar factor modelled as specified by argument \code{r.mod}. By default
-\code{ry} is taken to be 1. For \code{family = "poisson"} a single value can be specified,
-determining how well the Poisson distribution is approximated by the negative binomial distribution.
-The value should be large enough such that the negative binomial's overdispersion
-becomes negligible, but not too large as this might result in slow MCMC mixing. The default is
-\code{ry=100} in this case.}
+\code{ry} is taken to be 1.}
 
 \item{r.mod}{prior specification for a scalar (reciprocal) dispersion parameter
 of the negative binomial distribution. The prior can be specified by a call to a prior

@@ -32,7 +32,7 @@ Default is \code{TRUE}.}
 \item{expanded.cMVN.sampler}{whether an expanded linear system including dual variables is used
 for equality constrained multivariate normal sampling. If set to \code{TRUE} this may
 improve the performance of the blocked Gibbs sampler in case of a large number of equality
-constraints, typically identifiability constraints for GMRFs.}
+constraints, typically GMRF identifiability constraints.}
 
 \item{CG}{use a conjugate gradient iterative algorithm instead of Cholesky updates for sampling
 the model's coefficients. This must be a list with possible components \code{max.it},

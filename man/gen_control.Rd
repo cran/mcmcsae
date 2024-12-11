@@ -9,12 +9,12 @@ gen_control(MHprop = c("GiG", "LNRW"))
 \arguments{
 \item{MHprop}{MH proposal for the variance component in case of a MLiG prior
 on the coefficients. The two options are "GiG" for a generalized inverse gamma
-proposal, and "LNRW" for a log_normal random walk proposal. The former should
+proposal, and "LNRW" for a log-normal random walk proposal. The former should
 approximate the conditional posterior quite well provided MLiG parameter \code{a}
 is large, such that the coefficients' prior is approximately normal.}
 }
 \value{
-A list with computational options regarding a 'gen' model component.
+A list of computational options regarding a 'gen' model component.
 }
 \description{
 Set computational options for the sampling algorithms used for a 'gen' model component

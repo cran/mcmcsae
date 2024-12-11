@@ -26,7 +26,7 @@ test_that("BART component 'brt' works", {
   expect_identical(nrow(summ$bart), n)
   #plot(dat$x, summ$bart[, "Mean"])
   expect_length(sim$bart_trees_, n.ch)
-  expect_length(sim$bart_trees_[[1L]], ndraws(sim))
+  expect_length(sim$bart_trees_[[1L]], n_draws(sim))
   expect_equal(max(sim$bart_trees_[[1L]][[1L]]$tree), n.tr)
   compute_DIC(sim)
   waic1 <- compute_WAIC(sim, show.progress=FALSE)
@@ -35,7 +35,7 @@ test_that("BART component 'brt' works", {
   expect_equal(waic1[["p_WAIC2"]], waic2$estimates["p_waic", "Estimate"])
   suppressWarnings(loo(sim))
 
-  pred <- predict(sim, newdata=testdat, iters=sample(ndraws(sim), 30), show.progress=FALSE)
+  pred <- predict(sim, newdata=testdat, iters=sample(n_draws(sim), 30), show.progress=FALSE)
   summpred <- summary(pred)
   #plot(testdat$x, summpred[, "Mean"])
   #points(testdat$x, fx(testdat$x) + 0.5*0.5, col="red")
@@ -43,11 +43,11 @@ test_that("BART component 'brt' works", {
   spl <- split_iters(sim, parts=3)
   expect_length(spl, 3L)
   expect_length(spl[[1]]$bart_trees_, n.ch)
-  expect_lt(length(spl[[1]]$bart_trees_[[1L]]), ndraws(sim)/2)
+  expect_lt(length(spl[[1]]$bart_trees_[[1L]]), n_draws(sim)/2)
   expect_identical(max(spl[[1]]$bart_trees_[[1L]][[1L]]$tree), n.tr)
-  
+
   test <- combine_chains(sim, sim)
   expect_length(test$bart_trees_, 2*n.ch)
-  expect_length(test$bart_trees_[[1L]], ndraws(sim))
+  expect_length(test$bart_trees_[[1L]], n_draws(sim))
   expect_identical(max(test$bart_trees_[[1L]][[1L]]$tree), n.tr)
 })

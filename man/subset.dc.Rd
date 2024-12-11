@@ -4,13 +4,7 @@
 \alias{subset.dc}
 \title{Select a subset of chains, samples and parameters from a draws component (dc) object}
 \usage{
-\method{subset}{dc}(
-  x,
-  chains = seq_len(nchains(x)),
-  draws = seq_len(ndraws(x)),
-  vars = seq_len(nvars(x)),
-  ...
-)
+\method{subset}{dc}(x, chains = NULL, draws = NULL, vars = NULL, ...)
 }
 \arguments{
 \item{x}{a draws component (dc) object.}
@@ -38,7 +32,7 @@ sampler <- create_sampler(y ~ reg(~ x + f, name="beta"), data=dat)
 sim <- MCMCsim(sampler)
 (summary(sim$beta))
 (summary(subset(sim$beta, chains=1)))
-(summary(subset(sim$beta, chains=1, draws=sample(1:ndraws(sim), 100))))
+(summary(subset(sim$beta, chains=1, draws=sample(1:n_draws(sim), 100))))
 (summary(subset(sim$beta, vars=1:2)))
 
 }

@@ -9,9 +9,9 @@
 drawMVN_cholQ <- function(ch, xy=NULL, sd=1) {
   z <- Crnorm(ch$size, sd=sd)  # NB sd must be scalar in Crnorm
   if (is.null(xy))
-    ch$solve(z, system="Lt", systemP=TRUE)
+    ch$solve(z, system="Lt")
   else  # draw from multivariate normal N(Q^-1 xy, sd^2 Q^-1)
-    ch$solve(ch$solve(xy, system="L", systemP=TRUE) + z, system="Lt", systemP=TRUE)
+    ch$solve(ch$solve(xy, system="L") + z, system="Lt")
 }
 
 drawMVN_Q <- function(M, sd=1, perm=FALSE)

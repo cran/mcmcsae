@@ -7,8 +7,8 @@
 SBC_test(
   ...,
   pars,
-  n.draws = 25L,
-  n.sim = 20L * n.draws,
+  n.draw = 25L,
+  n.sim = 20L * n.draw,
   burnin = 25L,
   thin = 2L,
   show.progress = TRUE,
@@ -25,7 +25,7 @@ SBC_test(
 \item{pars}{named list with univariate functions of the parameters to use in test. This list
 is passed to argument \code{pred} of \code{\link{MCMCsim}}.}
 
-\item{n.draws}{number of posterior draws to retain in posterior simulations.}
+\item{n.draw}{number of posterior draws to retain in posterior simulations.}
 
 \item{n.sim}{number of simulation iterations.}
 
@@ -64,7 +64,7 @@ dat <- data.frame(x=runif(n))
 ranks <- SBC_test(~ reg(~ 1 + x, prior=pr_normal(mean=c(0.25, 1), precision=1), name="beta"),
   sigma.mod=pr_invchisq(df=1, scale=list(df=1, scale=1)), data=dat,
   pars=list(mu="beta[1]", beta_x="beta[2]", sigma="sigma_"),
-  n.draws=9L, n.sim=10L*20L, thin=2L, burnin=20L
+  n.draw=9L, n.sim=10L*20L, thin=2L, burnin=20L
 )
 ranks
 }

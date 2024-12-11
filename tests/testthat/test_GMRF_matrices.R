@@ -3,6 +3,22 @@ context("GMRF matrices")
 
 set.seed(1, kind="Mersenne-Twister", normal.kind="Inversion")
 
+test_that("GMRF matrices have expected types", {
+  n <- 10
+  expect_is(D_AR1(n, 0), "dgCMatrix")
+  expect_is(Q_AR1(n, 0), "dsCMatrix")
+  expect_equal(Q_AR1(n, 1), Q_RW1(n))
+  expect_is(D_AR1(n, 0.1), "dgCMatrix")
+  expect_is(Q_AR1(n, 0.12), "dsCMatrix")
+  expect_is(D_AR1(n, 0.1, w=runif(n - 1)), "dgCMatrix")
+  expect_is(Q_AR1(n, 0.12, w=runif(n - 1)), "dsCMatrix")
+})
+
+test_that("crossprod of incidence matrix yields precision matrix", {
+  expect_equal(crossprod(D_AR1(14, 0.1)), Q_AR1(14, 0.1))
+  expect_equal(crossprod(D_season(120, 12)), Q_season(120, 12))
+})
+
 x <- seq(0, 1, 0.01)
 dat <- data.frame(x, y=x*sin(5*x))
 

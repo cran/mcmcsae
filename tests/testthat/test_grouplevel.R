@@ -83,9 +83,9 @@ test_that("centered sampler runs", {
 
 # test_that("assigning a normal prior precision for group-level effects works", {
 #   sampler <- create_sampler(
-#     #y ~ gen(factor = ~ RW1(t), formula.gl = ~ glreg(~ x, prior=pr_normal(precision = 10, labels="x")), name="v"),
-#     y ~ gen(factor = ~ RW1(t), formula.gl = ~ glreg(~ x, Q0=diag(c(0, 1e6))), name="v", debug=FALSE),
-#     data=df, block=TRUE
+#     y ~ gen(factor = ~ RW1(t), formula.gl = ~ glreg(~ x, prior=pr_normal(precision = 10, labels="x")), name="v"),
+#     #y ~ gen(factor = ~ RW1(t), formula.gl = ~ glreg(~ x, Q0=diag(c(0, 1e6))), name="v", debug=FALSE),
+#     data=df
 #   )
 #   sampler$mod[[1]]$glp$Q0
 #   sampler$draw_sigma

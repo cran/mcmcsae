@@ -13,15 +13,29 @@ NumericVector copy_vector(const NumericVector & x) {
   return clone(x);
 }
 
-//’ Add a numeric vector to another numeric vector, in-place.
-//’ 
-//’ @param x a numeric vector.
-//’ @param y a numeric vector.
+//’ Add or subtract a numeric vector or scalar from an existing numeric vector, in-place.
+//’
+//’ @param y a numeric vector to be updated in-place.
+//’ @param plus whether the matrix-vector product is to be added or subtracted.
+//’ @param x a numeric vector, of length equal to that of y, or length 1.
 //’ @returns No return value, but x is updated in-place to x + y.
 // [[Rcpp::export(rng=false)]]
-void add_vector(Eigen::Map<Eigen::VectorXd> & x, const Eigen::Map<Eigen::VectorXd> & y) {
-  if (x.size() != y.size()) stop("incompatible dimensions");
-  x += y;
+void v_update(Eigen::Map<Eigen::VectorXd> & y, const bool plus, const Eigen::Map<Eigen::VectorXd> & x) {
+  if (x.size() == y.size()) {
+    if (plus) {
+      y += x;
+    } else {
+      y -= x;
+    }
+  } else if (x.size() == 1) {
+    if (plus) {
+      y.array() += x.coeff(0);
+    } else {
+      y.array() -= x.coeff(0);
+    }
+  } else {
+    stop("incompatible dimensions");
+  }
 }
 
 

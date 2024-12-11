@@ -155,3 +155,14 @@ test_that("special characters in variable names pose no problem", {
     model_matrix(~ ., dat, sparse=FALSE)
   )
 })
+
+test_that("has_explicit_intercept works", {
+  expect_true(has_explicit_intercept(~ 1))
+  expect_true(has_explicit_intercept(~ 1 + a))
+  expect_true(has_explicit_intercept(~ b + 1 + a))
+  expect_true(has_explicit_intercept(~ b + 1 + a + reg(~ 0 + x)))
+  expect_true(has_explicit_intercept(~ b +  ((1 )  ) + a + reg(~ 0 + x)))
+  expect_false(has_explicit_intercept(~ b + a + reg(~ 0 + x)))
+  expect_false(has_explicit_intercept(~ b + a - 1 + reg(~ 0 + x)))
+  expect_false(has_explicit_intercept(~ a + reg(~ x + 1 + I((u + 1)/2))))
+})

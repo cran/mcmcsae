@@ -90,8 +90,22 @@ add <- function(f, expr) {
 #' @noRd
 #' @param names character vector of labels of the categories of an interaction term.
 #' @returns Names with each component alphabetically ordered by factor label separated by ':'.
-order_interactions <- function(names) {
-  sapply( strsplit(names, ":", fixed=TRUE), function(s) paste(sort.int(s), collapse=":") )
-}
+order_interactions <- function(names)
+  s_apply(strsplit(names, ":", fixed=TRUE), function(s) paste0(sort.int(s), collapse=":"))
 
 warn <- function(..., immediate. = TRUE) warning(..., call. = FALSE, immediate. = immediate.)
+
+# copy objects from one env to another by reference
+# see https://stackoverflow.com/questions/9965577/copy-move-one-environment-to-another
+copy_objects <- function(from, to, names=ls(from, all.names=TRUE)) {
+  mapply(assign, names, mget(names, from), list(to), SIMPLIFY=FALSE, USE.NAMES=FALSE)
+  invisible(NULL)
+}
+
+is_numeric_scalar <- function(x) any(typeof(x) == c("integer", "double")) && length(x) == 1L
+
+unlst <- function(x, recursive=TRUE) unlist(x, recursive, FALSE)
+
+s_apply <- function(x, f, ..., USE.NAMES=FALSE) vapply(x, f, "", ..., USE.NAMES=USE.NAMES)
+b_apply <- function(x, f, ..., USE.NAMES=FALSE) vapply(x, f, TRUE, ..., USE.NAMES=USE.NAMES)
+i_apply <- function(x, f, ..., USE.NAMES=FALSE) vapply(x, f, 0L, ..., USE.NAMES=USE.NAMES)

@@ -28,11 +28,12 @@
 #' @param remove.redundant whether redundant columns should be removed from the model matrix
 #'  associated with \code{formula}. Default is \code{FALSE}.
 #' @param drop.empty.levels whether to remove factor levels without observations.
-#' @param X A (possibly sparse) design matrix. This can be used instead of \code{formula} and \code{factor}.
+#' @param X A (possibly sparse) design matrix. If \code{X} is specified, \code{formula} and \code{factor}
+#'  are only used to derive the random effects' structured precision matrix.
 #' @param var the (co)variance structure among the varying effects defined by \code{formula}
 #'  over the levels of the factors defined by \code{factor}.
 #'  The default is \code{"unstructured"}, meaning that a full covariance matrix
-#'  parameterization is used. For uncorrelated effects with unequal variances use
+#'  parametrization is used. For uncorrelated effects with unequal variances use
 #'  \code{var="diagonal"}. For uncorrelated effects with equal variances use \code{var="scalar"}.
 #'  In the case of a single varying effect there is no difference between these choices.
 #' @param prior the prior specification for the variance parameters of the random effects.
@@ -61,21 +62,13 @@
 #'      parameters. Default is \code{TRUE}.}
 #     \item{sparse}{UNDOCUMENTED}
 #'  }
-#' @param GMRFmats list of incidence/precision/constraint matrices. This can be specified
-#'  as an alternative to \code{factor}. It should be a list such as that returned
-#'  by \code{\link{compute_GMRF_matrices}}. Can be used together with argument \code{X}
-#'  as a flexible alternative to \code{formula} and \code{factor}.
 #' @param priorA prior distribution for scale factors at the variance scale associated with \code{QA}.
 #'  In case of IGMRF models the scale factors correspond to the innovations.
 #'  The default \code{NULL} means not to use any local scale factors.
 #'  A prior can currently be specified using \code{\link{pr_invchisq}} or \code{\link{pr_exp}}.
-#' @param Leroux this option alters the precision matrix determined by \code{factor} by taking a
-#'  weighted average of it with the identity matrix. If \code{TRUE} the model gains an additional parameter,
-#'  the 'Leroux' parameter, being the weight of the original, structured, precision matrix in the weighted
-#'  average. By default a uniform prior for the weight and a uniform Metropolis-Hastings proposal density
-#'  are employed. This default can be changed by supplying a list with elements a, b, and a.star, b.star,
-#'  implying a beta(a, b) prior and a beta(a.star, b.star) independence proposal density. A third option is
-#'  to supply a single number between 0 and 1, which is then used as a fixed value for the Leroux parameter.
+#' @param strucA this option can be used to modify the default structure encoded by
+#'  \code{factor} to a 'bym2' or 'leroux' structure. See \code{\link{GMRF_structure}}
+#'  for details.
 #' @param R0 an optional equality restriction matrix acting on the coefficients defined by \code{formula}, for each
 #'  level defined by \code{factor}. If c is the number of restrictions, \code{R0} is a
 #'  q0 x c matrix where q0 is the number of columns of the design matrix derived
@@ -107,7 +100,7 @@
 #' @param formula.gl a formula of the form \code{~ glreg(...)} for group-level predictors
 #'  around which the random effect component is hierarchically centered.
 #'  See \code{\link{glreg}} for details.
-#' @param a only used in case the effects are MLiG distributed, such as is
+#' @param a only used in case the effects are MLiG distributed, as
 #'  assumed in case of a gamma sampling distribution, or for
 #'  gaussian variance modelling. In those cases \code{a} controls how close
 #'  the effects' prior is to a normal prior, see \code{\link{pr_MLiG}}.
@@ -144,11 +137,6 @@
 #'    Using Redundant Parameterizations to Fit Hierarchical Models.
 #'    Journal of Computational and Graphical Statistics 17(1), 95-122.
 #'
-#'  B. Leroux, X. Lei and N. Breslow (1999).
-#'    Estimation of Disease Rates in Small Areas: A New Mixed Model for Spatial Dependence.
-#'    In M. Halloran and D. Berry (Eds.), Statistical Models in Epidemiology,
-#'    the Environment and Clinical Trials, 135-178.
-#'
 #'  T. Park and G. Casella (2008).
 #'    The Bayesian Lasso.
 #'    Journal of the American Statistical Association 103(482), 681-686.
@@ -159,7 +147,8 @@
 gen <- function(formula = ~ 1, factor=NULL,
                 remove.redundant=FALSE, drop.empty.levels=FALSE, X=NULL,
                 var=NULL, prior=NULL, Q0=NULL, PX=NULL,
-                GMRFmats=NULL, priorA=NULL, Leroux=FALSE,
+                priorA=NULL,
+                strucA=GMRF_structure(),
                 R0=NULL, RA=NULL, constr=NULL, S0=NULL, SA=NULL,
                 formula.gl=NULL, a=1000,
                 name="", sparse=NULL, control=gen_control(), debug=FALSE) {
@@ -182,44 +171,32 @@ gen <- function(formula = ~ 1, factor=NULL,
   # check supplied var component; if NULL leave it to be filled in later
   if (!is.null(var)) var <- match.arg(var, c("unstructured", "diagonal", "scalar"))
   if (!is.null(factor) && !inherits(factor, "formula")) stop("element 'factor' of a model component must be a formula")
-  if (is.list(Leroux)) {
-    if (!all(names(Leroux) %in% c("a", "b", "a.star", "b.star"))) stop("invalid Leroux model component parameter list")
-    if (is.null(Leroux$a)) Leroux$a <- 1
-    if (is.null(Leroux$b)) Leroux$b <- 1
-    if (is.null(Leroux$a.star)) Leroux$a.star <- 1
-    if (is.null(Leroux$b.star)) Leroux$b.star <- 1
-    if (any(unlist(Leroux, use.names=FALSE) < 0)) stop("parameters of beta distribution cannot be negative")
-    Leroux_type <- "general"
-  } else {
-    if (is.numeric(Leroux)) {
-      if (length(Leroux) != 1L) stop("only a single number can be specified for a Leroux parameter")
-      if (Leroux < 0 || Leroux > 1) stop("Leroux parameter must be between 0 and 1")
-      Leroux_type <- "fixed"
-    } else {
-      if (!is.logical(Leroux) || (length(Leroux) != 1L)) stop("wrong input for 'Leroux'")
-      Leroux_type <- if (Leroux) "default" else "none"
-    }
+  if (!is.environment(strucA)) stop("'strucA' must be an environment created by GMRF_structure")
+
+  if (e$family$family == "multinomial") {
+    edat.formula <- new.env(parent = environment(formula))
+    environment(formula) <- edat.formula
+    edat.factor <- new.env(parent = environment(factor))
+    environment(factor) <- edat.factor
   }
-  Leroux_update <- Leroux_type == "general" || Leroux_type == "default"
 
   varnames <- factor.cols.removed <- NULL
   if (is.null(X)) {
     if (e$family$family == "multinomial") {
-      edat <- new.env(parent = .GlobalEnv)
-      for (k in seq_len(e$Km1)) {
-        edat$cat_ <- factor(rep.int(e$cats[k], e[["n0"]]), levels=e$cats[-length(e$cats)])
+      for (k in seq_len(e[["Km1"]])) {
+        edat.factor$cat_ <- edat.formula$cat_ <- factor(rep.int(e$cats[k], e[["n0"]]), levels=e$cats[-length(e$cats)])
         if (k == 1L) {
-          X0 <- model_matrix(formula, e$data, sparse=sparse, enclos=edat)
-          XA <- compute_XA(factor, e$data, enclos=edat)
+          X0 <- model_matrix(formula, e[["data"]], sparse=sparse)
+          XA <- compute_XA(factor, e[["data"]])
         } else {
-          X0 <- rbind(X0, model_matrix(formula, e$data, sparse=sparse, enclos=edat))
-          if (!is.null(XA)) XA <- rbind(XA, compute_XA(factor, e$data, enclos=edat))
+          X0 <- rbind(X0, model_matrix(formula, e[["data"]], sparse=sparse))
+          if (!is.null(XA)) XA <- rbind(XA, compute_XA(factor, e[["data"]]))
         }
       }
-      rm(edat)
+      edat.factor$cat_ <- edat.formula$cat_ <- NULL
     } else {
-      X0 <- model_matrix(formula, e$data, sparse=sparse)
-      XA <- compute_XA(factor, e$data)
+      X0 <- model_matrix(formula, e[["data"]], sparse=sparse)
+      XA <- compute_XA(factor, e[["data"]])
     }
     if (remove.redundant) X0 <- remove_redundancy(X0)
     varnames <- colnames(X0)
@@ -228,64 +205,103 @@ gen <- function(formula = ~ 1, factor=NULL,
         factor.cols.removed <- which(zero_col(XA))
         if (length(factor.cols.removed)) XA <- XA[, -factor.cols.removed, drop=FALSE]
       }
+      if (strucA$type == "bym2") XA <- cbind(XA, zeroMatrix(e[["n"]], ncol(XA)))
       X <- combine_X0_XA(X0, XA)
     } else {
       X <- X0
     }
     rm(X0, XA)
+  } else {
+    if (is.null(colnames(X))) colnames(X) <- seq_len(ncol(X))
   }
   if (nrow(X) != e[["n"]]) stop("design matrix with incompatible number of rows")
   e$coef.names[[name]] <- colnames(X)
-  X <- economizeMatrix(X, strip.names=TRUE, check=TRUE)
+  X <- economizeMatrix(X, sparse=sparse, strip.names=TRUE, check=TRUE)
   q <- ncol(X)
-  in_block <- any(name == unlist(e$block, use.names=FALSE)) || any(name == unlist(e$block.V, use.names=FALSE))
+  in_block <- any(name == unlst(e[["block"]])) || any(name == unlst(e[["block.V"]]))
 
   self <- environment()
 
-  # fast GMRF prior currently only for IGMRF without user-defined constraints
-  fastGMRFprior <- is.null(priorA) && allow_fastGMRFprior(self) && modus == "regular" &&
-    is.null(RA) && is.null(R0) && is.null(SA) && is.null(S0)
+  if (e$family$family == "multinomial") {
+    edat.factor$cat_ <- e$cats[-length(e$cats)]  # K-1 categories; TODO for general GMRF prediction need all K categories?
+  }
+  info <- get_factor_info(factor, e[["data"]])
+  is.proper <- all(info$types %in% c("iid", "AR1")) || strucA$type == "leroux"
   # by default, IGMRF constraints are imposed, unless the GMRF is proper
   # NB constr currently only refers to QA, not Q0
-  if (is.null(constr)) constr <- !is_proper_GMRF(self)
-  if (is.null(GMRFmats)) {
-    if (e$family$family == "multinomial") {
-      edat <- new.env(parent = .GlobalEnv)
-      edat$cat_ <- e$cats[-length(e$cats)]  # K-1 categories; TODO for general GMRF prediction need all K categories?
-    } else {
-      edat <- .GlobalEnv
-    }
-    GMRFmats <- compute_GMRF_matrices(factor, e$data,
-      D=fastGMRFprior || !is.null(priorA) || !is.null(e$control$CG) || e$control$expanded.cMVN.sampler,
-      Q=!(fastGMRFprior || !is.null(priorA)),
-      R=constr, sparse=if (in_block) TRUE else NULL,
-      cols2remove=factor.cols.removed, drop.zeros=TRUE, enclos=edat, n.parent=2L
-    )
-    rm(edat)
+  if (is.null(constr)) constr <- !is.proper
+  # fastGMRFprior currently only for IGMRF without user-defined constraints
+  #   and currently only used for IGMRFs
+  #   and not possible for spatial as typically n_edges > n_vertices
+  #   and only if any custom factor has (incidence) matrix D specified
+  fastGMRFprior <- !is.null(info) && is.null(priorA) && modus == "regular" &&
+    is.null(RA) && is.null(R0) && is.null(SA) && is.null(S0) &&
+    strucA$type == "default" &&
+    !all(info$types %in% c("iid", "AR1")) && all(info$types != "spatial") &&
+    all(b_apply(info$factors[info$types == "custom"], function(x) !is.null(x[["D"]]))) &&
+    all(!b_apply(info$factors, function(x) isTRUE(x[["circular"]])))
+  GMRFmats <- compute_GMRF_matrices(info, e[["data"]],
+    D=fastGMRFprior || !is.null(priorA) || !is.null(e$control$CG) || e$control$expanded.cMVN.sampler,
+    Q=!(fastGMRFprior || !is.null(priorA)),
+    R=constr, sparse=if (in_block) TRUE else NULL,
+    cols2remove=factor.cols.removed, scale.precision=strucA$scale.precision, drop.zeros=TRUE
+  )
+
+  AR1.inferred <- which(info$types == "AR1" & !b_apply(info$extra, is.null))
+  if (length(AR1.inferred) == 1L) {
+    if (!is.null(formula.gl)) stop("AR1 with non-trivial parameter prior not supported in combination with group-level effects")
+    if (strucA$type != "default") stop("AR1 with non-trivial parameter prior not supported in combination with GMRF extension")
+    if (!is.null(info$factors[[AR1.inferred]][["w"]])) stop("AR1 with non-trivial parameter prior not supported in combination with AR1 weights")
+  } else if (length(AR1.inferred) == 2L) {
+    stop("only one AR1 factor with a parameter to be inferred allowed")
+  } else {
+    AR1.inferred <- NULL
   }
+
   if (fastGMRFprior || !is.null(priorA) || !is.null(e$control$CG) || e$control$expanded.cMVN.sampler) {
-    DA <- GMRFmats$D  # lD x l incidence matrix DA
-    l <- ncol(DA)
-    if (is.null(priorA))
-      QA <- economizeMatrix(crossprod(DA), sparse=if (in_block) TRUE else NULL, symmetric=TRUE, check=TRUE)
+    if (is.null(AR1.inferred)) {
+      DA <- GMRFmats[["D"]]  # lD x l incidence matrix DA
+      l <- ncol(DA)
+      lD <- nrow(DA)
+    } else {
+      DA.template <- DA_AR1_template(info, GMRFmats[["D"]], AR1.inferred)
+      l <- ncol(DA.template$DA0.5)
+      lD <- nrow(DA.template$DA0.5)
+    }
+    if (is.null(priorA)) {
+      if (is.null(AR1.inferred)) {
+        QA <- economizeMatrix(crossprod(DA), sparse=if (in_block) TRUE else NULL, symmetric=TRUE, check=TRUE)
+      } else {
+        QA.template <- QA_AR1_template(info,
+          economizeMatrix(crossprod(DA.template$DA0.5), sparse=TRUE, symmetric=TRUE, check=TRUE),
+          AR1.inferred
+        )
+      }
+    }
   } else {  # compute precision matrix QA only
-    QA <- economizeMatrix(GMRFmats$Q, sparse=if (in_block) TRUE else NULL, symmetric=TRUE, check=TRUE)
-    l <- nrow(QA)
+    if (is.null(AR1.inferred)) {
+      QA <- economizeMatrix(GMRFmats[["Q"]], sparse=if (in_block) TRUE else NULL, symmetric=TRUE, check=TRUE)
+      l <- nrow(QA)
+    } else {
+      QA.template <- QA_AR1_template(info, GMRFmats[["Q"]], AR1.inferred)
+      l <- ncol(QA.template$QA0.5)
+    }
   }
+  if (strucA$type == "bym2") l <- 2L * l
   if (q %% l != 0L) stop("incompatible dimensions of design and precision matrices")
   q0 <- q %/% l  # --> q = q0 * l
 
   if (!is.null(priorA)) {  # scaled precision matrix QA = DA' QD DA with QD modeled
-    lD <- nrow(DA)
     name_omega <- paste0(name, "_omega")
-    if (Leroux_type != "none") stop("not implemented: scaled Leroux type correlation")
+    if (strucA$type != "default") stop("not implemented: GMRF extension in combination with non-normal random effects")
     switch(priorA$type,
       invchisq = {
-        priorA$init(lD, !e$prior.only)
         df.data.omega <- q0  # TODO is this always the correct value?
       },
-      exp = priorA$init(lD, !e$prior.only)
+      exp = {},
+      stop("priorA argument expects a prior specified with pr_invchisq or pr_exp")
     )
+    priorA$init(lD, !e$prior.only)
   }
 
   if (q0 == 1L) {
@@ -350,20 +366,6 @@ gen <- function(formula = ~ 1, factor=NULL,
     name_xi <- paste0(name, "_xi_")  # trailing '_' --> not stored by MCMCsim even if store.all=TRUE
   }  # END if (usePX)
 
-  if (Leroux_type != "none") {
-    if (isUnitDiag(QA)) warn("Leroux extension for iid random effects has no effect")
-    if (Leroux_type == "fixed") {
-      # compute the weighted average once and for all
-      QA <- economizeMatrix(Leroux * QA + (1 - Leroux) * CdiagU(l), symmetric=TRUE, sparse=if (in_block) TRUE else NULL)
-    } else {
-      # use a sparse (sum) template
-      idL <- CdiagU(l)
-      mat_sum_Leroux <- make_mat_sum(M1=QA, M2=idL)
-      # base the determinant template on 0.5*(QA + I) to ensure it is non-singular
-      det <- make_det(mat_sum_Leroux(QA, idL, 0.5, 0.5))
-    }
-  }
-
   # construct equality restriction matrix
   # TODO if R is supplied, it is assumed to be the full constraint matrix...
   #      in that case the derivation from R0 and RA can be skipped
@@ -374,15 +376,18 @@ gen <- function(formula = ~ 1, factor=NULL,
 
   # if a matrix 'RA' is provided by the user, use these constraints in addition to possible GMRF constraints
   if (is.null(RA)) {
-    RA <- GMRFmats$R
+    RA <- GMRFmats[["R"]]
   } else {
     if (nrow(RA) != l) stop("incompatible matrix RA")
-    if (!is.null(GMRFmats$R)) {
-      RA <- economizeMatrix(cbind(RA, GMRFmats$R), allow.tabMatrix=FALSE, check=TRUE)
+    if (!is.null(GMRFmats[["R"]])) {
+      RA <- economizeMatrix(cbind(RA, GMRFmats[["R"]]), allow.tabMatrix=FALSE, check=TRUE)
       RA <- remove_redundancy(RA)  # combination of user-supplied and IGMRF constraints may contain redundant columns
     }
   }
 
+  # RA is needed here for scale.precision, and it is expanded in case of bym2
+  strucA <- create_GMRF_structure(strucA, self, e$prior.only)
+  
   R <- switch(paste0(is.null(RA), is.null(R0)),
     TRUETRUE = NULL,
     TRUEFALSE = kronecker(CdiagU(l), R0),
@@ -468,7 +473,6 @@ gen <- function(formula = ~ 1, factor=NULL,
     name_gl <- paste0(name, "_gl")
     glp <- vars[[1L]]
     glp$name <- name_gl
-    gl <- TRUE
     rm(vars)
   }
 
@@ -477,16 +481,46 @@ gen <- function(formula = ~ 1, factor=NULL,
       # ensure that XX is always sparse because we need a sparse block diagonal template in this case
       X <- economizeMatrix(X, sparse=TRUE)  # --> crossprod_sym(X, Q) also sparse
     }
-    XX <- crossprod_sym(X, crossprod_sym(Diagonal(x=runif(e[["n"]], 0.9, 1.1)), e$Q0))
+    XX <- crossprod_sym(X, crossprod_sym(Cdiag(runif(e[["n"]], 0.9, 1.1)), e[["Q0"]]))
   } else {
-    XX <- economizeMatrix(crossprod_sym(X, e$Q0), symmetric=TRUE, drop.zeros=TRUE)
+    XX <- economizeMatrix(crossprod_sym(X, e[["Q0"]]), symmetric=TRUE, drop.zeros=TRUE)
   }
 
   # for both memory and speed efficiency define unit_Q case (random intercept and random slope with scalar var components, no constraints)
-  unit_Q <- is.null(priorA) && isUnitDiag(QA) && (var == "scalar" && is.null(Q0)) && is.null(R)
+  unit_Q <- is.null(priorA) && is.null(AR1.inferred) && is_unit_diag(QA) && (var == "scalar" && is.null(Q0)) && is.null(R)
   if (modus != "regular") {
-    if (!(unit_Q && q0 == 1L && !gl && Leroux_type == "none" && is.null(S))) stop("gamma family and variance modelling can currently be combined with basic generic model components only")
+    if (!(unit_Q && q0 == 1L && !gl && strucA$type == "default" && is.null(S))) stop("gamma family and variance modelling can currently be combined with basic generic model components only")
   }
+
+  generate_Qv <-
+    if (var == "unstructured") {
+      function() rWishart(1L, df=prior$df, Sigma=diag(q0))[,,1L]
+    } else if (var == "scalar" && !is.null(Q0)) {
+      function() scale_mat(Q0, runif(if (usePX && PX$vector) q0 else 1L, 0.25, 0.75))
+    } else if (var == "diagonal" || (usePX && PX$vector)) {
+      function() runif(q0, 0.25, 0.75)
+    } else {  # scalar var, scalar or no PX
+      function() runif(1L, 0.25, 0.75)
+    }
+
+  if (gl) {  # group-level covariates
+    glp <- eval(glp)
+    sparse_template(self, update.XX=e$modeled.Q)
+    if (!in_block && !e$prior.only) glp$R <- NULL
+  } else if (modus == "regular") {
+    sparse_template(self, update.XX=e$modeled.Q)
+  } else {
+    if (in_block) {
+      Q <- Cdiag(rep.int(1/a, q))  # to construct QT template in mc_block
+    } else {
+      if (modus == "vargamma")
+        cholHH <- build_chol(2 * XX  + (1/a) * runif(1L, 0.9, 1.1) * CdiagU(q))
+      else
+        cholHH <- build_chol(XX + (1/a) * runif(1L, 0.9, 1.1) * CdiagU(q))
+    }
+  }
+
+  if (!is.null(AR1.inferred)) AR1sampler <- AR1_sampler(self)
 
   name_sigma <- paste0(name, "_sigma")
   if (var == "unstructured") name_rho <- paste0(name, "_rho")
@@ -514,28 +548,46 @@ gen <- function(formula = ~ 1, factor=NULL,
     else
       compute_Qfactor <- function(p) exp(X %m*v% (-p[[name]]))
   }
-  linpred <- function(p) X %m*v% p[[name]]
+  lp <- function(p) X %m*v% p[[name]]
+  lp_update <- function(x, plus=TRUE, p) mv_update(x, plus, X, p[[name]])
+  # draws_linpred method acts on (subset of) mcdraws object, used in fitted() and pointwise log-likelihood llh_i functions
+  draws_linpred <- function(obj, units=NULL, chains=NULL, draws=NULL, matrix=FALSE) {
+    if (is.null(units)) Xi <- X else Xi <- X[units, , drop=FALSE]
+    if (matrix) {
+      out <- tcrossprod(as.matrix.dc(get_from(obj[[name]], chains=chains, draws=draws), colnames=FALSE), Xi)
+    } else {
+      out <- list()
+      for (ch in seq_along(chains))
+        out[[ch]] <- tcrossprod(get_from(obj[[name]], chains=chains[ch], draws=draws)[[1L]], Xi)
+    }
+    out
+  }
 
-  make_predict <- function(newdata=NULL, Xnew, verbose=TRUE) {
+  make_predict <- function(newdata=NULL, Xnew=NULL, verbose=TRUE) {
     if (modus == "vargamma") stop("prediction for 'gaussian_gamma' family not supported")
+    linpred <- function(p) Xnew %m*v% p[[name]]
+    linpred_update <- function(x, plus=TRUE, p) mv_update(x, plus, Xnew, p[[name]])
     if (is.null(newdata)) {
-      Xnew <- economizeMatrix(Xnew, strip.names=TRUE, check=TRUE)
-      if (ncol(Xnew) != q) stop("wrong number of columns for Xnew matrix of component ", name)
-      linpred <- function(p) Xnew %m*v% p[[name]]
+      if (is.null(Xnew)) {
+        # in-sample prediction
+        Xnew <- X
+      } else {
+        Xnew <- economizeMatrix(Xnew, strip.names=TRUE, check=TRUE)
+        if (ncol(Xnew) != q) stop("wrong number of columns for Xnew matrix of component ", name)
+      }
     } else {
       if (e$family$family == "multinomial") {
-        edat <- new.env(parent = .GlobalEnv)
-        for (k in seq_len(e$Km1)) {
-          edat$cat_ <- factor(rep.int(e$cats[k], nrow(newdata)), levels=e$cats[-length(e$cats)])
+        for (k in seq_len(e[["Km1"]])) {
+          edat.factor$cat_ <- edat.formula$cat_ <- factor(rep.int(e$cats[k], nrow(newdata)), levels=e$cats[-length(e$cats)])
           if (k == 1L) {
-            X0 <- model_matrix(formula, data=newdata, sparse=sparse, enclos=edat)
-            XA <- compute_XA(factor, newdata, enclos=edat)
+            X0 <- model_matrix(formula, data=newdata, sparse=sparse)
+            XA <- compute_XA(factor, newdata)
           } else {
-            X0 <- rbind(X0, model_matrix(formula, data=newdata, sparse=sparse, enclos=edat))
-            if (!is.null(XA)) XA <- rbind(XA, compute_XA(factor, newdata, enclos=edat))
+            X0 <- rbind(X0, model_matrix(formula, data=newdata, sparse=sparse))
+            if (!is.null(XA)) XA <- rbind(XA, compute_XA(factor, newdata))
           }
         }
-        rm(edat)
+        edat.factor$cat_ <- edat.formula$cat_ <- NULL
       } else {
         X0 <- model_matrix(formula, newdata, sparse=sparse)
         XA <- compute_XA(factor, newdata)
@@ -554,6 +606,7 @@ gen <- function(formula = ~ 1, factor=NULL,
           # all random effects in Xnew are new
           if (verbose) message("model component '", name, "': all categories in 'newdata' are out-of-sample categories")
           linpred <- function(p) Xnew %m*v% Crnorm(qnew, sd = p[[name_sigma]])
+          linpred_update <- function(x, plus=TRUE, p) mv_update(x, plus, Xnew, Crnorm(qnew, sd = p[[name_sigma]]))
         } else if (anyNA(m)) {
           # both existing and new levels in newdata
           q_unmatched <- sum(is.na(m))
@@ -568,45 +621,33 @@ gen <- function(formula = ~ 1, factor=NULL,
             v[I_unmatched] <- Crnorm(q_unmatched, sd=p[[name_sigma]])
             Xnew %m*v% v
           }
+          linpred_update <- function(x, plus=TRUE, p) {
+            v <- numeric(qnew)
+            v[I_matched] <- p[[name]][I_coef]  # TODO distinguish case where I_coef = 1:q
+            v[I_unmatched] <- Crnorm(q_unmatched, sd=p[[name_sigma]])
+            mv_update(x, plus, Xnew, v)
+          }
         } else {
           # all columns of Xnew correspond to existing levels
-          if (identical(m, seq_len(q))) {
-            linpred <- function(p) Xnew %m*v% p[[name]]
-          } else {
+          if (!identical(m, seq_len(q))) {
             I_coef <- m
             linpred <- function(p) Xnew %m*v% p[[name]][I_coef]
+            linpred_update <- function(x, plus=TRUE, p) mv_update(x, plus, Xnew, p[[name]][I_coef])
           }
         }
         rm(m)
       } else {
         # generic case: here we expect the same levels in training and test sets
         # for prediction do not (automatically) remove redundant columns!
-        if (remove.redundant || drop.empty.levels)
-        Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
+        if (remove.redundant || drop.empty.levels) {
+          Xnew <- Xnew[, e$coef.names[[name]], drop=FALSE]
+        }
         if (ncol(Xnew) != q) stop("'newdata' yields ", ncol(Xnew), " predictor column(s) for model term '", name, "' versus ", q, " originally")
         Xnew <- economizeMatrix(Xnew, sparse=sparse, strip.names=TRUE, check=TRUE)
-        linpred <- function(p) Xnew %m*v% p[[name]]
       }
     }
     rm(newdata, verbose)
-    linpred
-  }
-
-  if (gl) {  # group-level covariates
-    glp <- eval(glp)
-    sparse_template(self, update.XX=e$modeled.Q)
-    if (!in_block && !e$prior.only) glp$R <- NULL
-  } else if (modus == "regular") {
-    sparse_template(self, update.XX=e$modeled.Q)
-  } else {
-    if (in_block)
-      Q <- Cdiag(rep.int(1/a, q))  # to construct QT template in mc_block
-    else {
-      if (modus == "vargamma")
-        cholHH <- build_chol(2 * XX  + (1/a) * runif(1L, 0.9, 1.1) * CdiagU(q))
-      else
-        cholHH <- build_chol(XX + (1/a) * runif(1L, 0.9, 1.1) * CdiagU(q))
-    }
+    environment()
   }
 
   # BEGIN rprior function
@@ -646,15 +687,14 @@ gen <- function(formula = ~ 1, factor=NULL,
       add(quote(Qv <- Qraw * inv_xi^2)) |>
       add(bquote(p[[.(name_sigma)]] <- sqrt(1/Qv)))
   }
-  if (Leroux_update) {
-    name_Leroux <- paste0(name, "_Leroux")
-    if (Leroux_type == "default")
-      rprior <- add(rprior, bquote(p[[.(name_Leroux)]] <- runif(1L)))
-    else
-      rprior <- add(rprior, bquote(p[[.(name_Leroux)]] <- rbeta(1L, Leroux$a, Leroux$b)))
-    rprior <- add(rprior, bquote(QA <- mat_sum_Leroux(QA, idL, p[[.(name_Leroux)]], 1 - p[[.(name_Leroux)]])))
+  if (strucA$update.Q) {
+    rprior <- add(rprior, bquote(p[[.(strucA$name_ext)]] <- strucA$rprior()))
+    rprior <- add(rprior, bquote(QA <- strucA$update_Q(QA, p[[.(strucA$name_ext)]])))
   }
-
+  if (!is.null(AR1.inferred)) {
+    name_AR1 <- paste0(name, "_AR1")
+    rprior <- add(rprior, bquote(p[[.(name_AR1)]] <- info$extra[[AR1.inferred]]$prior$rprior()))
+  }
   if (gl) {  # draw group-level predictor coefficients
     rprior <- add(rprior, bquote(p[[.(name_gl)]] <- glp$prior$rprior(p)))
   }
@@ -714,13 +754,32 @@ gen <- function(formula = ~ 1, factor=NULL,
 
   if (e$prior.only) return(self)  # no need for posterior draw function in this case
 
-  if (!is.null(priorA) || is.list(prior$scale) || Leroux_update) {
-    # store Qraw --> no need to recompute at next MCMC iteration
+  if (!is.null(priorA) || is.list(prior$scale) || strucA$update.Q) {
+    # store Qraw in state p --> no need to recompute at next MCMC iteration
     name_Qraw <- paste0(name, "_Qraw_")
   }
 
   # BEGIN draw function
   draw <- if (debug) function(p) {browser()} else function(p) {}
+  if (in_block || !is.null(AR1.inferred)) {
+    # store QA x Qv for use in block sampler, and/or AR1 parameter sampler
+    name_Q <- paste0(name, "_Q_")  # trailing "_" --> only temporary storage
+  }
+  if (!is.null(e$control$CG) || e$control$expanded.cMVN.sampler ||
+      (!is.null(AR1.inferred) && AR1sampler$MH$type != "TN")) {
+    name_Qv <- paste0(name, "_Qv_")
+  }
+  if (!is.null(AR1.inferred)) {
+    draw <- add(draw, bquote(phi <- p[[.(name_AR1)]]))
+    draw <- add(draw, bquote(p[[.(name_AR1)]] <- AR1sampler$draw(phi, p)))
+    if (fastGMRFprior || !is.null(priorA) || !is.null(e$control$CG) || e$control$expanded.cMVN.sampler) {
+      draw <- add(draw, bquote(DA <- DA.template$update(p[[.(name_AR1)]])))
+      if (is.null(priorA))
+        draw <- add(draw, bquote(QA <- QA.template$update(p[[.(name_AR1)]])))
+    } else {
+      draw <- add(draw, bquote(QA <- QA.template$update(p[[.(name_AR1)]])))
+    }
+  }
   if (modus == "var" || modus == "vargamma") {
     if (!e$single.V.block) {
       if (is_ind_matrix(X) && q < e[["n"]])
@@ -740,8 +799,8 @@ gen <- function(formula = ~ 1, factor=NULL,
     }
   }
 
-  if (!e$e.is.res && e$single.block && !e$use.offset && length(e$mod) > 1L && modus == "regular") {
-    # need to correct Q_e function; this should not be necessary if we draw all xi's in a single block too !!
+  if (!e$e.is.res && e$single.block && length(e$mod) > 1L && modus == "regular") {
+    # need to correct Q_e function; this should not be necessary if we draw all xi's in a single block!!
     if (e$family$link == "probit")
       draw <- add(draw, quote(Xy <- crossprod_mv(X, e$Q_e(p) - p[["e_"]])))
     else
@@ -758,7 +817,7 @@ gen <- function(formula = ~ 1, factor=NULL,
     if (modus == "gamma") {
       if (e$family$alpha.fixed) {
         alpha <- e$family$get_shape()
-        if (e$single.block && !e$use.offset)
+        if (e$single.block)
           kappa <- alpha * e[["y"]]
         else {
           kappa0 <- alpha * e[["y"]]
@@ -766,7 +825,7 @@ gen <- function(formula = ~ 1, factor=NULL,
         }
       } else {
         draw <- add(draw, quote(alpha <- e$family$get_shape(p)))
-        if (e$single.block && !e$use.offset)
+        if (e$single.block)
           draw <- add(draw, quote(kappa <- alpha * e[["y"]]))
         else
           draw <- add(draw, quote(kappa <- alpha * e[["y"]] * exp(-p[["e_"]])))
@@ -812,7 +871,7 @@ gen <- function(formula = ~ 1, factor=NULL,
   if (usePX) {
     if (PX$vector) {
       if (PX$sparse) {  # sparse M_ind, Dv
-        M_ind <- as(as(kronecker(rep.int(1, l), CdiagU(q0)), "CsparseMatrix"), "generalMatrix")
+        M_ind <- kronecker(rep.int(1, l), CdiagU(q0))  # dgC
         mat_sum_xi <- make_mat_sum(M0=PX_Q0, M1=crossprod_sym(M_ind, XX))
         chol_xi <- build_chol(mat_sum_xi(crossprod_sym(M_ind, XX)))
         draw <- draw |>
@@ -939,17 +998,15 @@ gen <- function(formula = ~ 1, factor=NULL,
       invchisq = {
         if (is.list(priorA$df)) {
           draw <- add(draw, bquote(p[[.(name_df)]] <- priorA$draw_df(p[[.(name_df)]], 1 / p[[.(name_omega)]])))
-          if (is.list(priorA$scale)) {
+          if (is.list(priorA$scale))
             draw <- add(draw, bquote(p[[.(name_omega)]] <- priorA$draw(p[[.(name_df)]], df.data.omega, SSR, 1 / p[[.(name_omega)]])))
-          } else {
+          else
             draw <- add(draw, bquote(p[[.(name_omega)]] <- priorA$draw(p[[.(name_df)]], df.data.omega, SSR)))
-          }
         } else {
-          if (is.list(priorA$scale)) {
+          if (is.list(priorA$scale))
             draw <- add(draw, bquote(p[[.(name_omega)]] <- priorA$draw(df.data.omega, SSR, 1 / p[[.(name_omega)]])))
-          } else {
+          else
             draw <- add(draw, bquote(p[[.(name_omega)]] <- priorA$draw(df.data.omega, SSR)))
-          }
         }
       },
       exp = {
@@ -961,13 +1018,10 @@ gen <- function(formula = ~ 1, factor=NULL,
     draw <- add(draw, bquote(QA <- crossprod_sym(DA, 1 / p[[.(name_omega)]])))
   }
 
-  if (Leroux_update) {
-    # draw Leroux parameter
+  if (strucA$update.Q) {
     draw <- draw |>
-      add(quote(p <- draw_Leroux(p, self, M_coef_raw))) |>
-      # compute QA using current value of Leroux parameter
-      # alternatively, store it in p[[name_temp]]$QA_L and recompute only if a new Leroux parameter has been accepted
-      add(bquote(QA <- mat_sum_Leroux(QA, idL, p[[.(name_Leroux)]], 1 - p[[.(name_Leroux)]])))
+      add(quote(p <- strucA$draw(p, M_coef_raw))) |>
+      add(bquote(QA <- strucA$update_Q(QA, p[[.(strucA$name_ext)]])))
   }
 
   # draw V
@@ -1094,12 +1148,11 @@ gen <- function(formula = ~ 1, factor=NULL,
         add(bquote(p[[.(name_sigma)]] <- 1/sqrtQv))
     }
   }
-  if (!is.null(priorA) || is.list(prior$scale) || Leroux_update) {
-    # store Qraw for next iteration -> saves reconstructing it from sigma, rho, xi
+  if (!is.null(priorA) || is.list(prior$scale) || strucA$update.Q) {
     draw <- add(draw, bquote(p[[.(name_Qraw)]] <- Qraw))
   }
-  if (!is.null(e$control$CG) || e$control$expanded.cMVN.sampler) {
-    name_Qv <- paste0(name, "_Qv_")
+  if (!is.null(e$control$CG) || e$control$expanded.cMVN.sampler ||
+      (!is.null(AR1.inferred) && AR1sampler$MH$type != "TN")) {
     draw <- add(draw, bquote(p[[.(name_Qv)]] <- Qv))
   }
 
@@ -1109,7 +1162,6 @@ gen <- function(formula = ~ 1, factor=NULL,
     i.alpha <- (q + 1L):(q + glp$p0 * q0)  # indices for group-level effect vector in u=(v, alpha)
   }
   if (in_block) {
-    name_Q <- paste0(name, "_Q_")  # trailing "_" --> only temporary storage
     if (gl) {
       draw <- add(draw, bquote(p[[.(name_Q)]] <- kron_prod(glp[["QA.ext"]], Qv, values.only=TRUE)))
     } else {
@@ -1121,10 +1173,14 @@ gen <- function(formula = ~ 1, factor=NULL,
     }
     draw <- add(draw, bquote(p[[.(name)]] <- xi * coef_raw))
   } else {
+    if (!is.null(AR1.inferred)) {
+      # in non-blocked case p[[name_Q]] and kron_prod used only for drawing AR1 parameter
+      draw <- add(draw, bquote(p[[.(name_Q)]] <- kron_prod(QA, Qv, values.only=TRUE)))
+    }
     if (gl) {  # block sampling of (coef, glp)
       if (e$modeled.Q)
         draw <- add(draw, quote(attr(glp[["XX.ext"]], "x") <- c(XX@x, glp[["Q0"]]@x)))
-      if (Leroux_update)
+      if (strucA$update.Q)
         draw <- add(draw, quote(glp[["QA.ext"]] <- crossprod_sym(glp[["IU0"]], QA)))
       draw <- draw |>
         add(quote(Qlist <- update(glp[["XX.ext"]], glp[["QA.ext"]], Qv, 1/tau))) |>
@@ -1168,7 +1224,7 @@ gen <- function(formula = ~ 1, factor=NULL,
   } else {
     if (e$e.is.res)
       draw <- add(draw, bquote(mv_update(p[["e_"]], plus=FALSE, X, p[[.(name)]])))
-    else if (e$single.block && length(e$mod) == 1L && !e$use.offset)
+    else if (e$single.block && length(e$mod) == 1L)
       draw <- add(draw, bquote(p[["e_"]] <- X %m*v% p[[.(name)]]))
     else
       draw <- add(draw, bquote(mv_update(p[["e_"]], plus=TRUE, X, p[[.(name)]])))
@@ -1205,7 +1261,7 @@ gen <- function(formula = ~ 1, factor=NULL,
       start <- add(start, bquote(if (is.null(p[[.(name_xi)]])) p[[.(name_xi)]] <- 1))
   }
 
-  if (!is.null(priorA) || is.list(prior$scale) || Leroux_update) {
+  if (!is.null(priorA) || is.list(prior$scale) || strucA$update.Q) {
     switch(var,
       unstructured = {
         start <- add(start, bquote(if (is.null(p[[.(name_Qraw)]])) p[[.(name_Qraw)]] <- rWishart(1L, prior$df, if (is.list(prior$scale)) (1/psi0)*diag(q0) else inverseSPD(psi0))[,,1L]))
@@ -1217,44 +1273,52 @@ gen <- function(formula = ~ 1, factor=NULL,
           start <- add(start, bquote(if (is.null(p[[.(name_Qraw)]])) p[[.(name_Qraw)]] <- rchisq_scaled(.(if (var == "diagonal") q0 else 1L), prior$df, psi=prior$psi0)))
       }
     )
-    if (Leroux_update) {
-      name_detQA <- paste0(name, "_detQA_")
-      start <- start |>
-        add(bquote(if (is.null(p[[.(name_Leroux)]])) p[[.(name_Leroux)]] <- runif(1L))) |>
-        add(bquote(if (is.null(p[[.(name_detQA)]])) p[[.(name_detQA)]] <- det(2*p[[.(name_Leroux)]], 1 - 2*p[[.(name_Leroux)]])))
+    if (strucA$update.Q) {
+      start <- add(start, quote(p <- strucA$start(p)))
     }
     if (!is.null(priorA)) {
       if (is.list(priorA$df))
         start <- add(start, bquote(if (is.null(p[[.(name_df)]])) p[[.(name_df)]] <- runif(1L, 1, 25)))
-      if (is.list(priorA$df) || is.list(priorA$scale))
+      if (is.list(priorA$df) || is.list(priorA$scale) || !is.null(AR1.inferred))
         start <- add(start, bquote(if (is.null(p[[.(name_omega)]])) p[[.(name_omega)]] <- runif(.(lD), 0.75, 1.25)))
     }
   } else if (modus != "regular") {
     start <- add(start, bquote(if (is.null(p[[.(name_sigma)]])) p[[.(name_sigma)]] <- rexp(1L)))
   }
 
+  if (!is.null(AR1.inferred)) {
+    start <- add(start, bquote(if (is.null(p[[.(name_AR1)]])) p[[.(name_AR1)]] <- runif(1L, 0.25, 0.75)))
+    if (AR1sampler$MH$type == "TN")
+      start <- add(start, bquote(if (is.null(p[[.(name_Q)]])) p[[.(name_Q)]] <- kron_prod(QA.template$update(p[[.(name_AR1)]]), generate_Qv(), values.only=TRUE)))
+    else {
+      start <- add(start, bquote(if (is.null(p[[.(name_Qv)]])) p[[.(name_Qv)]] <- generate_Qv()))
+      if (is.null(priorA)) {
+        start <- add(start, bquote(if (is.null(p[[.(name_Q)]])) p[[.(name_Q)]] <- kron_prod(QA.template$update(p[[.(name_AR1)]]), generate_Qv(), values.only=TRUE)))
+      } else
+        start <- add(start, bquote(if (is.null(p[[.(name_Q)]])) p[[.(name_Q)]] <- kron_prod(crossprod_sym(DA.template$update(p[[.(name_AR1)]]), p[[.(name_omega)]]), p[[.(name_Qv)]], values.only=TRUE)))
+    }
+  }
+
   start <- add(start, quote(p))
 
   if (in_block && (!is.null(e$control$CG) || e$control$expanded.cMVN.sampler)) {
     if (q0 == 1L) {
-      drawMVNvarQ <- function(p)
-        crossprod_mv(DA, sqrt(p[[name_Qv]]) * Crnorm(nrow(DA)))
+      drawMVNvarQ <- function(p) crossprod_mv(DA, sqrt(p[[name_Qv]]) * Crnorm(lD))
     } else {
       if (var == "unstructured")
         cholQV <- build_chol(rWishart(1L, q0, diag(q0))[,,1L])
       else
         cholQV <- build_chol(runif(q0, 0.5, 1.5))
       drawMVNvarQ <- function(p) {
-        y2 <- Crnorm(q0 * nrow(DA))
-        dim(y2) <- c(q0, nrow(DA))
+        y2 <- Crnorm(q0 * lD)
+        dim(y2) <- c(q0, lD)
         cholQV$update(p[[name_Qv]])
         cholQV$Ltimes(y2, transpose=FALSE) %m*m% DA
       }
     }
 
   }
-  
-  # TODO rm more components no longer needed (Leroux_type, Leroux, other switches such as gl, ...)
+
   self
 }
 
@@ -1267,15 +1331,15 @@ setup_priorGMRFsampler <- function(mc, Qv) {
   mc$cholQv <- build_chol(Qv, control=chol_control(perm=FALSE))
   rGMRF <- function(Qv) {}
   rGMRF <- add(rGMRF, quote(cholQv$update(Qv)))
-  if (mc$q0 == 1L) {
+  if (mc[["q0"]] == 1L) {
     rGMRF <- rGMRF |>
       add(bquote(Z <- Crnorm(.(nrow(mc$DA))))) |>
-      add(quote(Z <- cholQv$solve(Z, system="Lt", systemP=TRUE))) |>
+      add(quote(Z <- cholQv$solve(Z, system="Lt"))) |>
       add(quote(crossprod_mv(DA, cholDD$solve(Z))))
   } else {
     rGMRF <- rGMRF |>
-      add(bquote(Z <- matrix(Crnorm(.(mc$q0 * nrow(mc$DA))), nrow=.(mc$q0)))) |>
-      add(quote(Z <- cholQv$solve(Z, system="Lt", systemP=TRUE))) |>
+      add(bquote(Z <- matrix(Crnorm(.(mc[["q0"]] * nrow(mc$DA))), nrow=.(mc[["q0"]])))) |>
+      add(quote(Z <- cholQv$solve(Z, system="Lt"))) |>
       add(quote(coef <- crossprod(DA, cholDD$solve(t.default(Z))))) |>
       add(quote(as.numeric(t.default(coef))))
   }
@@ -1285,7 +1349,7 @@ setup_priorGMRFsampler <- function(mc, Qv) {
 
 setup_priorMVNsampler <- function(mc, Q) {
   rMVN <- function(p, Q) {}
-  if (is_proper_GMRF(mc)) {
+  if (mc$is.proper) {
     mc$priorMVNsampler <- create_TMVN_sampler(Q, update.Q=TRUE, update.mu=FALSE, name="coef", R=mc$R)
   } else {
     if (is.null(mc$R)) stop("cannot sample from improper GMRF without constraints")
@@ -1302,13 +1366,13 @@ setup_priorMVNsampler <- function(mc, Q) {
 
 #' Set computational options for the sampling algorithms used for a 'gen' model component
 #'
+#' @export
 #' @param MHprop MH proposal for the variance component in case of a MLiG prior
 #'  on the coefficients. The two options are "GiG" for a generalized inverse gamma
-#'  proposal, and "LNRW" for a log_normal random walk proposal. The former should
+#'  proposal, and "LNRW" for a log-normal random walk proposal. The former should
 #'  approximate the conditional posterior quite well provided MLiG parameter \code{a}
 #'  is large, such that the coefficients' prior is approximately normal.
-#' @returns A list with computational options regarding a 'gen' model component.
-#' @export
+#' @returns A list of computational options regarding a 'gen' model component.
 gen_control <- function(MHprop = c("GiG", "LNRW")) {
   list(MHprop = match.arg(MHprop))
 }

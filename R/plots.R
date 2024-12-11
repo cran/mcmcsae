@@ -17,15 +17,15 @@
 #' @param ask ask before plotting the next page; default is \code{FALSE}.
 #' @param ... arguments passed to \code{\link[stats]{density}}.
 plot.dc <- function(x, nrows, ncols, ask=FALSE, ...) {
-  if (missing(nrows)) nrows <- min(5L, nvars(x))
-  if (missing(ncols)) ncols <- 3L * min(2L, ceiling(nvars(x) / nrows))
+  if (missing(nrows)) nrows <- min(5L, n_vars(x))
+  if (missing(ncols)) ncols <- 3L * min(2L, ceiling(n_vars(x) / nrows))
   oldpar <- par(no.readonly=TRUE)
   on.exit(par(oldpar))
   par(mar=c(2.4,2.8,0.9,0.8))
   par(mfrow=c(nrows, ncols))
   par(ask=ask)
   labs <- labels(x)
-  for (i in seq_len(nvars(x))) {
+  for (i in seq_len(n_vars(x))) {
     drawsi <- get_from(x, i)
     drawsi <- do.call("cbind", drawsi)  # niter x nchain matrix
     lab <- if (is.null(labs)) "" else labs[i]
@@ -65,7 +65,7 @@ plot.mcdraws <- function(x, vnames, nrows, ncols, ask=FALSE, ...) {
       warn("parameter '", vars$name, "' not in MCMC output")
       next
     }
-    if (is.null(vars$range)) vars$range <- seq_len(nvars(x[[vars$name]]))
+    if (is.null(vars$range)) vars$range <- seq_len(n_vars(x[[vars$name]]))
     if (is.null(obj)) {
       obj <- get_from(x[[vars$name]], vars$range)
     } else {
@@ -116,12 +116,12 @@ trace_plot <- function(dc1, xlab="iterations", ylab="") {
 #' dat$y <- gd$y
 #' # fit a base model
 #' model0 <- y ~ reg(~ 1, name="beta") + gen(factor=~f, name="v")
-#' sampler <- create_sampler(model0, data=dat, block=TRUE)
+#' sampler <- create_sampler(model0, data=dat)
 #' sim <- MCMCsim(sampler, store.all=TRUE)
 #' (summ0 <- summary(sim))
 #' # fit 'true' model
 #' model <- y ~ reg(~ x, name="beta") + gen(factor=~f, name="v")
-#' sampler <- create_sampler(model, data=dat, block=TRUE)
+#' sampler <- create_sampler(model, data=dat)
 #' sim <- MCMCsim(sampler, store.all=TRUE)
 #' (summ <- summary(sim))
 #' # compare random effect estimates against true parameter values
@@ -157,7 +157,7 @@ plot_coef <- function(..., n.se=1, est.names, sort.by=NULL, decreasing=FALSE,
                       offset=0.1, cex.var=0.8, mar=c(0.1,2.1,5.1,0.1)) {
 
   dotargs <- list(...)
-  toplot <- sapply(dotargs, function(obj) any(class(obj)[1L] == c("dc_summary", "matrix", "sae", "list")))
+  toplot <- b_apply(dotargs, function(obj) any(class(obj)[1L] == c("dc_summary", "matrix", "sae", "list")))
   grpar <- dotargs[!toplot]  # other graphical parameters
   if (!length(grpar)) grpar <- NULL
 
@@ -290,7 +290,7 @@ plot_coef <- function(..., n.se=1, est.names, sort.by=NULL, decreasing=FALSE,
       plot(0, 0, type="n", bty="n", xaxt="n", yaxt="n")
       if (missing(est.names))
         est.names <- paste0("est", seq_along(ests))
-      dots.only <- sapply(x, function(obj) is.list(obj) && is.null(obj$se) && is.null(obj$lower))
+      dots.only <- b_apply(x, function(obj) is.list(obj) && is.null(obj[["se"]]) && is.null(obj[["lower"]]))
       legend("topright", est.names, xpd=TRUE, horiz=TRUE, inset=c(0, 0),
         bty="n", pch=rep.int(20L, length(ests)), lty=ifelse(dots.only, 0, 1),
         col=seq_along(ests)
@@ -309,15 +309,14 @@ cplot <- function (coefs, intervals=NULL,
                    mar=c(0.1,2.1,5.1,0.1), plot=TRUE,
                    add=FALSE, offset=0.1, ...) {
   
-  if (is.list(coefs)) coefs <- unlist(coefs, use.names=FALSE)
+  if (is.list(coefs)) coefs <- unlst(coefs)
   m <- length(coefs)
   id <- seq_len(m)
   if (is.null(intervals)) intervals <- cbind(coefs, coefs)
-  if (is.null(varnames)) {
+  if (is.null(varnames))
     maxchar <- 0
-  } else {
-    maxchar <- max(sapply(varnames, nchar))
-  }
+  else
+    maxchar <- max(i_apply(varnames, nchar))
   k <- 1/m
   oldmar <- par("mar")
   on.exit(par(mar=oldmar))
@@ -333,7 +332,7 @@ cplot <- function (coefs, intervals=NULL,
         axes=FALSE, main=main, xlab=xlab, ylab=ylab, ...)
       if (h.axis) axis(3L)
       if (v.axis) {
-        axis(2L, rev(id), varnames[rev(id)], las=var.las, 
+        axis(2L, rev(id), varnames[rev(id)], las=var.las,
           tck=FALSE, lty=0, cex.axis=cex.var)
       }
       abline(v=0, lty=2L)

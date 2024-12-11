@@ -14,13 +14,14 @@
 #      including this factor only has a computational advantage in case of gaussian variance sigma^2 Sigma0, where Sigma0 is fixed
 pr_normal <- function(mean=0, precision=0, labels=NULL) {
   mean <- as.numeric(mean)
-  if (!is.null(labels) && all(length(mean) != c(1L, length(labels)))) stop("if 'labels' are specified, parameter 'mean' must have the same length, or be a scalar")
+  if (!is.null(labels) && all(length(mean) != c(1L, length(labels))))
+    stop("if 'labels' are specified, parameter 'mean' must have the same length, or be a scalar")
   if (is.vector(precision)) {
-    if (!is.null(labels) && all(length(precision) != c(1L, length(labels)))) stop("if 'labels' are specified, the size of 'precision' must be compatible if it not a scalar")
+    if (!is.null(labels) && all(length(precision) != c(1L, length(labels)))) stop("if 'labels' are specified, the size of 'precision' must be compatible if it is not a scalar")
     if (any(precision < 0)) stop("parameter 'precision' must be nonnegative")
     informative <- any(precision != 0)
   } else if (is_a_matrix(precision)) {
-    if (!is.null(labels) && all(nrow(precision) != c(1L, length(labels)))) stop("if 'labels' are specified, the size of 'precision' must be compatible if it not a scalar")
+    if (!is.null(labels) && all(nrow(precision) != c(1L, length(labels)))) stop("if 'labels' are specified, the size of 'precision' must be compatible if it is not a scalar")
     precision <- economizeMatrix(precision, symmetric=TRUE, check=TRUE)
     informative <- !is_zero_matrix(precision)
     # TODO check for positive semi-definiteness
@@ -42,7 +43,7 @@ pr_normal <- function(mean=0, precision=0, labels=NULL) {
     } else {
       if (length(coefnames) != n) stop("'coefnames' must have length 'n'")
       m <- match(labels, coefnames)
-      if (anyNA(m)) stop("non-matching labels: ", paste(labels[is.na(m)], collapse=", "))
+      if (anyNA(m)) stop("non-matching labels: ", paste0(labels[is.na(m)], collapse=", "))
       temp <- numeric(n)
       temp[m] <- mean
       mean <<- temp
@@ -58,7 +59,7 @@ pr_normal <- function(mean=0, precision=0, labels=NULL) {
     }
     # sparse: block sampler expects sparse matrix with x-slot
     precision <<- economizeMatrix(precision, sparse=sparse, symmetric=TRUE)
-    if (isTRUE(sparse) && isUnitDiag(precision)) precision <<- expandUnitDiag(precision)
+    if (isTRUE(sparse) && is_unit_ddi(precision)) precision <<- expand_unit_ddi(precision)
     sigma <<- sigma
     if (sigma) {
       # combined conjugate prior for ordinary gaussian regression --> sigma^2 factor in coefficients' prior variance
@@ -80,8 +81,9 @@ pr_normal <- function(mean=0, precision=0, labels=NULL) {
       log_prior <<- log_prior |>
         add(quote(sigma <- p[["sigma_"]])) |>
         add(quote(- n * log(sigma) - 0.5 * dotprodC(delta.beta, precision %m*v% delta.beta) / sigma^2))
-    } else
+    } else {
       log_prior <<- add(log_prior, quote(- 0.5 * dotprodC(delta.beta, precision %m*v% delta.beta)))
+    }
   }
   type <- "normal"
   environment()
@@ -91,7 +93,7 @@ pr_normal <- function(mean=0, precision=0, labels=NULL) {
 #'
 #' @export
 #' @param mean scalar or vector parameter for the mean in the large
-#'  \code{a} limit, when the distribution approaches a normal distribution. 
+#'  \code{a} limit, when the distribution approaches a normal distribution.
 #' @param precision scalar or vector parameter for the precision in the
 #'  large \code{a} limit, when the distribution approaches a normal
 #'  distribution.
@@ -124,7 +126,7 @@ pr_MLiG <- function(mean=0, precision=0, labels=NULL, a=1000) {
       if (all(length(mean) != c(1L, length(labels)))) stop("parameter 'mean' has wrong length")
       if (all(length(precision) != c(1L, length(labels)))) stop("parameter 'precision' has wrong length")
       m <- match(labels, coefnames)
-      if (anyNA(m)) stop("non-matching coefficient names: ", paste(labels[is.na(m)], collapse=", "))
+      if (anyNA(m)) stop("non-matching coefficient names: ", paste0(labels[is.na(m)], collapse=", "))
       temp <- numeric(n)
       temp[m] <- mean
       mean <<- temp
@@ -157,6 +159,81 @@ pr_fixed <- function(value=1) {
     #if (post) draw <<- function() value
   }
   type <- "fixed"
+  environment()
+}
+
+#' Create an object representing uniform prior distributions
+#'
+#' @export
+#' @param min lower limit.
+#' @param max upper limit.
+#' @returns An environment representing the specified prior, for internal use.
+pr_unif <- function(min=0, max=1) {
+  if (!all(min <= max)) stop("'min' should not exceed 'max'")
+  n <- NULL
+  rprior <- function() stop("please call method 'init' first")
+  # ldr: log-density-ratio, i.e. log(dbeta(x1)/dbeta(x2)), used in MH log-acceptance-rate
+  ldr <- NULL
+  init <- function(n=1L) {
+    n <<- as.integer(n)
+    if (all(length(min) != c(1L, n))) stop("parameter 'min' has wrong length")
+    if (all(length(max) != c(1L, n))) stop("parameter 'max' has wrong length")
+    rprior <<- function() runif(n, min, max)
+    ldr <<- function(x1, x2) 0
+  }
+  type <- "unif"
+  environment()
+}
+
+#' Create an object representing beta prior distributions
+#'
+#' @export
+#' @param a positive shape parameter.
+#' @param b positive shape parameter.
+#' @returns An environment representing the specified prior, for internal use.
+pr_beta <- function(a=1, b=1) {
+  if (!all(a > 0 & b > 0)) stop("'a' and 'b' must be positive")
+  n <- NULL
+  rprior <- function() stop("please call method 'init' first")
+  # ldr: log-density-ratio, i.e. log(dbeta(x1)/dbeta(x2)), used in MH log-acceptance-rate
+  ldr <- NULL
+  init <- function(n=1L) {
+    n <<- as.integer(n)
+    if (all(length(a) != c(1L, n))) stop("parameter 'a' has wrong length")
+    if (all(length(b) != c(1L, n))) stop("parameter 'b' has wrong length")
+    rprior <<- function() rbeta(n, a, b)
+    ldr <<- function(x1, x2) {
+      out <- if (a == 1) 0 else (a - 1) * log(x1/x2)
+      if (b != 1) out <- out + (b - 1) * log((1 - x1)/(1 - x2))
+      out
+    }
+  }
+  type <- "beta"
+  environment()
+}
+
+#' Create an object representing truncated normal prior distributions
+#'
+#' @export
+#' @param mean scalar or vector mean parameter.
+#' @param precision scalar, vector or matrix precision parameter.
+#' @param lower lower limit of the truncated interval.
+#' @param upper lower limit of the truncated interval.
+#' @returns An environment representing the specified prior, for internal use.
+pr_truncnormal <- function(mean=0, precision=1, lower=0, upper=Inf) {
+  if (!all(lower <= upper)) stop("'lower' should not exceed 'upper'")
+  n <- NULL
+  rprior <- function() stop("please call method 'init' first")
+  init <- function(n=1L) {
+    n <<- as.integer(n)
+    if (all(length(mean) != c(1L, n))) stop("mean parameter has wrong length")
+    if (all(length(precision) != c(1L, n))) stop("precision parameter has wrong length")
+    if (all(length(lower) != c(1L, n))) stop("lower parameter has wrong length")
+    if (all(length(upper) != c(1L, n))) stop("upper parameter has wrong length")
+    stdev <- 1/sqrt(precision)
+    rprior <<- function() mean + stdev * Crtuvn((lower - mean)/stdev, (upper - mean)/stdev)
+  }
+  type <- "truncnormal"
   environment()
 }
 

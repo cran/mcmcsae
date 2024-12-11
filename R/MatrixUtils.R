@@ -1,5 +1,6 @@
 #' Detect and remove redundancy in columns of a matrix object
 #'
+#' @noRd
 #' @param X a (possibly sparse) matrix. If \code{method="chol"} the input matrix \code{X}
 #'  for function \code{detect_redundancy} must be symmetric.
 #' @param method either "chol" (Cholesky with pivoting) or "qr" (QR decomposition).
@@ -13,7 +14,6 @@
 #'  For function \code{remove_redundancy} the matrix object with redundant columns,
 #'  if any, removed.
 #' @name redundancy
-#' @noRd
 NULL
 
 ## @export
@@ -74,8 +74,9 @@ zeroMatrix <- function(nr, nc)
 # matrix algebra: efficient matrix-vector products and some new Matrix methods
 
 # RcppEigen 'knows' dgC, but not dsC --> represent dsC as dgC
-.dgC.class.attr <- class(as(matrix(c(0,0)), "CsparseMatrix"))
-.dsC.class.attr <- class(as(as(matrix(0), "CsparseMatrix"), "symmetricMatrix"))
+#.dgC.class.attr <- class(.m2sparse(matrix(0), "dgC"))
+.dgC.class.attr <- class(as(matrix(c(0, 0)), "CsparseMatrix"))
+.dsC.class.attr <- class(forceSymmetric(as(matrix(0), "CsparseMatrix")))
 
 #' Fast matrix-vector multiplications
 #' 
@@ -402,8 +403,8 @@ setMethod("%*%", signature("ddiMatrix", "matrix"), function(x, y) {
 
 # NB the RcppEigen version is faster (especially for small x)
 #' @rdname Matrix-methods
-setMethod("%*%", signature("dgCMatrix", "matrix"), function(x, y)
-  Csparse_dense_prod(x, y)
+setMethod("%*%", signature("dgCMatrix", "matrix"),
+  function(x, y) Csparse_dense_prod(x, y)
 )
 
 #' @rdname Matrix-methods
@@ -414,23 +415,23 @@ setMethod("%*%", signature("dsCMatrix", "matrix"), function(x, y) {
 })
 
 #' @rdname Matrix-methods
-setMethod("%*%", signature("tabMatrix", "matrix"), function(x, y)
-  Ctab_dense_prod(x, y)
+setMethod("%*%", signature("tabMatrix", "matrix"),
+  function(x, y) Ctab_dense_prod(x, y)
 )
 
 #' @rdname Matrix-methods
-setMethod("%*%", signature("matrix", "tabMatrix"), function(x, y)
-  x %*% Ctab2dgC(y)
+setMethod("%*%", signature("matrix", "tabMatrix"),
+  function(x, y) x %*% Ctab2dgC(y)
 )
 
 #' @rdname Matrix-methods
-setMethod("%*%", signature("tabMatrix", "numLike"), function(x, y)
-  Ctab_dense_prod(x, matrix(y, ncol=1L))
+setMethod("%*%", signature("tabMatrix", "numLike"),
+  function(x, y) Ctab_dense_prod(x, matrix(y, ncol=1L))
 )
 
 #' @rdname Matrix-methods
-setMethod("%*%", signature("ddiMatrix", "dgCMatrix"), function(x, y)
-  if (x@diag == "U") y else Cdiag_sparse_prod(x@x, y)
+setMethod("%*%", signature("ddiMatrix", "dgCMatrix"),
+  function(x, y) if (x@diag == "U") y else Cdiag_sparse_prod(x@x, y)
 )
 
 #' @rdname Matrix-methods
@@ -452,23 +453,23 @@ setMethod("%*%", signature("ddiMatrix", "tabMatrix"), function(x, y) {
 })
 
 #' @rdname Matrix-methods
-setMethod("%*%", signature("CsparseMatrix", "tabMatrix"), function(x, y)
-  x %*% Ctab2dgC(y)
+setMethod("%*%", signature("CsparseMatrix", "tabMatrix"),
+  function(x, y) x %*% Ctab2dgC(y)
 )
 
 #' @rdname Matrix-methods
-setMethod("%*%", signature("tabMatrix", "CsparseMatrix"), function(x, y)
-  Ctab2dgC(x) %*% y
+setMethod("%*%", signature("tabMatrix", "CsparseMatrix"),
+  function(x, y) Ctab2dgC(x) %*% y
 )
 
 #' @rdname Matrix-methods
-setMethod("tcrossprod", signature("matrix", "dgCMatrix"), function(x, y)
-  Cdense_sparse_tcrossprod(x, y)
+setMethod("tcrossprod", signature("matrix", "dgCMatrix"),
+  function(x, y) Cdense_sparse_tcrossprod(x, y)
 )
 
 #' @rdname Matrix-methods
-setMethod("tcrossprod", signature("matrix", "tabMatrix"), function(x, y)
-  Cdense_tab_tcrossprod(x, y)
+setMethod("tcrossprod", signature("matrix", "tabMatrix"),
+  function(x, y) Cdense_tab_tcrossprod(x, y)
 )
 
 #' @rdname Matrix-methods
@@ -479,44 +480,52 @@ setMethod("tcrossprod", signature("matrix", "ddiMatrix"), function(x, y) {
 
 # (unary) crossprod method for tabMatrix
 #' @rdname Matrix-methods
-setMethod("crossprod", signature=c("tabMatrix", "missing"), function(x, y)
-  Cdiag(Ctab_unary_crossprod(x))
+setMethod("crossprod", signature=c("tabMatrix", "missing"),
+  function(x, y) Cdiag(Ctab_unary_crossprod(x))
 )
 
 #' @rdname Matrix-methods
-setMethod("crossprod", signature("tabMatrix", "matrix"), function(x, y)
-  Ctab_dense_crossprod(x, y)
+setMethod("crossprod", signature("tabMatrix", "matrix"),
+  function(x, y) Ctab_dense_crossprod(x, y)
 )
 
 #' @rdname Matrix-methods
-setMethod("crossprod", signature("tabMatrix", "dgCMatrix"), function(x, y)
-  crossprod(Ctab2dgC(x), y)
+setMethod("crossprod", signature("tabMatrix", "dgCMatrix"),
+  function(x, y) crossprod(Ctab2dgC(x), y)
 )
 
 #' @rdname Matrix-methods
-setMethod("crossprod", signature("tabMatrix", "tabMatrix"), function(x, y)
-  crossprod(Ctab2dgC(x), Ctab2dgC(y))
+setMethod("crossprod", signature("tabMatrix", "tabMatrix"),
+  function(x, y) crossprod(Ctab2dgC(x), Ctab2dgC(y))
 )
 
 # used in fast GMRF prior sampler
 #' @rdname Matrix-methods
-setMethod("crossprod", signature=c("dgCMatrix", "matrix"), function(x, y)
-  Csparse_dense_crossprod(x, y)
+setMethod("crossprod", signature=c("dgCMatrix", "matrix"),
+  function(x, y) Csparse_dense_crossprod(x, y)
 )
 
-# test for unit Diagonal Matrix
-isUnitDiag <- function(M) class(M)[1L] == "ddiMatrix" && M@diag == "U"
 
-# make sure Diagonal Matrix has x-slot
-expandUnitDiag <- function(M) {
-  if (!isUnitDiag(M)) stop("expandUnitDiag: unit ddiMatrix expected")
+is_unit_ddi <- function(M) class(M)[1L] == "ddiMatrix" && M@diag == "U"
+
+# test for unit diagonal matrix
+# assume that matrix is economized, i.e. either ddi (sparse) or matrix (dense)
+is_unit_diag <- function(M) {
+  if (is.matrix(M))
+    all(diag(M) == 1) && isDiagonal(M)
+  else
+    is_unit_ddi(M)
+}
+
+# make sure ddiMatrix has x-slot
+expand_unit_ddi <- function(M) {
   attr(M, "x") <- rep.int(1, M@Dim[1L])
   attr(M, "diag") <- "N"
   M
 }
 
 rm_Matrix_names <- function(M) {
-  if (!all(sapply(M@Dimnames, is.null))) attr(M, "Dimnames") <- list(NULL, NULL)
+  if (!all(b_apply(M@Dimnames, is.null))) attr(M, "Dimnames") <- list(NULL, NULL)
   M
 }
 
@@ -524,26 +533,22 @@ rm_Matrix_names <- function(M) {
 # if (vec.diag) returns a numeric vector, in case all elements equal a numeric scalar
 # else returns a ddiMatrix, if possible a unit-ddiMatrix
 economizeDiagMatrix <- function(M, strip.names=TRUE, vec.diag=FALSE) {
-  if (!strip.names) labs <- dimnames(M)  # as(, "diagonalMatrix") may remove dimnames...
   M <- as(M, "diagonalMatrix")
   if (M@diag == "N" && all(M@x == 1)) {
     attr(M, "x") <- numeric(0L)
     attr(M, "diag") <- "U"
   }
   if (vec.diag) {  # NB in scalar case names are not returned
-    if (M@diag == "U") {
+    if (M@diag == "U")
       1
-    } else if (all(M@x == M@x[1L])) {
+    else if (all(M@x == M@x[1L]))
       M@x[1L]
-    } else if (strip.names) {
+    else if (strip.names)
       M@x
-    } else setNames(M@x, labs)
+    else setNames(M@x, colnames(M))
   } else {
-    if (strip.names) {
+    if (strip.names)
       M <- rm_Matrix_names(M)
-    } else {
-      if (!is.null(labs)) attr(M, "Dimnames") <- labs
-    }
     M
   }
 }
@@ -578,11 +583,11 @@ economizeMatrix <- function(M, sparse=NULL, symmetric=FALSE, strip.names=TRUE,
   }
   if (check && !is_a_matrix(M)) stop("not a matrix or Matrix")
   if (check && anyNA(M)) stop("economizeMatrix: missing values in input matrix")
-  if (symmetric && !identical(sparse, FALSE) && isDiagonal(M)) {
+  if (symmetric && !isFALSE(sparse) && isDiagonal(M))
     return(economizeDiagMatrix(M, strip.names, vec.diag))
-  }
   if (is.null(sparse)) sparse <- better_sparse(M, symmetric)
   if (sparse) {
+    #if (is.matrix(M)) M <- .m2sparse(M, "dgC")
     if (is.matrix(M)) M <- as(as(as(M, "CsparseMatrix"), "generalMatrix"), "dMatrix")
   } else {
     if (!is.matrix(M)) M <- as.matrix(M)
@@ -604,7 +609,7 @@ economizeMatrix <- function(M, sparse=NULL, symmetric=FALSE, strip.names=TRUE,
   }
   if (all(class(M)[1L] != c("dgCMatrix", "dsCMatrix")))
     M <- as(as(as(M, "CsparseMatrix"), "generalMatrix"), "dMatrix")
-  if (drop.zeros) M <- drop0(M)
+  if (drop.zeros) M <- drop0(M, is.Csparse=TRUE)
   if (symmetric && class(M)[1L] == "dgCMatrix") {
     if (check && !isSymmetric(M)) stop("economizeMatrix: matrix is not symmetric")
     M <- forceSymmetric(M, uplo="U")
@@ -628,14 +633,14 @@ sparsity <- function(x) 1 - nnzero(x) / prod(dim(x))
 better_sparse <- function(x, symmetric=FALSE) {
   if (symmetric) {
     # the packed dsC format is another advantage compared to matrix
-    sparsity(x) > 0.25 && prod(dim(x)) > 500L
+    sparsity(x) > 0.25 && prod(dim(x)) > 500
   } else {
-    sparsity(x) > 0.5 && prod(dim(x)) > 500L
+    sparsity(x) > 0.5 && prod(dim(x)) > 500
   }
 }
 
 # assume x is a matrix object; if dense, it is assumed to be matrix
-large_and_sparse <- function(x) !is.matrix(x) && prod(dim(x)) > 1e6L
+large_and_sparse <- function(x) !is.matrix(x) && prod(dim(x)) > 1e6
 
 setMethod("solve", signature("ddiMatrix", "numeric"), function(a, b)
   switch(a@diag,
@@ -662,8 +667,9 @@ setMethod("solve", signature("ddiMatrix", "matrix"), function(a, b)
 #' @param lex.order passed to \code{\link[base]{interaction}}.
 #' @param enclos enclosure to look for objects not found in \code{data}.
 #' @returns The combined (interaction) factor variable.
-combine_factors <- function(fvars, data, drop=FALSE, sep=":", lex.order=FALSE, enclos=.GlobalEnv) {
+combine_factors <- function(fvars, data, drop=FALSE, sep=":", lex.order=FALSE, enclos=emptyenv()) {
   if (length(fvars)) {
+    if (!is.character(fvars)) stop("'fvars' must be a character vector")
     fac <- eval_in(fvars[1L], data, enclos)
     # keep all levels, including those of empty combinations, even combinations of empty levels
     for (f in fvars[-1L])
@@ -749,7 +755,7 @@ dgC_colwise <- function(M, fun) {
 
 # returns a logical vector indicating whether a column is zero or not
 # TODO use relative instead of absolute tolerance (?), or mean (over nonzero elements) instead of sum?
-zero_col <- function(M, tol=.Machine$double.eps^0.5) {
+zero_col <- function(M, tol=sqrt(.Machine$double.eps)) {
   f <- function(x) sum(abs(x))
   switch(class(M)[1L],
     matrix = apply(M, 2L, f) < tol,

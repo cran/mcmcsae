@@ -14,8 +14,8 @@ check_ny <- function(ny, data) {
   if (any(ny - as.integer(ny) > sqrt(.Machine$double.eps))) warn("non-integral values in 'ny' have been rounded")
   as.integer(round(ny))
   # or should we allow non-integral ny? allowed for model fitting but not for prediction by rbinom
-  # note that y in create_sampler is currently not rounded, but y <= ny is checked
-  # maybe add argument round and round only in case of prediction
+  # NB y <= ny is now checked in create_sampler, but may also not be strictly necessary
+  # maybe add argument round/strict, but always round for prediction(?)
 }
 
 check_ry <- function(ry, data) {

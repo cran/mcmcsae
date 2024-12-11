@@ -48,7 +48,7 @@ combine_chains <- function(...) {
   dotargs <- list(...)
   out <- list()
   out[["_info"]] <- dotargs[[1L]][["_info"]]
-  out[["_info"]]$n.chain <- sum(sapply(dotargs, nchains))
+  out[["_info"]]$n.chain <- sum(i_apply(dotargs, n_chains))
   out[["_model"]] <- dotargs[[1L]][["_model"]]
   out[["_state"]] <- do.call("c", lapply(dotargs, `[[`, "_state"))
   if (!is.null(dotargs[[1L]][["_accept"]])) {
@@ -72,21 +72,22 @@ combine_chains <- function(...) {
     class(out[[v]]) <- "dc"
   }
   if (!is.null(dotargs[[1L]][["_info"]][["list.pars"]])) {
-    for (v in dotargs[[1L]][["_info"]][["list.pars"]]) {
+    for (v in dotargs[[1L]][["_info"]][["list.pars"]])
       out[[v]] <- do.call("c", lapply(dotargs, `[[`, v))
-    }
   }
   class(out) <- "mcdraws"
   out
 }
 
+# obj is a list of dc objects
 combine_chains_dc <- function(obj) {
-  out <- unlist(obj, recursive=FALSE, use.names=FALSE)
+  out <- unlst(obj, recursive=FALSE)
   if (!is.null(attr(obj[[1L]], "ppp"))) {
-    if (length(attr(obj[[1L]], "ppp")) == 1L)
-      attr(out, "ppp") <- mean(sapply(obj, attr, "ppp"))
+    l <- length(attr(obj[[1L]], "ppp"))
+    if (l == 1L)
+      attr(out, "ppp") <- mean(vapply(obj, attr, 0, "ppp"))
     else
-      attr(out, "ppp") <- rowMeans(sapply(obj, attr, "ppp"))
+      attr(out, "ppp") <- rowMeans(vapply(obj, attr, numeric(l), "ppp"))
   }
   if (!is.null(attr(obj[[1L]], "labels"))) attr(out, "labels") <- attr(obj[[1L]], "labels")
   class(out) <- "dc"
@@ -95,7 +96,7 @@ combine_chains_dc <- function(obj) {
 
 # obj can be of class mcdraws or dc (the latter may also be a list)
 split_chains <- function(obj, parts=NULL) {
-  n.chain <- nchains(obj)
+  n.chain <- n_chains(obj)
   if (is.null(parts)) {
     parts <- n.chain  # by default, split into single chains
   } else {
@@ -151,7 +152,7 @@ combine_iters <- function(...) {
   out <- list()
   if (!is.null(dotargs[[1L]][["_info"]])) {
     out[["_info"]] <- dotargs[[1L]][["_info"]]
-    out[["_info"]]$n.draw <- sum(sapply(dotargs, ndraws))
+    out[["_info"]]$n.draw <- sum(i_apply(dotargs, n_draws))
   }
   out[["_model"]] <- dotargs[[1L]][["_model"]]
   out[["_state"]] <- dotargs[[length(dotargs)]][["_state"]]
@@ -180,7 +181,7 @@ combine_iters <- function(...) {
 # obj is a list of dc objects
 combine_iters_dc <- function(obj) {
   chains <- seq_along(obj[[1L]])
-  n.draw <- sum(sapply(obj, function(x) nrow(x[[1L]])))
+  n.draw <- sum(i_apply(obj, function(x) nrow(x[[1L]])))
   n.var <- ncol(obj[[1L]][[1L]])
   out <- list()
   if (is.integer(obj[[1L]][[1L]][1L, 1L]))
@@ -195,9 +196,9 @@ combine_iters_dc <- function(obj) {
   }
   if (!is.null(attr(obj[[1L]], "ppp"))) {
     if (length(attr(obj[[1L]], "ppp")) == 1L)
-      attr(out, "ppp") <- sum(sapply(obj, attr, "ppp")) / (length(chains) * n.draw)
+      attr(out, "ppp") <- sum(vapply(obj, attr, 0, "ppp")) / (length(chains) * n.draw)
     else
-      attr(out, "ppp") <- rowSums(sapply(obj, attr, "ppp")) / (length(chains) * n.draw)
+      attr(out, "ppp") <- rowSums(vapply(obj, attr, numeric(n.var), "ppp")) / (length(chains) * n.draw)
   }
   if (!is.null(attr(obj[[1L]], "labels"))) attr(out, "labels") <- attr(obj[[1L]], "labels")
   class(out) <- "dc"
@@ -211,9 +212,9 @@ split_iters <- function(obj, iters=NULL, parts=NULL) {
   parts <- as.integer(parts)
   if (length(parts) != 1L || parts < 1L) stop("wrong input for 'parts'")
   if (is.null(iters))
-    iters <- seq_len(ndraws(obj))
+    iters <- seq_len(n_draws(obj))
   else
-    if (!all(iters %in% seq_len(ndraws(obj)))) stop("non-existing iterations selected")
+    if (!all(iters %in% seq_len(n_draws(obj)))) stop("non-existing iterations selected")
   n.iter <- length(iters)
   if (n.iter < parts) stop("cannot split ", n.iter, " draws in ", parts, " parts")
   its <- rep(n.iter %/% parts, parts) + rep(1:0, c(n.iter %% parts, parts - n.iter %% parts))

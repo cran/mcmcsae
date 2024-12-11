@@ -43,8 +43,8 @@ NULL
 #' @export
 ## @method fitted mcdraws
 #' @rdname residuals-fitted-values
-fitted.mcdraws <- function(object, mean.only=FALSE, units=NULL, chains=seq_len(nchains(object)),
-                           draws=seq_len(ndraws(object)), matrix=FALSE, type=c("link", "response"), ...) {
+fitted.mcdraws <- function(object, mean.only=FALSE, units=NULL, chains=seq_len(n_chains(object)),
+                           draws=seq_len(n_draws(object)), matrix=FALSE, type=c("link", "response"), ...) {
   type <- match.arg(type)
   fitted_res(object, mean.only, units, chains, draws, matrix, type, resid=FALSE)
 }
@@ -52,14 +52,14 @@ fitted.mcdraws <- function(object, mean.only=FALSE, units=NULL, chains=seq_len(n
 #' @export
 ## @method residuals mcdraws
 #' @rdname residuals-fitted-values
-residuals.mcdraws <- function(object, mean.only=FALSE, units=NULL, chains=seq_len(nchains(object)),
-                              draws=seq_len(ndraws(object)), matrix=FALSE, ...) {
+residuals.mcdraws <- function(object, mean.only=FALSE, units=NULL, chains=seq_len(n_chains(object)),
+                              draws=seq_len(n_draws(object)), matrix=FALSE, ...) {
   fitted_res(object, mean.only, units, chains, draws, matrix, type="response", resid=TRUE)
 }
 
 # get fitted values or resduals, internal function
-fitted_res <- function(obj, mean.only=FALSE, units=NULL, chains=seq_len(nchains(obj)),
-                       draws=seq_len(ndraws(obj)), matrix=FALSE, type, resid, ...) {
+fitted_res <- function(obj, mean.only=FALSE, units=NULL, chains=seq_len(n_chains(obj)),
+                       draws=seq_len(n_draws(obj)), matrix=FALSE, type, resid, ...) {
   smplr <- obj[["_model"]]
   if (mean.only && (!is.null(obj[["e_"]]) || !is.null(obj[["_means"]][["e_"]]))) {
     if ((resid && smplr$e.is.res) || (!resid && !smplr$e.is.res))
@@ -74,48 +74,12 @@ fitted_res <- function(obj, mean.only=FALSE, units=NULL, chains=seq_len(nchains(
     all.units <- FALSE
   }
   if (is.null(obj[["e_"]])) {
+    nr <- if (matrix) length(chains) * length(draws) else length(draws)
     mc <- smplr$mod[[1L]]
-    if (mc[["type"]] == "brt") {
-      if (is.null(obj[[mc$name]])) stop("no fitted values for 'brt' component; please re-run MCMCsim with 'store.all=TRUE'")
-      if (matrix) {
-        out <- as.matrix.dc(get_from(obj[[mc$name]], chains=chains, draws=draws))[, units, drop=FALSE]
-      } else {
-        out <- list()
-        for (ch in seq_along(chains))
-          out[[ch]] <- obj[[mc$name]][[chains[ch]]][draws, units, drop=FALSE]
-      }
-    } else {
-      if (all.units) Xi <- mc$X else Xi <- mc$X[units, , drop=FALSE]
-      if (matrix) {
-        out <- tcrossprod(as.matrix.dc(get_from(obj[[mc$name]], chains=chains, draws=draws), colnames=FALSE), Xi)
-      } else {
-        out <- list()
-        for (ch in seq_along(chains))
-          out[[ch]] <- tcrossprod(obj[[mc$name]][[chains[ch]]][draws, , drop=FALSE], Xi)
-      }
-    }
-    for (mc in smplr$mod[-1L]) {
-      if (mc[["type"]] == "brt") {
-        if (matrix)
-          out <- out + as.matrix.dc(get_from(obj[[mc$name]], chains=chains, draws=draws))[, units, drop=FALSE]
-        else
-          for (ch in seq_along(chains))
-            out[[ch]] <- out[[ch]] + obj[[mc$name]][[chains[ch]]][draws, units, drop=FALSE]
-      } else {
-        if (all.units) Xi <- mc$X else Xi <- mc$X[units, , drop=FALSE]
-        if (matrix)
-          out <- out + tcrossprod(as.matrix.dc(get_from(obj[[mc$name]], chains=chains, draws=draws), colnames=FALSE), Xi)
-        else
-          for (ch in seq_along(chains))
-            out[[ch]] <- out[[ch]] + tcrossprod(obj[[mc$name]][[chains[ch]]][draws, , drop=FALSE], Xi)
-      }
-    }
-    if (smplr$use.offset) {
-      if (matrix)
-        out <- out + rep_each(smplr$offset[units], nrow(out))
-      else
-        out <- lapply(out, function(x) x + rep_each(smplr$offset[units], nrow(x)))
-    }
+    out <- mc$draws_linpred(obj, units, chains, draws, matrix)
+    for (mc in smplr$mod[-1L])
+      for (ch in chains)
+        out[[ch]] <- out[[ch]] + mc$draws_linpred(obj, units, ch, draws, matrix)[[1L]]
   } else {
     out <- get_from(obj[["e_"]], chains=chains, draws=draws, vars=units)
     if (smplr$e.is.res) {
@@ -298,9 +262,9 @@ compute_DIC <- function(x, use.pV=FALSE) {
 get_lppd_function <- function(x) {
   llh_i <- x[["_model"]]$llh_i
   if (is.null(llh_i)) stop("pointwise log-likelihood function not implemented; cannot compute WAIC")
-  if (!(any("e_" == par_names(x)) || all(names(x[["_model"]]$mod) %in% par_names(x))))
+  if (!(any("e_" == par_names(x)) || all(names(Filter(function(mc) mc[["type"]] != "mc_offset", x[["_model"]]$mod)) %in% par_names(x))))
     stop("WAIC can only be computed if all coefficients are stored. Please use 'store.all=TRUE' in MCMCsim.")
-  if (x[["_model"]]$modeled.Q && x[["_model"]]$family$family == "gaussian" && !all(names(x[["_model"]]$Vmod) %in% par_names(x)))
+  if (x[["_model"]]$modeled.Q && x[["_model"]]$family$family == "gaussian" && !all(names(Filter(function(mc) mc[["type"]] != "mc_offset", x[["_model"]]$Vmod)) %in% par_names(x)))
     stop("WAIC can only be computed if all modeled variance factors are stored. Please use 'store.all=TRUE' in MCMCsim.")
   llh_i
 }
@@ -311,11 +275,11 @@ compute_WAIC <- function(x, diagnostic=FALSE, batch.size=NULL, show.progress=TRU
   if (!inherits(x, "mcdraws")) stop("not an object of class 'mcdraws'")
   if (x[["_info"]]$from.prior) stop("cannot compute WAIC for draws from prior")
   n <- x[["_model"]]$n
-  n.chains <- nchains(x)
-  n.draws <- n.chains * ndraws(x)
+  n.chain <- n_chains(x)
+  n.draw <- n.chain * n_draws(x)
   if (is.null(batch.size)) {
     # determine batch size to avoid too much memory use; now by default truncated to ~ 80MB chunks
-    batch.size <- min(n, 10000000L %/% n.draws)
+    batch.size <- min(n, 10000000L %/% n.draw)
   }
   if ((x[["_model"]]$Q0.type == "symm") && (batch.size != n)) {
     warn("For non-diagonal precision matrix, use 'batch.size' equal to the number of
@@ -334,7 +298,7 @@ compute_WAIC <- function(x, diagnostic=FALSE, batch.size=NULL, show.progress=TRU
       on.exit(stop_cluster(cl))
     }
     waic_obj <- function(obj) {
-      nS <- ndraws(obj) * n.chains
+      nS <- n_draws(obj) * n.chain
       llh_i <- get_lppd_function(obj)
       lppd <- waic.var <- waic.mean <- rep.int(NA_real_, n)
       for (b in seq_len(n.batch)) {
@@ -349,7 +313,7 @@ compute_WAIC <- function(x, diagnostic=FALSE, batch.size=NULL, show.progress=TRU
       }
       list(lppd=lppd, var=waic.var, mean=waic.mean, nS=nS)
     }
-    message(n.draws, " draws distributed over ", n.cores, " cores")
+    message(n.draw, " draws distributed over ", n.cores, " cores")
     sim_list <- split_iters(x, parts=n.cores)
     out <- parallel::parLapply(cl, X=sim_list, fun=waic_obj)
     lppd <- exp(out[[1L]]$lppd)
@@ -379,14 +343,14 @@ compute_WAIC <- function(x, diagnostic=FALSE, batch.size=NULL, show.progress=TRU
       else
         ind <- batch + (b - 1L) * batch.size
       logprob_i <- llh_i(x, ind)
-      lppd_i <- colLogSumExps(logprob_i) - log(n.draws)
+      lppd_i <- colLogSumExps(logprob_i) - log(n.draw)
       pwaic_i <- colVars(logprob_i)
       if (diagnostic) {
         lppd[ind] <- lppd_i
         pwaic[ind] <- pwaic_i
       }
       lppd_sum <- lppd_sum + sum(lppd_i)
-      pWAIC1 <- pWAIC1 + sum(.colMeans(logprob_i, n.draws, length(ind)))
+      pWAIC1 <- pWAIC1 + sum(.colMeans(logprob_i, n.draw, length(ind)))
       pWAIC2 <- pWAIC2 + sum(pwaic_i)
       if (show.progress) setTxtProgressBar(pb, b)
     }
@@ -432,14 +396,14 @@ loo.mcdraws <- function(x, by.unit=FALSE, r_eff=FALSE, n.cores=1L, ...) {
     data <- data.frame(i=seq_len(x[["_model"]]$n))
     f <- function(data_i, draws) llh_i(draws, data_i$i)
     if (r_eff)
-      r_eff <- loo::relative_eff(f, chain_id=rep_each(seq_len(nchains(x)), ndraws(x)), data=data, draws=x, cores=n.cores)
+      r_eff <- loo::relative_eff(f, chain_id=rep_each(seq_len(n_chains(x)), n_draws(x)), data=data, draws=x, cores=n.cores)
     else
       r_eff <- NULL
     loo::loo(f, data=data, draws=x, r_eff=r_eff, cores=n.cores)
   } else {
     llh <- llh_i(x)
     if (r_eff)
-      r_eff <- loo::relative_eff(exp(llh), chain_id=rep_each(seq_len(nchains(x)), ndraws(x)), cores=n.cores)
+      r_eff <- loo::relative_eff(exp(llh), chain_id=rep_each(seq_len(n_chains(x)), n_draws(x)), cores=n.cores)
     else
       r_eff <- NULL
     loo::loo(llh, r_eff=r_eff, cores=n.cores, ...)

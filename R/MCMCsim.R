@@ -159,7 +159,7 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
     if (is.null(start) || is.function(start)) {
       start.list <- rep(list(start), n.cores)
     } else {
-      if (!is.list(start) || (length(start) != n.chain) || !all(sapply(start, is.list)))
+      if (!is.list(start) || (length(start) != n.chain) || !all(b_apply(start, is.list)))
         stop("start has wrong format; see the help for possible ways to specify initial values")
       start.list <- split(start, rep(seq_len(n.cores), chains.per.worker))
     }
@@ -202,7 +202,7 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
   # set up starting values
   p <- list()
   if (!is.null(start) && !is.function(start))
-    if (!is.list(start) || (length(start) != n.chain) || !all(sapply(start, is.list)))
+    if (!is.list(start) || (length(start) != n.chain) || !all(b_apply(start, is.list)))
       stop("start has wrong format; see the help for possible ways to specify initial values")
   for (ch in chains) {
     # user-defined function or values can be provided for some or all of the parameters
@@ -243,18 +243,17 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
   if (do.pred) {
     if (any(names(pred) %in% names(test_draw)))
       stop("names in 'pred' clashing with sampler's parameter names: ",
-           paste(intersect(names(pred), names(test_draw)), collapse=", "))
+           paste0(intersect(names(pred), names(test_draw)), collapse=", "))
     timing <- timing + system.time(test_draw <- predict(test_draw))
   }
-  if (verbose && (burnin + n.iter) * n.chain * timing["elapsed"] > 1) {
+  if (verbose && (burnin + n.iter) * n.chain * timing["elapsed"] > 1)
     cat("\nEstimated computation time:", format((burnin + n.iter) * n.chain * timing["elapsed"]), "s\n")
-  }
 
   # derive names and ranges of variables to trace
   trace.convergence <- lapply(trace.convergence, get_name_range)
   plot.trace <- lapply(plot.trace, get_name_range)
-  if (any(sapply(plot.trace, function(x) length(x$range)) > 1L)) stop("for plots only single elements of vector parameters may be specified")
-
+  if (any(b_apply(plot.trace, function(x) length(x$range) > 1L))) stop("for plots only single elements of vector parameters may be specified")
+  
   # remove components to trace or plot that are not in the sampler's output
   trace.convergence <- Filter(function(x) any(x$name == names(test_draw)), trace.convergence)
   plot.trace <- Filter(function(x) any(x$name == names(test_draw)), plot.trace)
@@ -268,8 +267,8 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
     if (!all(v$range %in% seq_along(test_draw[[v$name]]))) stop("illegal range in trace.convergence for parameter ", v$name)
   for (v in plot.trace)
     if (!all(v$range %in% seq_along(test_draw[[v$name]]))) stop("illegal range in plot.trace for parameter ", v$name)
-  trace.convergence.names <- unlist(lapply(trace.convergence, function(v) if (length(test_draw[[v$name]]) == 1L) v$name else paste0(v$name, "[", v$range, "]")), use.names=FALSE)
-  plot.trace.names <- unlist(lapply(plot.trace, function(v) if (length(test_draw[[v$name]]) == 1L) v$name else paste0(v$name, "[", v$range, "]")), use.names=FALSE)
+  trace.convergence.names <- unlst(lapply(trace.convergence, function(v) if (length(test_draw[[v$name]]) == 1L) v$name else paste0(v$name, "[", v$range, "]")))
+  plot.trace.names <- unlst(lapply(plot.trace, function(v) if (length(test_draw[[v$name]]) == 1L) v$name else paste0(v$name, "[", v$range, "]")))
   if (missing(store.mean)) {  # set parameters whose mean is stored by default
     if (is.null(sampler$store_mean_default))
       store.mean <- NULL
@@ -287,8 +286,8 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
   }
   # always store derived quantities and 'diagnostic' parameters
   if (do.pred) store <- union(store, names(pred))
-  if (length(trace.convergence)) store <- union(store, sapply(trace.convergence, `[[`, "name"))
-  if (length(plot.trace)) store <- union(store, sapply(plot.trace, `[[`, "name"))
+  if (length(trace.convergence)) store <- union(store, s_apply(trace.convergence, `[[`, "name"))
+  if (length(plot.trace)) store <- union(store, s_apply(plot.trace, `[[`, "name"))
 
   out <- list()
 
@@ -407,10 +406,10 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
         }
 
       # adaptation of MH proposals
-      if (i %% 100L == 0L) {  # only adapt during burnin
+      if (i %% 50L == 0L) {  # only adapt during burnin
         # adapt for each chain in the same way, depending on average acceptance rates
         for (a in seq_along(MHpars)) {
-          acc.rates[[a]] <- Reduce("+", out[["_accept"]][[a]]) / (n.chain * 100L)
+          acc.rates[[a]] <- Reduce("+", out[["_accept"]][[a]]) / (n.chain * 50L)
           out[["_accept"]][[a]] <- rep.int(list(0L), n.chain)  # reset
         }
         sampler$adapt(acc.rates)  # adapt MH proposals
@@ -436,14 +435,14 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
       for (ch in chains) {
         for (v in store) out[[v]][[ch]][index, ] <- p[[ch]][[v]]
         for (v in store.mean) {
-          add_vector(out[["_means"]][[v]][[ch]], p[[ch]][[v]])
+          v_update(out[["_means"]][[v]][[ch]], plus=TRUE, p[[ch]][[v]])
           if (store.sds)
-            add_vector(out[["_sds"]][[v]][[ch]], p[[ch]][[v]]^2)
+            v_update(out[["_sds"]][[v]][[ch]], plus=TRUE, p[[ch]][[v]]^2)
         }
       }  # END for (ch in chains)
       if (write.to.file)
         for (v in to.file)
-          writeBin(unlist(lapply(p, `[[`, v), use.names=FALSE), con=outfile[[v]], size=write.size)
+          writeBin(unlst(lapply(p, `[[`, v)), con=outfile[[v]], size=write.size)
     }  # END if (i %% thin == 0L)
 
     if (MH)
@@ -457,7 +456,7 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
     if (i %% 10L == 0L && verbose) cat("\riteration", i)
     if (i %% n.progress == 0L) {  # show progress
       if (length(trace.convergence) && (n.chain > 1L) && (index > 1L)) {
-        diagnostic <- unlist(lapply(trace.convergence, function(v) R_hat(get_from(out[[v$name]], v$range, draws=seq_len(index)))), use.names=FALSE)
+        diagnostic <- unlst(lapply(trace.convergence, function(v) R_hat(get_from(out[[v$name]], v$range, draws=seq_len(index)))))
         names(diagnostic) <- trace.convergence.names
         if (verbose) {
           cat("\n")
@@ -472,16 +471,16 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
         i0 <- max(index - (n.progress %/% thin) + 1L, 1L)
         if (length(plot.trace) == 1L) {  # 1d traceplot
           yvalues <- get_from(out[[plot.trace[[1L]]$name]], vars=plot.trace[[1L]]$range, draws=i0:index)
-          xvalues <- thin*(i0:index)
+          xvalues <- thin * (i0:index)
           for (ch in chains) {
             if (add.to.plot) {
               if (i0 == 1L && ch == 1L)
-                plot(xvalues, yvalues[[ch]], type=plot.type, xlim=thin*c(1L, n.draw), ylim=range(unlist(yvalues, use.names=FALSE)), xlab="iteration", ylab=plot.trace.names)
+                plot(xvalues, yvalues[[ch]], type=plot.type, xlim=thin*c(1L, n.draw), ylim=range(unlst(yvalues)), xlab="iteration", ylab=plot.trace.names)
               else
                 lines(xvalues, yvalues[[ch]], type=plot.type, col=ch)
             } else {
               if (ch == 1L)
-                plot(xvalues, yvalues[[ch]], type=plot.type, ylim=range(unlist(yvalues, use.names=FALSE)), xlab="iteration", ylab=plot.trace.names)
+                plot(xvalues, yvalues[[ch]], type=plot.type, ylim=range(unlst(yvalues)), xlab="iteration", ylab=plot.trace.names)
               else
                 lines(xvalues, yvalues[[ch]], type=plot.type, col=ch)
             }
@@ -491,14 +490,14 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
           yvalues <- get_from(out[[plot.trace[[2L]]$name]], vars=plot.trace[[2L]]$range, draws=i0:index)
           for (ch in chains) {
             if (ch == 1L && (!add.to.plot || (add.to.plot && i0 == 1L)))
-              plot(xvalues[[ch]], yvalues[[ch]], type=plot.type, xlim=range(unlist(xvalues, use.names=FALSE)), ylim=range(unlist(yvalues, use.names=FALSE)), xlab=plot.trace.names[1L], ylab=plot.trace.names[2L])
+              plot(xvalues[[ch]], yvalues[[ch]], type=plot.type, xlim=range(unlst(xvalues)), ylim=range(unlst(yvalues)), xlab=plot.trace.names[1L], ylab=plot.trace.names[2L])
             else
               lines(xvalues[[ch]], yvalues[[ch]], type=plot.type, col=ch)
           }
         } else {  # pairs plot for >=3 variables
           plot.matrix <- matrix(NA_real_, n.chain * (index - i0 + 1L), length(plot.trace))
           for (v in seq_along(plot.trace))
-            plot.matrix[, v] <- unlist(get_from(out[[plot.trace[[v]]$name]], vars=plot.trace[[v]]$range, draws=i0:index), use.names=FALSE)
+            plot.matrix[, v] <- unlst(get_from(out[[plot.trace[[v]]$name]], vars=plot.trace[[v]]$range, draws=i0:index))
           pairs(plot.matrix, labels=plot.trace.names, cex.labels=1, gap=0, pch=20L, col=rep_each(chains, index - i0 + 1L))
         }
         Sys.sleep(0)  # forces the plot to update
@@ -530,10 +529,10 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
       if (!is.null(sampler$coef.names))
         attr(out[[v]], "labels") <- sampler$coef.names[[v]]
       if (is.null(attr(out[[v]], "labels")))
-        if (nvars(out[[v]]) == 1L)
+        if (n_vars(out[[v]]) == 1L)
           attr(out[[v]], "labels") <- v
         else
-          attr(out[[v]], "labels") <- as.character(seq_len(nvars(out[[v]])))
+          attr(out[[v]], "labels") <- as.character(seq_len(n_vars(out[[v]])))
       class(out[[v]]) <- "dc"  # draws component class
     }
     sim.time <- proc.time() - started
@@ -542,7 +541,10 @@ MCMCsim <- function(sampler, from.prior=FALSE, n.iter=1000L, n.chain=3L, thin=1L
       cat("\n\n")
       print(sim.time)
     }
-  }, error=function(e) {print(e); cat("Error during finalization of output. Raw results returned.\n")})
+  }, error=function(e) {
+    print(e)
+    cat("Error during finalization of output. Raw results returned.\n")
+  })
   out
 }
 
@@ -618,7 +620,7 @@ NULL
 #' @rdname MCMC-object-conversion
 to_mcmc <- function(x) {
   if (!inherits(x, "dc")) stop("'x' should be an object of class 'dc'")
-  n.draw <- ndraws(x)
+  n.draw <- n_draws(x)
   out <- lapply(x, `attr<-`, which="mcpar", value=c(1L, n.draw, 1L))
   out <- lapply(out, `dimnames<-`, value=list(NULL, labels(x)))
   # turn each chain into mcmc object
@@ -633,14 +635,13 @@ to_draws_array <- function(x, components=NULL) {
   if (inherits(x, "mcdraws")) {
     f <- function(x, name) {
       out <- x[[name]]
-      if (nvars(out) > 1L) labels(out) <- paste(name, labels(out), sep="_")
+      if (n_vars(out) > 1L) labels(out) <- paste(name, labels(out), sep="_")
       to_draws_array(out)
     }
     if (is.null(components)) components <- par_names(x)
     out <- f(x, components[1L])
-    for (i in seq_along(components[-1L])) {
+    for (i in seq_along(components[-1L]))
       out <- posterior::bind_draws(out, f(x, components[i + 1L]), along="variable")
-    }
     out
   } else if (inherits(x, "dc")) {
     posterior::as_draws_array(as.array.dc(x))
@@ -653,8 +654,8 @@ to_draws_array <- function(x, components=NULL) {
 #' @export
 #' @rdname MCMC-object-conversion
 as.array.dc <- function(x, ...) {
-  chains <- seq_len(nchains(x))
-  out <- array(NA_real_, dim=c(ndraws(x), nchains(x), nvars(x)), dimnames=list(NULL, paste("chain", chains, sep=":"), labels(x)))
+  chains <- seq_len(n_chains(x))
+  out <- array(NA_real_, dim=c(n_draws(x), n_chains(x), n_vars(x)), dimnames=list(NULL, paste("chain", chains, sep=":"), labels(x)))
   for (ch in chains) out[, ch, ] <- x[[ch]]
   out
 }
@@ -743,12 +744,32 @@ read_draws <- function(name, filename=paste0("MCdraws_", name, ".dat")) {
 #' @param draws an integer vector indicating which samples to select.
 #' @returns The selected part of the draws component. The output object's class is \code{dc}.
 # for internal use; see below subset.dc for external use
-get_from <- function(dc, vars=seq_len(nvars(dc)), chains=seq_len(nchains(dc)), draws=seq_len(ndraws(dc))) {
-  lapply(dc[chains], function(x) x[draws, vars, drop=FALSE])
+get_from <- function(dc, vars=NULL, chains=NULL, draws=NULL) {
+  if (is.null(draws) && is.null(vars)) {
+    if (is.null(chains))
+      dc
+    else
+      dc[chains]
+  } else if (is.null(vars)) {
+    if (is.null(chains))
+      lapply(dc, function(x) x[draws, , drop=FALSE])
+    else
+      lapply(dc[chains], function(x) x[draws, , drop=FALSE])
+  } else if (is.null(draws)) {
+    if (is.null(chains))
+      lapply(dc, function(x) x[, vars, drop=FALSE])
+    else
+      lapply(dc[chains], function(x) x[, vars, drop=FALSE])
+  } else {
+    if (is.null(chains))
+      lapply(dc, function(x) x[draws, vars, drop=FALSE])
+    else
+      lapply(dc[chains], function(x) x[draws, vars, drop=FALSE])
+  }
 }
 
 #' Select a subset of chains, samples and parameters from a draws component (dc) object
-#' 
+#'
 #' @examples
 #' n <- 300
 #' dat <- data.frame(x=runif(n), f=as.factor(sample(1:7, n, replace=TRUE)))
@@ -758,9 +779,9 @@ get_from <- function(dc, vars=seq_len(nvars(dc)), chains=seq_len(nchains(dc)), d
 #' sim <- MCMCsim(sampler)
 #' (summary(sim$beta))
 #' (summary(subset(sim$beta, chains=1)))
-#' (summary(subset(sim$beta, chains=1, draws=sample(1:ndraws(sim), 100))))
+#' (summary(subset(sim$beta, chains=1, draws=sample(1:n_draws(sim), 100))))
 #' (summary(subset(sim$beta, vars=1:2)))
-#' 
+#'
 #' @export
 #' @method subset dc
 #' @param x a draws component (dc) object.
@@ -769,10 +790,10 @@ get_from <- function(dc, vars=seq_len(nvars(dc)), chains=seq_len(nchains(dc)), d
 #' @param vars an integer vector indicating which parameters to select.
 #' @param ... not used.
 #' @returns The selected part of the draws component as an object of class \code{dc}.
-subset.dc <- function(x, chains=seq_len(nchains(x)), draws=seq_len(ndraws(x)), vars=seq_len(nvars(x)), ...) {
+subset.dc <- function(x, chains=NULL, draws=NULL, vars=NULL, ...) {
   labs <- attr(x, "labels")
   out <- get_from(x, vars=vars, chains=chains, draws=draws)
-  if (!is.null(labs)) attr(out, "labels") <- labs[vars]
+  if (!is.null(labs)) attr(out, "labels") <- if (is.null(vars)) labs else labs[vars]
   class(out) <- "dc"
   out
 }
@@ -818,8 +839,8 @@ get_name_range <- function(composite.name, default.first=TRUE) {
 summary.dc <- function(object, probs=c(0.05, 0.5, 0.95), na.rm=FALSE, time=NULL, abbr=FALSE, batch.size=100L, ...) {
   col_names <- c("Mean", "SD", "t-value", "MCSE", paste0("q", probs), "n_eff")
   if (!is.null(time)) col_names <- c(col_names, "efficiency")
-  if (nchains(object) >= 2L) col_names <- c(col_names, "R_hat")
-  nv <- nvars(object)
+  if (n_chains(object) >= 2L) col_names <- c(col_names, "R_hat")
+  nv <- n_vars(object)
   labs <- labels(object)
   if (is.null(labs) && nv > 1L) labs <- seq_len(nv)
   if (length(labs) != nv) labs <- NULL  # be error tolerant
@@ -998,7 +1019,7 @@ labels.dc <- function(object, ...) attr(object, "labels")
 #' @rdname labels
 `labels<-` <- function(object, value) {
   if (class(object)[1L] == "dc") {
-    if (length(value) != nvars(object)) stop("wrong length of labels vector")
+    if (length(value) != n_vars(object)) stop("wrong length of labels vector")
   }
   attr(object, "labels") <- as.character(value)
   object
@@ -1011,47 +1032,45 @@ labels.dc <- function(object, ...) attr(object, "labels")
 #' ex <- mcmcsae_example(n=50)
 #' sampler <- create_sampler(ex$model, data=ex$dat)
 #' sim <- MCMCsim(sampler, burnin=100, n.iter=300, thin=2, n.chain=5, store.all=TRUE)
-#' # resolve possible conflict with posterior package:
-#' nchains <- mcmcsae::nchains; ndraws <- mcmcsae::ndraws
-#' nchains(sim); nchains(sim$beta)
-#' ndraws(sim); ndraws(sim$beta)
-#' nvars(sim$beta); nvars(sim$sigma_); nvars(sim$llh_); nvars(sim$v)
+#' n_chains(sim); n_chains(sim$beta)
+#' n_draws(sim); n_draws(sim$beta)
+#' n_vars(sim$beta); n_vars(sim$sigma_); n_vars(sim$llh_); n_vars(sim$v)
 #' plot(sim, "beta")
-#' nchains(subset(sim$beta, chains=1:2))
-#' ndraws(subset(sim$beta, draws=sample(1:ndraws(sim), 100)))
-#' nvars(subset(sim$u, vars=1:2))
+#' n_chains(subset(sim$beta, chains=1:2))
+#' n_draws(subset(sim$beta, draws=sample(1:n_draws(sim), 100)))
+#' n_vars(subset(sim$u, vars=1:2))
 #' }
 #'
 #' @param obj an mcdraws object or a draws component (dc) object.
 #' @param dc a draws component object.
 #' @returns The number of chains or retained samples per chain or
 #'  the number of variables.
-#' @name nchains-ndraws-nvars
+#' @name n_chains-n_draws-n_vars
 NULL
 
 #' @export
-#' @rdname nchains-ndraws-nvars
-nchains <- function(obj) {
+#' @rdname n_chains-n_draws-n_vars
+n_chains <- function(obj) {
   switch(class(obj)[1L],
-    mcdraws = obj[["_info"]]$n.chain,
+    mcdraws = obj[["_info"]][["n.chain"]],
     dc=, list = length(obj),  # NB object not necessarily (yet) of class 'dc' when called from MCMCsim
     stop("unexpected input")
   )
 }
 
 #' @export
-#' @rdname nchains-ndraws-nvars
-ndraws <- function(obj) {
+#' @rdname n_chains-n_draws-n_vars
+n_draws <- function(obj) {
   switch(class(obj)[1L],
-    mcdraws = obj[["_info"]]$n.draw,
+    mcdraws = obj[["_info"]][["n.draw"]],
     dc=, list = dim(obj[[1L]])[1L],
     stop("unexpected input")
   )
 }
 
 #' @export
-#' @rdname nchains-ndraws-nvars
-nvars <- function(dc) dim(dc[[1L]])[2L]
+#' @rdname n_chains-n_draws-n_vars
+n_vars <- function(dc) dim(dc[[1L]])[2L]
 
 #' Compute MCMC diagnostic measures
 #'
@@ -1094,10 +1113,10 @@ NULL
 #' @rdname MCMC-diagnostics
 # adapted from code in R package rstan
 R_hat <- function(dc) {
-  n.var <- nvars(dc)
-  n.draw <- ndraws(dc)
+  n.var <- n_vars(dc)
+  n.draw <- n_draws(dc)
   if (n.draw < 1L) stop("no draws in simulation object")
-  n.chain <- nchains(dc)
+  n.chain <- n_chains(dc)
   if (n.chain < 2L) stop("at least 2 chains required for R_hat diagnostic")
   split <- n.draw %/% 2L  # split in two halves
   part1 <- seq_len(split)
@@ -1119,9 +1138,9 @@ R_hat <- function(dc) {
 #' @rdname MCMC-diagnostics
 # based on code from package rstan
 n_eff <- function(dc, useFFT=TRUE, lag.max, cl=NULL) {
-  n.chain <- nchains(dc)
-  n.var <- nvars(dc)
-  n.draw <- ndraws(dc)
+  n.chain <- n_chains(dc)
+  n.var <- n_vars(dc)
+  n.draw <- n_draws(dc)
   if (n.draw < 2L) return(rep.int(NA_real_, n.var))
   if (missing(lag.max)) {
     lag.max <- n.draw - 1L
@@ -1135,7 +1154,7 @@ n_eff <- function(dc, useFFT=TRUE, lag.max, cl=NULL) {
   }
   # function to compute autocovariance function summed over (a subset of) chains
   compute_acov_sum <- function(dc) {
-    n.chain <- nchains(dc)
+    n.chain <- n_chains(dc)
     acov <- matrix(0, lag.max + 1L, n.var, dimnames=list(NULL, labels.dc(dc)))
     # TODO allow to use split chains
     for (ch in seq_len(n.chain)) {
@@ -1149,12 +1168,11 @@ n_eff <- function(dc, useFFT=TRUE, lag.max, cl=NULL) {
     }
     acov
   }
-  if (is.null(cl)) {
+  if (is.null(cl))
     acov <- compute_acov_sum(dc) / n.chain
-  } else {
+  else
     acov <- Reduce(`+`, parallel::parLapply(cl, split_chains(dc, length(cl)), compute_acov_sum)) / n.chain
-  }
-  chain_means <- sapply(dc, .colMeans, n.draw, n.var)  # n.var x n.chain matrix
+  chain_means <- vapply(dc, .colMeans, numeric(n.var), n.draw, n.var)  # n.var x n.chain matrix
   if (n.var == 1L) chain_means <- matrix(chain_means, ncol=n.chain)
   var_plus <- acov[1L, ]
   mean_var <- var_plus * n.draw / (n.draw - 1L)
@@ -1240,13 +1258,13 @@ get_means <- function(obj, vnames=NULL) {
   # first extract mean only components and average over chains
   out <- obj[["_means"]]
   if (length(out) && !is.null(vnames)) out <- out[names(out) %in% vnames]
-  nc <- nchains(obj)
+  nc <- n_chains(obj)
   if (length(out))
     for (v in seq_along(out)) out[[v]] <- Reduce(`+`, out[[v]]) / nc
   # append posterior means of draws components
   if (is.null(vnames)) vnames <- par_names(obj)
   vnames <- vnames[!(vnames %in% names(out)) & vnames %in% par_names(obj)]
-  ni <- ndraws(obj)  # draws per chain
+  ni <- n_draws(obj)  # draws per chain
   c(out, lapply(obj[vnames], function(x) Reduce(`+`, lapply(x, function(ch) .colMeans(ch, ni, ncol(ch)))) / nc))
 }
 
@@ -1256,8 +1274,8 @@ get_sds <- function(obj, vnames=NULL) {
   out <- obj[["_sds"]]
   if (length(out) && !is.null(vnames)) out <- out[names(out) %in% vnames]
   if (length(out)) {
-    nc <- nchains(obj)
-    ni <- ndraws(obj)
+    nc <- n_chains(obj)
+    ni <- n_draws(obj)
     # include between-chain component
     for (v in names(out))
       out[[v]] <- sqrt((1/(nc*ni - 1L))*((ni - 1L)*rowSums(do.call(cbind, out[[v]])^2) + ni*(nc - 1L)*apply(do.call(cbind, obj[["_means"]][[v]]), 1L, var)))
@@ -1316,10 +1334,10 @@ get_draw <- function(obj, iter, chain) {
 transform_dc <- function(..., fun, to.matrix=FALSE, labels=NULL) {
   objs <- list(...)
   nobj <- length(objs)
-  nc <- nchains(objs[[1L]])
-  ni <- ndraws(objs[[1L]])
+  nc <- n_chains(objs[[1L]])
+  ni <- n_draws(objs[[1L]])
   fun <- match.fun(fun)
-  if (length(formals(fun)) != nobj) stop("'fun' must have as many arguments as there are input objects")
+  if (length(formals(args(fun))) != nobj) stop("'fun' must have as many arguments as there are input objects")
   # TODO check that all objs have same number of chains, draws
   test <- do.call(fun, lapply(objs, function(x) x[[1L]][1L, ]))
   if (!is.vector(test)) stop("'fun' should return a vector")

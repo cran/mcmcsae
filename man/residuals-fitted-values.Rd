@@ -10,8 +10,8 @@
   object,
   mean.only = FALSE,
   units = NULL,
-  chains = seq_len(nchains(object)),
-  draws = seq_len(ndraws(object)),
+  chains = seq_len(n_chains(object)),
+  draws = seq_len(n_draws(object)),
   matrix = FALSE,
   type = c("link", "response"),
   ...
@@ -21,8 +21,8 @@
   object,
   mean.only = FALSE,
   units = NULL,
-  chains = seq_len(nchains(object)),
-  draws = seq_len(ndraws(object)),
+  chains = seq_len(n_chains(object)),
+  draws = seq_len(n_draws(object)),
   matrix = FALSE,
   ...
 )

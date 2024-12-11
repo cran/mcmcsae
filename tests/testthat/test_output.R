@@ -14,7 +14,7 @@ test_that("output of create_sampler and MCMCsim is as expected", {
   expect_identical(sort(par_names(sim)), c("beta", "llh_", "sigma_"))
   expect_is(n_eff(sim$beta), "numeric")
   expect_is(R_hat(sim$beta), "numeric")
-  expect_is(subset(sim$beta, vars=1L, chains=2:1, draws=c(100:ndraws(sim$beta))), "dc")
+  expect_is(subset(sim$beta, vars=1L, chains=2:1, draws=c(100:n_draws(sim$beta))), "dc")
   expect_is(get_means(sim), "list")
   expect_is(get_sds(sim), "list")
   summ <- summary(sim)

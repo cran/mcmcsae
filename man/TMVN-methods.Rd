@@ -10,16 +10,11 @@
 \title{Functions for specifying the method and corresponding options for sampling
 from a possibly truncated and degenerate multivariate normal distribution}
 \usage{
-m_direct()
+m_direct(use.cholV = NULL)
 
-m_Gibbs(slice = FALSE, diagnostic = FALSE, debug = FALSE)
+m_Gibbs(slice = FALSE, eps = sqrt(.Machine$double.eps), diagnostic = FALSE)
 
-m_HMC(
-  Tsim = pi/2,
-  max.events = .Machine$integer.max,
-  diagnostic = FALSE,
-  debug = FALSE
-)
+m_HMC(Tsim = pi/2, max.events = .Machine$integer.max, diagnostic = FALSE)
 
 m_HMCZigZag(
   Tsim = 1,
@@ -27,8 +22,7 @@ m_HMCZigZag(
   prec.eq = NULL,
   diagnostic = FALSE,
   max.events = .Machine$integer.max,
-  adapt = FALSE,
-  debug = FALSE
+  adapt = FALSE
 )
 
 m_softTMVN(
@@ -36,19 +30,21 @@ m_softTMVN(
   useV = FALSE,
   CG = NULL,
   PG.approx = TRUE,
-  PG.approx.m = -2L,
-  debug = FALSE
+  PG.approx.m = -2L
 )
 }
 \arguments{
+\item{use.cholV}{whether to use the Cholesky factor of the variance instead
+of precision matrix for sampling. If \code{NULL} the choice is made based on a
+simple heuristic.}
+
 \item{slice}{if \code{TRUE}, a Gibbs within slice sampler is used.}
+
+\item{eps}{small positive value to control numerical robustness of the algorithm.}
 
 \item{diagnostic}{whether information about violations of inequalities, bounces
 off inequality walls (for 'HMC' and 'HMCZigZag' methods) or gradient events
 (for 'HMCZigZag') is printed to the screen.}
-
-\item{debug}{if \code{TRUE} a breakpoint is set at the beginning of the TMVN sampling
-function. Mainly intended for developers.}
 
 \item{Tsim}{the duration of a Hamiltonian Monte Carlo simulated particle trajectory.
 This can be specified as either a single positive numeric value for a fixed
@@ -71,7 +67,7 @@ to control the precision with which the equality restrictions are imposed; the l
 in an attempt to make the sampling algorithm more efficient.}
 
 \item{sharpness}{for method 'softTMVN', the sharpness of the soft inequalities; the larger the better
-the approximation of exact inequalities. It must a positive numeric vector of length
+the approximation of exact inequalities. It must be a positive numeric vector of length
 one or the number of inequality restrictions.}
 
 \item{useV}{for method 'softTMVN' whether to base computations on variance instead of precision

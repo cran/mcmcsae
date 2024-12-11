@@ -246,13 +246,14 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// add_vector
-void add_vector(Eigen::Map<Eigen::VectorXd>& x, const Eigen::Map<Eigen::VectorXd>& y);
-RcppExport SEXP _mcmcsae_add_vector(SEXP xSEXP, SEXP ySEXP) {
+// v_update
+void v_update(Eigen::Map<Eigen::VectorXd>& y, const bool plus, const Eigen::Map<Eigen::VectorXd>& x);
+RcppExport SEXP _mcmcsae_v_update(SEXP ySEXP, SEXP plusSEXP, SEXP xSEXP) {
 BEGIN_RCPP
-    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type x(xSEXP);
-    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type y(ySEXP);
-    add_vector(x, y);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const bool >::type plus(plusSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type x(xSEXP);
+    v_update(y, plus, x);
     return R_NilValue;
 END_RCPP
 }

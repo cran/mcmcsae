@@ -66,7 +66,7 @@ double Crtuvn(const double l, const double u) {
 //’ @param v start value.
 //’ @param Ut dense matrix encoding the inequality constrained linear combinations.
 //’ @param ustar vector encoding the (initial) lower bounds corresponding to Ut.
-//’ @param eps small numerical value to stabilize the Gibbs sampler.
+//’ @param eps small positive value to control the numerical stability of the Gibbs sampler.
 //’ @returns A single draw from the standardized multivariate truncated normal distribution.
 //’ @references
 //’  Y. Li and S.K. Ghosh (2015). Efficient sampling methods for truncated multivariate normal
