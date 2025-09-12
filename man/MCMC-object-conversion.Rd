@@ -43,7 +43,7 @@ Finally, use \code{to_draws_array} to convert either a draws component or
 as defined in package \pkg{posterior}.
 }
 \examples{
-\donttest{
+\dontrun{
 data(iris)
 sampler <- create_sampler(Sepal.Length ~ reg(~ Petal.Length + Species, name="beta"), data=iris)
 sim <- MCMCsim(sampler, burnin=100, n.chain=2, n.iter=200)

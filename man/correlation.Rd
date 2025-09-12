@@ -129,7 +129,7 @@ to be imposed on the coefficient vector.
 }
 }
 \examples{
-\donttest{
+\dontrun{
 # example of CAR spatial random effects
 if (requireNamespace("sf")) {
   # 1. load a shape file of counties in North Carolina

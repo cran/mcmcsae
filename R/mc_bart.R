@@ -59,8 +59,8 @@
 #'  memory.
 #' @param ... parameters passed to \code{\link[dbarts]{dbarts}}.
 #' @returns An object with precomputed quantities and functions for sampling from
-#'  prior or conditional posterior distributions for this model component. Intended
-#'  for internal use by other package functions.
+#'  prior or conditional posterior distributions for this model component,
+#'  intended for internal use by other package functions.
 #' @references
 #'  H.A. Chipman, E.I. Georgea and R.E. McCulloch (2010).
 #'    BART: Bayesian additive regression trees.
@@ -71,8 +71,14 @@
 #'    The Annals of Statistics 19, 1-67.
 brt <- function(formula, X=NULL, n.trees=75L,
                 name="", debug=FALSE, keepTrees=FALSE, ...) {
+  stop("function 'brt' should only be used inside a formula")
+}
 
-  e <- sys.frame(-2L)
+# additional argument e to pass sampler environment
+# in.block always FALSE for brt
+mc_brt <- function(formula, X=NULL, n.trees=75L,
+                   name="", debug=FALSE, keepTrees=FALSE,
+                   e, in.block, ...) {
   type <- "brt"
   if (name == "") stop("missing model component name")
 
@@ -88,10 +94,9 @@ brt <- function(formula, X=NULL, n.trees=75L,
   }
   X <- economizeMatrix(X, sparse=FALSE, strip.names=FALSE, check=TRUE)
   q <- ncol(X)
+  in.block <- FALSE
 
   control <- dbarts::dbartsControl(n.chains=1L, updateState=FALSE, n.trees=n.trees)
-
-  in_block <- FALSE
 
   name_sampler <- paste0(name, "_sampler_")  # trailing '_' --> not stored by MCMCsim even if store.all=TRUE
   lp <- function(p) copy_vector(p[[name]])
@@ -132,12 +137,18 @@ brt <- function(formula, X=NULL, n.trees=75L,
     p
   }
 
-  if (e$family$family == "multinomial") {
+  if (e$family[["family"]] == "multinomial") {
     edat <- new.env(parent = environment(formula))
     environment(formula) <- edat
   }
 
-  if (keepTrees) name_trees <- paste0(name, "_", "trees_")
+  if (keepTrees) {
+    name_trees <- paste0(name, "_", "trees_")
+    store.default <- name_trees
+  } else {
+    store.default <- NULL
+  }
+
   make_predict <- function(newdata=NULL, Xnew=NULL, verbose=TRUE) {
     if (is.null(newdata) && is.null(Xnew)) {
       # in-sample prediction
