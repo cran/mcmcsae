@@ -8,7 +8,7 @@ f_negbinomial(
   link = "log",
   shape.vec = ~1,
   inv.shape.prior = pr_invchisq(df = 1, scale = 1),
-  control = negbin_control()
+  control = negbinomial_control()
 )
 }
 \arguments{
@@ -26,7 +26,7 @@ i.e. the overdispersion parameter. Supported prior distributions are
 \code{\link{pr_gig}}. The current default is \code{pr_invchisq(df=1, scale=1)}.}
 
 \item{control}{a list with computational options. These options can
-be specified using function \code{\link{negbin_control}}.}
+be specified using function \code{\link{negbinomial_control}}.}
 }
 \value{
 A family object.
@@ -55,6 +55,50 @@ binomial regression, so that a Polya-Gamma data augmentation sampling
 algorithm can be employed. Note that the fact that the linear predictor
 \eqn{\eta} does not include \eqn{\log r} effectively changes the
 interpretation of its intercept.
+}
+\examples{
+\dontrun{
+# first generate some data based on a negative binomial structured additive regression model
+n <- 1200
+nT <- 50
+dat <- data.frame(
+  x = runif(n),
+  t = factor(sample(1:nT, n, replace=TRUE), levels=1:nT)
+)
+# generate randow walk over time t
+v <- cumsum(rnorm(nT, sd=0.1))
+v <- v - mean(v)  # subtract mean to separate random walk from intercept
+lp <- with(dat, 1 - 0.5*x + v[t])
+shape <- 2  # inverse negative binomial dispersion parameter
+dat$y <- rnbinom(n, size=shape, mu = shape * exp(lp))
+
+# now fit a negative binomial model to this data
+sampler <- create_sampler(
+  y ~ reg(~ x, name="beta") + gen(factor = ~ RW1(t), name="v"),
+  data=dat, family = f_negbinomial()
+)
+sim <- MCMCsim(sampler, store.all=TRUE, plot.trace=c("v_sigma", "negbin_shape_"))
+(summ <- summary(sim))
+loo(sim)
+bayesplot::mcmc_recover_intervals(as.array(sim$beta), c(1, -0.5))
+bayesplot::mcmc_scatter(as.array(sim$beta))
+bayesplot::mcmc_recover_hist(as.array(sim$negbin_shape_), shape)
+bayesplot::mcmc_recover_hist(as.array(sim$v_sigma), 0.1)
+plot.ts(v); lines(summ$v[, "Mean"], col=2)
+pred <- predict(sim, type="response")
+summpred <- summary(pred)
+# NB prediction with type="response" does not include factor shape
+plot(exp(lp), summpred[, "Mean"]); abline(0, 1)
+plot(dat$y, shape * summpred[, "Mean"]); abline(0, 1)
+mean(dat$y); shape * mean(summpred[, "Mean"])
+# posterior predictive p-values at the observation level:
+ppred <- predict(sim, ppcheck=TRUE)
+hist(attr(ppred, "ppp"))
+# NB the peak at 1 is due to zeros in the data:
+dat$y[attr(ppred, "ppp") == 1]
+# as Pr(y_rep >= y) = 1 by construction for these cases
+}
+
 }
 \references{
 N. Polson, J.G. Scott and J. Windle (2013).

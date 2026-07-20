@@ -69,14 +69,13 @@ print(summary(sim, "linpred_"), digits=6)
 
 ## ----fig.width=4, fig.height=4, fig.align="center", message=FALSE---------------------------------
 sampler <- create_sampler(
-  model,
-  family = f_gaussian(var.model = ~vfac(prior=pr_invchisq(df="modeled"))),
+  model, family="student_t",
   linpred=list(reg1=matrix(XpopR, nrow=1)),
   data=apisrs, compute.weights=TRUE
 )
-sim <- MCMCsim(sampler, burnin=1000, n.iter=5000, thin=2, verbose=FALSE)
+sim <- MCMCsim(sampler, burnin=1000, n.iter=4000, thin=2, verbose=FALSE)
 (summ <- summary(sim))
-plot(sim, "vfac1_df")
+plot(sim, "student_t_df")
 acceptance_rates(sim)
 compute_DIC(sim)
 predictions <- predict(sim, newdata=apipop[-m, ], show.progress=FALSE,

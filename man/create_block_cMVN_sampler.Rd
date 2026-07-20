@@ -10,9 +10,9 @@ create_block_cMVN_sampler(
   Q,
   R = NULL,
   r = NULL,
-  sampler,
+  fam,
   name = "x",
-  chol.control
+  control
 )
 }
 \arguments{
@@ -26,11 +26,11 @@ create_block_cMVN_sampler(
 
 \item{r}{rhs vector for equality constraints \eqn{R'x = r}, where \eqn{R'} denotes the transpose of R.}
 
-\item{sampler}{sampler object as created by \code{\link{create_sampler}}.}
+\item{fam}{family object.}
 
 \item{name}{name of the cMVN vector parameter.}
 
-\item{chol.control}{options for Cholesky decomposition, see \code{\link{chol_control}}.}
+\item{control}{list with numerical control options, which can be set using function \code{\link{cMVN_control}}.}
 }
 \value{
 An environment with precomputed quantities and functions for sampling

@@ -115,7 +115,8 @@ formulas <- list(
   ~ x*t, ~ I(x*t), ~ x + t*f1*f2 + f1*f2*f3,
   ~ 0 + t:x:f1:f2,
   ~ 0 + f1:z, ~ 0 + f1:z0, ~ 0 + f1:z1,
-  ~ f2:z + f2*f1*z + f3:f1*z*z0 + z + z0 + z1 + z1*z:f2
+  ~ f2:z + f2*f1*z + f3:f1*z*z0 + z + z0 + z1 + z1*z:f2,
+  ~ f1*scale(exp(x))  # NB scale returns single column matrix
 )
 test_that("many special case formulas work", {
   for (mod in formulas) {
@@ -126,6 +127,13 @@ test_that("many special case formulas work", {
   }
   expect_error(model.matrix(~ f4, data))
   expect_warning(model_matrix(~ f4, data))
+})
+
+test_that("standardise_formula works", {
+  f <- ~ x + z + gen(~ 1 + x, factor = ~ RW1(t))
+  fs <- standardise_formula(f)
+  expect_equal(fs, ~reg(~x + z) + gen(~1 + x, factor = ~RW1(t)))
+  expect_equal(standardise_formula(fs), fs)  # idempotent
 })
 
 data <- data.frame(

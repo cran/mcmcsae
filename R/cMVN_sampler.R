@@ -1,6 +1,7 @@
 
 #' Set up a function for direct sampling from a constrained multivariate normal distribution
 #'
+#'
 #' @export
 #' @param D factor of precision matrix Q such that Q=D'D.
 #' @param Q precision matrix.
@@ -8,6 +9,7 @@
 #' @param R equality restriction matrix.
 #' @param r rhs vector for equality constraints \eqn{R'x = r}, where \eqn{R'} denotes the transpose of R.
 #' @param eps1 scalar parameter to control numerical robustness against singularity of Q.
+#'  Currently ignored in case of no constraints.
 #' @param eps2 scalar parameter associated with the constraint part to control numerical robustness.
 #' @param chol.control options for Cholesky decomposition, see \code{\link{chol_control}}.
 #' @returns An environment with precomputed quantities and a method 'draw' for sampling
@@ -81,7 +83,7 @@ create_cMVN_sampler <- function(D=NULL, Q=NULL, update.Q=FALSE, R=NULL, r=NULL,
       )
     }
   }
-  rhs <- c(rep.int(0, q), r)
+  rhs <- c(numeric(q), r)
   Iq <- seq_len(q)
   if (update.Q) {
     if (is.null(R)) {
@@ -118,34 +120,32 @@ create_cMVN_sampler <- function(D=NULL, Q=NULL, update.Q=FALSE, R=NULL, r=NULL,
 #' @param Q precision matrix.
 #' @param R equality restriction matrix.
 #' @param r rhs vector for equality constraints \eqn{R'x = r}, where \eqn{R'} denotes the transpose of R.
-#' @param sampler sampler object as created by \code{\link{create_sampler}}.
+#' @param fam family object.
 #' @param name name of the cMVN vector parameter.
-#' @param chol.control options for Cholesky decomposition, see \code{\link{chol_control}}.
+#' @param control list with numerical control options, which can be set using function \code{\link{cMVN_control}}.
 #' @returns An environment with precomputed quantities and functions for sampling
 #'   from a multivariate normal distribution subject to equality constraints.
-create_block_cMVN_sampler <- function(mbs, X, Q, R=NULL, r=NULL, sampler, name="x", chol.control) {
+create_block_cMVN_sampler <- function(mbs, X, Q, R=NULL, r=NULL, fam, name="x", control) {
 
   if (name == "") stop("empty name")
 
-  chol.control[["LDL"]] <- TRUE
+  chol.control <- control[["chol.control"]]
   smplr <- create_cMVN_sampler(D=NULL, Q=Q, update.Q=TRUE, R=R, r=r,
-    eps1=.tol, eps2=.tol, chol.control=chol.control
+    eps1=control[["eps1"]], eps2=control[["eps2"]], chol.control=chol.control
   )
   update <- function(Q, Imult=0) smplr$update(Q, Imult)
 
-  ## X, QT passed from block's draw function
+  # Xy is rhs, i.e. X' Qn ytilde (+ possibly prior reg term)
+  # for multi-response family there is no global sigma_ parameter
   draw <- function(p, Xy, X) {
-
-    # Xy is rhs, i.e. X' Qn ytilde (+ possibly prior reg term)
     if (is.null(p[["sigma_"]])) sigma <- 1 else sigma <- p[["sigma_"]]
-    u <- Xy + sigma * crossprod_mv(X, sampler$drawMVNvarQ(p))
+    u <- Xy + sigma * crossprod_mv(X, fam$drawMVNvarQ(p))
     for (mc in mbs) {
       if (mc[["type"]] == "gen")
         u[mc$block.i] <- u[mc$block.i] + sigma^2 * mc$drawMVNvarQ(p)
       else if (mc[["informative.prior"]])
         u[mc$block.i] <- u[mc$block.i] + sigma * mc$drawMVNvarQ(p)
     }
-
     p[[name]] <- smplr$draw(u)
     p
   }
@@ -186,4 +186,28 @@ sim_marg_var <- function(D, Q=NULL, R=NULL, r=NULL, eps1=1e-9, eps2=1e-9, nSim=1
   res <- matrix(NA_real_, ncol(D), nSim)
   for (i in seq_len(nSim)) res[, i] <- smplr$draw()
   rowVarsC(res)
+}
+
+#' Set options for fast sampling from a degenerate multivariate normal distribution
+#'
+#' @export
+#' @param eps1 scalar parameter to control numerical robustness against singularity of Q.
+#' @param eps2 scalar parameter associated with the constraint part to control numerical robustness.
+#' @param chol.control options for Cholesky decomposition, see \code{\link{chol_control}}.
+#' @returns A list of options used by the constrained MVN sampler.
+cMVN_control <- function(eps1=sqrt(.Machine$double.eps), eps2=sqrt(.Machine$double.eps),
+                         chol.control=chol_control()) {
+  list(eps1=eps1, eps2=eps2, chol.control=chol.control)
+}
+
+# a manually specified list of control options might not be complete or consistent --> check it
+check_cMVN_control <- function(control) {
+  if (is.null(control)) control <- list()
+  if (!is.list(control)) stop("control options must be specified as a list, preferably using the appropriate control setter function")
+  defaults <- cMVN_control()
+  w <- whichv(names(control) %in% names(defaults), FALSE)
+  if (length(w)) stop("unrecognized control parameters ", paste0(names(control)[w], collapse=", "))
+  control <- modifyList(defaults, control, keep.null=TRUE)
+  control$chol.control <- check_chol_control(control[["chol.control"]])
+  control
 }
